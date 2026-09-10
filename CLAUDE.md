@@ -25,6 +25,9 @@ from five onboarding answers, then tracks every set. One athlete, fixed home-gym
 ## Working agreements
 
 - **Discuss before building.** Propose the plan, get agreement, then implement. Milestone scope is agreed in conversation.
+- **Xcode GUI steps are the user's.** For the wizard, signing, targets, or schemes, give numbered click-by-click
+  directions naming the exact control, ask for a screenshot when unsure, and verify the result afterward with
+  read-only greps on `project.pbxproj`.
 - The user is a senior React/TypeScript/Node developer new to Swift. When introducing a Swift or SwiftUI concept,
   add a one-line note mapping it to the React equivalent (`@State` ≈ `useState`, `@Environment` ≈ context,
   `@Observable` ≈ store, `.task {}` ≈ effect on mount). Prefer readable Swift over clever Swift.

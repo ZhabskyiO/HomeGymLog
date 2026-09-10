@@ -194,7 +194,39 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
 - Streak counts consecutive completed scheduled sessions backward from today; today's unfinished session
   does not break it.
 
+## Agent tuning
+
+- 2026-09-10 — **researcher**: its "no `@MainActor` needed in tests" finding was true for raw `ModelContext` but
+  was quoted broadly and became a plan defect (persistence suites calling app-target types under MainActor
+  default isolation). Findings must state the exact configuration they were verified under, including build
+  settings and which target the calling code lives in.
+- 2026-09-10 — **spec-creator**: first draft specified shift/skip as mutations on `@Model` rows and used
+  `precondition` for input validation; the architecture reviewer caught both. It now reads the Engine/Model
+  boundary decision from INSIGHTS, but the agent prompt should say it directly. Strength: it corrected a wrong
+  worked example given in its prompt and flagged that the prototype has no A1/B3 labels; keep asking it for
+  worked numbers.
+- 2026-09-10 — **implementation-planner**: referenced a fixture (`exampleAInputs`) no step declared, and a log
+  file the BUILD shorthand never wrote; verifier findings F2/F3. Every helper, file, or artifact a step uses
+  must be introduced in that step or an earlier one.
+- 2026-09-10 — **plan-verifier**: the rewritten AC-traceability version found the one blocking issue (test
+  isolation) that would have been a compile error at Step 6. Two rounds sufficed. Cost is ~110k tokens per
+  full run; scope re-runs to finding ids. A rate-limit kill mid-run is safe to relaunch from scratch.
+- 2026-09-10 — **test-writer** and **swift-reviewer** needed no re-prompt. The reviewer's `precondition` →
+  `guard` finding on `skip` was worth applying; its "occupied day" observation was recorded as an M4 decision.
+- 2026-09-10 — **doc-writer** adds `///` comments to Swift files; always build once after it runs.
+- 2026-09-10 — **process**: resuming an agent with SendMessage for a revision (spec-creator ×2, planner ×1,
+  verifier ×1) kept its context and produced tighter revisions than a fresh launch. Launching researcher and
+  spec-creator in parallel at the start of `/milestone` saved a full round.
+
 ## Patterns
+
+### 2026-09-10 — Verify UI on the simulator by screenshot, not by eye
+Build, install, launch, then `xcrun simctl io <udid> screenshot build/shot.png` and read the PNG (the Read
+tool renders images). Toggle appearance with `xcrun simctl ui <udid> appearance dark|light` and re-shoot; crop
+a region with `sips -c <h> <w> --cropOffset <y> <x>` when a system banner covers part of the screen. Resolve the
+udid with `xcrun simctl list devices available -j` filtered by runtime and name, since names repeat across
+runtimes. This caught the pill geometry and both themes in M1 without opening Xcode. Kill and relaunch with
+`simctl terminate` / `simctl launch` for resume checks.
 
 ### 2026-09-10 — Test fixtures: fixed calendar, fresh in-memory store per test, one sample-graph helper
 `HomeGymLogTests/Support/` holds three pieces every suite reuses. `TestCalendar.calendar` is Gregorian,

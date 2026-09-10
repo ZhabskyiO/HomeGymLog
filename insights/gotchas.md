@@ -56,6 +56,18 @@ new bites: what happened, the fix, and how to recognize it next time. Date each 
 
 ## Xcode / build
 
+- 2026-09-10 — **Xcode 26's App wizard defaults need five corrections** before the project matches the plan:
+  it creates iPhone + iPad + Mac + Apple Vision destinations (remove all but iPhone under General →
+  Supported Destinations; that also drops the macOS App Sandbox capability); the Minimum Deployments dropdown
+  only offers installed SDK versions, so 17.0 must be typed (the wizard leaves 17.6 on the app and 26.5 on the
+  test target, and the test target must be set too or tests cannot run on the 17.5 simulator); the wizard
+  appends a `<ProductName>/` folder to the chosen location, so create it anywhere and move
+  `HomeGymLog.xcodeproj`, `HomeGymLog/`, `HomeGymLogTests/` into the repo root (paths are relative, no pbxproj
+  edit); ticking Shared in Manage Schemes can silently not persist, so copy
+  `xcuserdata/<user>.xcuserdatad/xcschemes/HomeGymLog.xcscheme` to `xcshareddata/xcschemes/`; deleting the
+  UITests target does not delete its folder (Move to Trash separately). Verify everything read-only with
+  `grep` on `project.pbxproj` before building.
+
 - 2026-09-09 — A `.swift` file outside `HomeGymLog/` or `HomeGymLogTests/` is in no target and silently
   ignored; one in the wrong folder lands in the wrong target. Symptom: "cannot find X in scope". Fix: move the
   file. Never edit `project.pbxproj` by hand for membership.

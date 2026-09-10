@@ -28,7 +28,9 @@ Write the spec to `docs/specs/<milestone-or-feature>.md` with these sections:
 8. **Acceptance criteria.** Numbered, each verifiable on a simulator or by a unit test.
 9. **Open questions.** Only things the prototype and decisions do not settle. Propose a default for each.
 
-Rules: describe behavior, not implementation. No SwiftUI view names, no code. Where the prototype is
+Rules: describe behavior, not implementation. No SwiftUI view names, no code. Engine functions are
+specified over plain values with an explicit calendar and reference date, never as mutations on stored
+rows; input validation throws a typed error, never traps. Where the prototype is
 ambiguous or does nothing (the missed-day shift button, for example), say so and apply the recorded
 decision. Do not invent features the prototype does not show. Do not edit any file other than the spec.
 

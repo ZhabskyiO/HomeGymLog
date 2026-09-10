@@ -26,7 +26,9 @@ Produce a plan at `docs/plans/<milestone-or-feature>.md` with these sections:
    mitigation for each.
 6. **Definition of done.** A checklist the user can verify on the simulator or device.
 
-Constraints: no new dependencies or entitlements unless the spec approved them. Pure Engine code, views
+Constraints: no new dependencies or entitlements unless the spec approved them. Every helper, fixture,
+file, or artifact a step uses must be declared in that step or an earlier one, and every verify command
+may read only files an earlier command writes. Pure Engine code, views
 separate. Prefer the smallest plan that fully meets the spec. Do not write Swift code beyond signatures
 and short illustrative snippets. Do not edit any file other than the plan.
 

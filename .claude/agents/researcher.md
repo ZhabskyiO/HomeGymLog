@@ -21,6 +21,9 @@ For each question:
    assuming versions.
 5. Give a minimal, correct code example that compiles against iOS 17 when the question is "how do I".
    Mark anything you could not verify as unverified.
+6. State the exact configuration every claim was verified under: OS runtime, build settings (language
+   mode, default actor isolation), and which target the calling code lives in. A claim verified for one
+   target does not transfer to another; say so explicitly.
 
 Do not modify project files. Do not pad with background the user did not ask for.
 
