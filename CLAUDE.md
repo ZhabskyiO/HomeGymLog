@@ -3,7 +3,7 @@
 Free iPhone-only workout app. Display name **HomeGymLog**, bundle id **com.zhabskyi.homegymlog**.
 The design prototype calls it "Benchmark"; that name is not used in the app. Generates a phased strength program (Foundation → Build → Peak → Deload)
 from five onboarding answers, then tracks every set. One athlete, fixed home-gym equipment
-(dumbbells ≤55 lb, adjustable bench, Marcy 150 lb stack). Never charges users; no backend.
+(dumbbells 5–52.5 lb in 2.5 lb steps, adjustable bench, Marcy MWM-8147 150 lb stack in 10 lb plates). Never charges users; no backend.
 
 ## Stack (decided 2026-09-09, do not relitigate)
 
@@ -64,7 +64,8 @@ Skills (`.claude/skills/README.md`): `/milestone <name>` runs that flow up to pl
 
 ## Commands
 
-Filled in once the Xcode project exists. Expected shape:
+The Xcode project is created once through Xcode's wizard; `HomeGymLog/` and `HomeGymLogTests/` are synchronized
+folders, so any `.swift` file written under them is compiled with no project-file edits. Never hand-edit `project.pbxproj`.
 
 ```
 xcodebuild -scheme HomeGymLog -destination 'platform=iOS Simulator,name=iPhone 16' build

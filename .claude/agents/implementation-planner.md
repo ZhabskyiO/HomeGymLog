@@ -16,8 +16,10 @@ Produce a plan at `docs/plans/<milestone-or-feature>.md` with these sections:
    default, stating it.
 3. **Steps.** An ordered list. Each step names the files to create or change, the types and functions
    involved with their signatures, the tests that cover the step, and how to verify it (a command or a
-   simulator action). Order steps so the project builds and tests pass after every step. Put Engine
-   logic and its tests before views that use it. Keep each step small enough to review as one diff.
+   simulator action), and the spec acceptance criteria it discharges as `AC-N` ids (every AC must appear
+   in at least one step; list any AC you deliberately exclude under "Goal and scope" with the reason).
+   Order steps so the project builds and tests pass after every step. Put Engine logic and its tests
+   before views that use it. Keep each step small enough to review as one diff.
 4. **Data model changes.** Any SwiftData model added or altered, with fields, types, units, and
    relationships. Flag migration impact.
 5. **Risks and gotchas.** Anything from `insights/gotchas.md` that applies, plus new risks with a
