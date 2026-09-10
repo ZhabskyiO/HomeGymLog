@@ -1,35 +1,54 @@
 ---
 name: milestone
-description: Drive the agent flow for one named milestone or feature: research if needed, spec, architecture review, plan, plan verification, then stop for the user's approval before any code. Usage: /milestone <name or number>.
+description: Drive the agent flow for one milestone or one feature slice of it: research if needed, spec, architecture review, plan, plan verification, then stop for the user's approval before any code. Saves every agent report under docs/reviews/. Usage: /milestone <number> [slice-name], e.g. /milestone 2 onboarding.
 ---
 
-Run the pre-implementation pipeline for the milestone given as the argument. Do not write production
-code in this skill. The output is an approved spec and a verified plan.
+Run the pre-implementation pipeline for the milestone (or slice) given as the argument. Do not write
+production code in this skill. The output is an approved spec and a verified plan, plus the agent reports
+on disk.
+
+## Slices
+
+A milestone with more than one screen or flow is run as slices, one pipeline per slice, in the order
+the milestone list in `CLAUDE.md` implies (for M2: `onboarding`, then `home`, then `program-tab`, each
+depending on the previous). A slice slug is `m<N>-<slice>` (e.g. `m2-onboarding`). The first slice's spec
+carries the milestone-wide decisions; later slices reference it instead of restating. Ask the user with a
+multiple-choice question when the slicing is not obvious.
 
 ## Steps
 
-1. Resolve the milestone from the argument against the list in `CLAUDE.md`. If it is ambiguous, ask
-   with a multiple-choice question. Derive a short slug (e.g. `m1-skeleton-engine`).
-2. Read `CLAUDE.md`, `insights/INSIGHTS.md`, and `insights/gotchas.md`. Note any platform question the
-   milestone raises (an API, an entitlement, an iOS 17 availability doubt).
-3. If there are platform questions, launch `researcher` with them. Record findings that matter in
-   `insights/` via `doc-writer`, or directly if a one-liner.
-4. Launch `spec-creator` for the milestone → `docs/specs/<slug>.md`. Read the spec. Present the open
-   questions to the user as multiple-choice questions with a recommended default. Fold answers back
-   into the spec (edit the file yourself; it is small) and record new decisions in `insights/INSIGHTS.md`.
-5. Launch `architecture-reviewer` on the spec. If the verdict is rework, fix the spec and re-run once.
-   Surface anything blocking to the user.
+1. Resolve the milestone and slice from the argument against `CLAUDE.md`. Derive the slug. Create the
+   branch `git switch -c <slug>` from `main` (if it exists, switch to it). Work stays on the branch until
+   `/pr-self-review` and merge.
+2. Read `CLAUDE.md`, `insights/INSIGHTS.md`, `insights/gotchas.md`, and any earlier spec of the same
+   milestone under `docs/specs/`. Note any platform question the slice raises (an API, an entitlement, an
+   iOS 17 availability doubt). Skip `researcher` when there are none.
+3. If there are platform questions, launch `researcher` with them and, in parallel, `spec-creator` (step
+   4); they are independent. Save the researcher's reply verbatim to
+   `docs/reviews/<slug>-researcher.md`. Record findings that matter in `insights/`.
+4. Launch `spec-creator` for the slice → `docs/specs/<slug>.md`. For a UI slice the brief must name the
+   prototype snapshots it covers, require a `-seed` launch state per screen (M2 adds the seeder; specs
+   state which seed shows which screen), and require screenshot-based acceptance criteria that
+   `/design-compare` can check. Read the spec. Present its open questions to the user as multiple-choice
+   questions with a recommended default, batched. Fold answers into the spec and record decisions in
+   `insights/INSIGHTS.md`.
+5. Launch `architecture-reviewer` on the spec. Save its reply to `docs/reviews/<slug>-architecture.md`.
+   If the verdict is rework, fix the spec (resume the same `spec-creator` agent with SendMessage so it
+   keeps context) and re-run once. Surface anything blocking to the user.
 6. Launch `implementation-planner` → `docs/plans/<slug>.md`.
-7. Launch `plan-verifier` on the plan. If not PASS, fix the plan (re-run the planner with the findings,
-   or edit directly for small fixes) and re-verify. Maximum three rounds; after that, show the user the
-   remaining findings and ask how to proceed.
-8. Stop. Present to the user: spec path, plan path, the step list in five lines or fewer, definition of
-   done, risks, and any question only they can answer. Ask for approval to implement. Do not implement
-   inside this skill.
+7. Launch `plan-verifier` on the plan. Save its reply to `docs/reviews/<slug>-verifier-<round>.md`. If
+   not PASS, fix the plan (resume the planner with the finding ids) and re-verify scoped to those ids.
+   Maximum three rounds; after that, show the user the remaining findings and ask how to proceed.
+8. Commit the spec, plan and reviews on the branch (`git add docs insights && git commit`).
+9. Stop. Present to the user: branch, spec path, plan path, the step list in five lines or fewer,
+   definition of done, risks, and any question only they can answer. Ask for approval to implement. Do
+   not implement inside this skill.
 
 ## Rules
 
 - Batch questions to the user; do not ask one at a time.
-- Every agent gets the milestone slug and file paths explicitly in its prompt.
+- Every agent gets the slug and file paths explicitly in its prompt.
+- Resume an agent with SendMessage for revisions instead of launching a fresh one; it keeps context.
 - If an agent's output is weak, say so and re-run with a sharper prompt rather than patching around it.
-  Note what was weak; `engineering-insight` will use it.
+  Note what was weak; `/engineering-insight` will use it.
+- A rate-limit failure mid-agent is safe to relaunch from scratch.

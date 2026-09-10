@@ -18,7 +18,8 @@ with confidence.
    `insights/INSIGHTS.md`. Pounds canonical, static library, sets written immediately, pure Engine, no
    new dependency or entitlement, no "Benchmark" in UI strings.
 5. **Tests.** Run the `run-tests` skill. Map each Engine change to a test; list untested logic.
-6. **Code.** Launch `swift-reviewer` on the diff. Then scan for leftovers: `print(`, `TODO`, `FIXME`,
+6. **Code.** Launch `swift-reviewer` on the diff (or reuse `docs/reviews/<slug>-swift-review.md` from
+   `/ship-check` if the diff has not changed since). Then scan for leftovers: `print(`, `TODO`, `FIXME`,
    force unwraps in new code, commented-out code, unused files, `#if DEBUG` that should not ship.
 7. **Docs.** Confirm `insights/`, `CLAUDE.md` commands and layout, and the spec/plan status lines reflect
    the change. Launch `doc-writer` if not.
@@ -45,4 +46,5 @@ Unplanned changes, decisions made, follow-ups.
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 ```
 
-Ask before running `gh pr create`.
+Ask before running `gh pr create`. After merge, `/learning-notes <slug>` writes the study note for the
+slice and `/engineering-insight` harvests the session.

@@ -16,7 +16,13 @@ Install the app on the physical iPhone. Free-tier signing rules apply (see `insi
      -configuration Debug -derivedDataPath build/DerivedData -allowProvisioningUpdates build 2>&1 \
      | tee build/last-device-build.log | grep -E "error:|Signing|BUILD (SUCCEEDED|FAILED)"
    ```
-3. If signing fails: the usual causes on the free tier are (a) no team selected in the target's
+3. If the build reports "Developer Mode disabled" (xcodebuild shows it as "Timed out waiting for all
+   destinations"), the phone needs Settings → Privacy & Security → Developer Mode → on → restart → Turn On.
+   If it reports "Failed Registering Bundle Identifier … not available", the id collides with one already
+   registered (App IDs compare case-insensitively); diagnose with
+   `xcodebuild … PRODUCT_BUNDLE_IDENTIFIER=<candidate> build` before changing the project, then have the user
+   change it in Xcode (never in the pbxproj).
+   If signing fails otherwise: the usual causes on the free tier are (a) no team selected in the target's
    Signing & Capabilities, (b) the personal team's 7-day profile expired, (c) the 10 App ID limit.
    Tell the user to open the project in Xcode, select their personal team under Signing, and press Run
    once; Xcode handles the profile. Do not fiddle with certificates from the command line.
@@ -27,8 +33,9 @@ Install the app on the physical iPhone. Free-tier signing rules apply (see `insi
    xcrun devicectl device process launch --device <identifier> com.zhabskyi.homegymlog.ios
    ```
 5. First install of a personal-team app on a phone needs trust: Settings → General → VPN & Device
-   Management → tap the developer email → Trust. Say this only when the launch fails with an untrusted
-   developer error.
+   Management → tap the developer email → Trust. The launch error for this case reads "invalid code
+   signature, inadequate entitlements or its profile has not been explicitly trusted". Give the steps
+   only then, and ask the user to open the app from the home screen afterward.
 
 ## Report
 

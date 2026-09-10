@@ -25,10 +25,14 @@ Write the spec to `docs/specs/<milestone-or-feature>.md` with these sections:
 6. **Edge cases.** Dates across week and month boundaries, caps, rounding, skipped sets, swapped
    exercises, missed sessions, unit switching, app backgrounded or killed.
 7. **Out of scope.** What this spec deliberately excludes.
-8. **Acceptance criteria.** Numbered, each verifiable on a simulator or by a unit test.
+8. **Acceptance criteria.** Numbered, each verifiable on a simulator or by a unit test. For a screen,
+   the criterion names the prototype snapshot it must match (`ob2`, `home`, …), the `-seed` launch state
+   that shows it, and "matches by `/design-compare`" as the check; list any deliberate deviation from the
+   snapshot explicitly so the comparison can skip it.
 9. **Open questions.** Only things the prototype and decisions do not settle. Propose a default for each.
 
-Rules: describe behavior, not implementation. No SwiftUI view names, no code. Engine functions are
+Rules: keep the spec under 400 lines unless numeric tables require more; prefer tables to prose.
+Describe behavior, not implementation. No SwiftUI view names, no code. Engine functions are
 specified over plain values with an explicit calendar and reference date, never as mutations on stored
 rows; input validation throws a typed error, never traps. Where the prototype is
 ambiguous or does nothing (the missed-day shift button, for example), say so and apply the recorded

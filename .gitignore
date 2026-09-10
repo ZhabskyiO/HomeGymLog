@@ -39,3 +39,6 @@ Package.resolved.bak
 *.mobileprovision
 *.p12
 *.cer
+
+# Retrospective marker (local state)
+.claude/.last-retro

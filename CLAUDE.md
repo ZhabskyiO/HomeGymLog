@@ -57,6 +57,8 @@ HomeGymLogTests/           Swift Testing target
   Persistence/             ModelRoundTrip, ProgramStore, ExerciseNoteStore, StatusInvariant, CascadeDelete suites
 design/                    prototype export (read-only reference)
 docs/specs, docs/plans     specs from spec-creator, plans from implementation-planner (dated status when done)
+docs/reviews               saved agent reports per slice (researcher, architecture, verifier rounds, swift review)
+docs/learning              per-slice Swift study notes for the user (/learning-notes)
 insights/                  INSIGHTS.md, gotchas.md
 .claude/agents, .claude/skills
 ```
@@ -67,14 +69,22 @@ researcher (if platform questions) → spec-creator → architecture-reviewer �
 plan-verifier → implement → test-writer → swift-reviewer → doc-writer. Details in `.claude/agents/README.md`.
 Agents that write only touch their own output (specs, plans, tests, docs); production Swift is written in the main session.
 
-Skills (`.claude/skills/README.md`): `/milestone <name>` runs that flow up to plan approval. `/build-and-run`,
+Work happens in slices on branches `m<N>-<slice>` created by `/milestone`, merged to `main` after
+`/pr-self-review`. UI slices are verified against the prototype with `/design-compare`, which needs a
+`-seed` launch state per screen (the seeder is M2's first code task, mirroring the prototype's Tweaks:
+onboarding, midProgram, missedDayPrompt).
+
+Skills (`.claude/skills/README.md`): `/milestone <n> [slice]` runs that flow up to plan approval. `/build-and-run`,
 `/run-tests`, `/device-install` drive Xcode. `/ship-check` before a commit, `/pr-self-review` before a PR,
-`/security-audit` before a release, `/swift-best-practices` for house style, `/engineering-insight` at session end.
+`/security-audit` before a release, `/swift-best-practices` for house style. `/engineering-insight` is the retrospective:
+it reads the session, diff, build/test logs and agent reports, then edits agents and skills directly; a Stop hook
+runs it once after every commit that touches code.
 
 ## Commands
 
 The Xcode project is created once through Xcode's wizard; `HomeGymLog/` and `HomeGymLogTests/` are synchronized
-folders, so any `.swift` file written under them is compiled with no project-file edits. Never hand-edit `project.pbxproj`.
+folders, so any `.swift` file written under them is compiled with no project-file edits. Never hand-edit `project.pbxproj`;
+a PreToolUse hook (`.claude/hooks/guard-pbxproj.sh`, wired in `.claude/settings.json`) denies Edit/Write on it.
 
 ```
 # iOS 17.5 (primary): iPhone 15. iOS 26.5: iPhone 17. The OS must be given or xcodebuild picks the newest runtime.

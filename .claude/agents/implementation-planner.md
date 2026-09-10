@@ -26,7 +26,12 @@ Produce a plan at `docs/plans/<milestone-or-feature>.md` with these sections:
    mitigation for each.
 6. **Definition of done.** A checklist the user can verify on the simulator or device.
 
-Constraints: no new dependencies or entitlements unless the spec approved them. Every helper, fixture,
+Constraints: no new dependencies or entitlements unless the spec approved them. Any step that adds or
+changes a SwiftData relationship, delete, or `#Predicate` must include a persistence test that runs on the
+iPhone 15 / iOS 17.5 simulator (runtime behavior differs from newer OS; see gotchas "SwiftData"). Any step
+that adds a screen must (a) name the `-seed` launch state that shows it, extending `App/DebugSeed` when
+none fits, and (b) verify with `/design-compare <snapshot>` against the prototype snapshot the spec names,
+not by eye. Keep the plan under 400 lines; put long tables in the spec and reference them. Every helper, fixture,
 file, or artifact a step uses must be declared in that step or an earlier one, and every verify command
 may read only files an earlier command writes. Pure Engine code, views
 separate. Prefer the smallest plan that fully meets the spec. Do not write Swift code beyond signatures
