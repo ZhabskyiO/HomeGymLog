@@ -26,7 +26,16 @@ new bites: what happened, the fix, and how to recognize it next time. Date each 
 
 ## SwiftData
 
-(none yet — expected areas: relationship deletes, `@Query` sorting on relationships, migrations, previews)
+- 2026-09-10 — **`.cascade` delete rules do nothing on the iOS 17.5 runtime.** Verified on the simulator with
+  four declaration styles (inverse on the to-many side, on the to-one side, inferred), in-memory and on-disk,
+  same context and fresh context, children loaded or not: after deleting the parent and saving, every child
+  row survives with its parent set to nil. The identical code cascades correctly on iOS 26.5. Fix: never rely
+  on the rule; delete through `ProgramStore.delete(_:in:)` and `WorkoutLogStore.delete(_:in:)`, which delete
+  children explicitly before the parent. The rules stay declared for newer OS versions and CloudKit.
+- 2026-09-10 — `print` inside a test never reaches xcodebuild's output. To see a value from a test, put it in
+  a failing `#expect(Bool(false), Comment(rawValue: ...))` and read it from the result bundle with
+  `xcrun xcresulttool get test-results tests --path build/tests.xcresult`.
+- (expected areas still open: `@Query` sorting on relationships, migrations, previews)
 
 ## SwiftUI
 
@@ -42,5 +51,8 @@ new bites: what happened, the fix, and how to recognize it next time. Date each 
 - 2026-09-09 — A `.swift` file outside `HomeGymLog/` or `HomeGymLogTests/` is in no target and silently
   ignored; one in the wrong folder lands in the wrong target. Symptom: "cannot find X in scope". Fix: move the
   file. Never edit `project.pbxproj` by hand for membership.
+- 2026-09-10 — `-destination 'platform=iOS Simulator,name=iPhone 15'` fails with "Unable to find a device" because
+  xcodebuild resolves `OS:latest` (26.5) and iPhone 15 exists only on the 17.5 runtime. Always pass the OS:
+  `name=iPhone 15,OS=17.5` for iOS 17 runs, `name=iPhone 17,OS=26.5` for iOS 26 runs.
 - 2026-09-09 — `xcodebuild` needs a shared scheme. If "does not contain a scheme named HomeGymLog", tick Shared
   in Product → Scheme → Manage Schemes (creates `HomeGymLog.xcodeproj/xcshareddata/xcschemes/`).

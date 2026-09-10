@@ -1,6 +1,16 @@
 # M1 — Skeleton and engine
 
-Status: draft, revised 2026-09-09 (equipment, weight formula, open-question decisions, and the
+**Status: implemented 2026-09-10.** 80 Swift Testing tests pass on iPhone 15 / iOS 17.5 and iPhone 17 /
+iOS 26.5; shell verified by screenshot on both (dark and light, no system tab bar on iOS 26). Physical
+device install pending the user's iPhone. Recorded deviations from this spec:
+(a) `.cascade` delete rules are not honored on the iOS 17.5 runtime, so deletes go through
+`ProgramStore.delete(_:in:)` and `WorkoutLogStore.delete(_:in:)`, which delete children explicitly;
+AC-10 and AC-11 are satisfied via those helpers, and the rules stay declared for iOS 18+ and CloudKit.
+(b) `ProgramStore.skip` is a `guard` no-op on a non-pending session, not a precondition.
+(c) `CascadeDeleteTests` count rows on a fresh `ModelContext` so results reflect what is persisted.
+(d) iOS 17.0–17.4 runtimes were not available; verified on 17.5 and 26.5 only.
+
+Previous status: draft, revised 2026-09-09 (equipment, weight formula, open-question decisions, and the
 architecture review folded in). Source: `design/BenchmarkApp.prototype.html` (option **1a**, the
 clickable prototype; markup for the tab bar at `<!-- tab bar -->`, logic in the `text/x-dc` script),
 `CLAUDE.md`, `insights/INSIGHTS.md`, `insights/gotchas.md`. Where this spec and the prototype disagree,

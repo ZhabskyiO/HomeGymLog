@@ -1,6 +1,14 @@
 # M1 — Skeleton and engine: implementation plan
 
-Status: draft 2026-09-10, revised the same day for plan-verifier findings F1–F11, for `docs/specs/m1-skeleton-engine.md` (revised 2026-09-09). Sections 4, 5 and 8
+**Status: implemented 2026-09-10.** Steps 0–10 done; Step 11 done except the physical-device install
+(pending the user's iPhone). 80 Swift Testing tests pass on iPhone 15 / iOS 17.5 and iPhone 17 / iOS 26.5.
+Recorded deviations: (a) `.cascade` is not honored on iOS 17.5, so deletes go through
+`ProgramStore.delete` / `WorkoutLogStore.delete` (AC-10/AC-11 satisfied via those helpers);
+(b) `ProgramStore.skip` is a `guard` no-op on a non-pending session instead of a precondition;
+(c) `CascadeDeleteTests` count on a fresh `ModelContext`; (d) iOS 17.0–17.4 runtimes not available for
+verification.
+
+Previous status: draft 2026-09-10, revised the same day for plan-verifier findings F1–F11, for `docs/specs/m1-skeleton-engine.md` (revised 2026-09-09). Sections 4, 5 and 8
 of the spec are the contract; acceptance criteria are referenced as `AC-N`.
 
 ---

@@ -6,6 +6,20 @@ Keep entries short. Date them. Newest at the top within each section.
 
 ## Architecture decisions
 
+### 2026-09-10 — Open for M4: does an occupied day block re-slotting?
+`Reslot` steps over completed and skipped sessions without reserving their day, exactly as the M1 spec says,
+so a pending session can be re-dated onto a day a completed or skipped session already holds (only when that
+session is dated after the cursor: a future session skipped, or finished early). The same spec also says no
+two sessions share a date. M4's missed-day work must decide; a Reslot test documents the current behavior.
+Model-layer note: `apply(reslotMap:)`, `skip`, and both `delete` helpers do not save; callers must
+`try context.save()` explicitly (never rely on autosave, per "every set is written immediately").
+
+### 2026-09-10 — Deletes go through explicit model-layer helpers, not cascade rules
+The iOS 17.5 runtime ignores `.cascade` (see gotchas). `ProgramStore.delete(_:in:)` removes sessions, logs,
+exercises and sets before the program; `WorkoutLogStore.delete(_:in:)` removes exercises and sets before the
+log. M2's restart path and M3's exit-without-finish must call these, never `context.delete` on a parent
+directly. The `.cascade` declarations remain because they are correct on iOS 18+ and required for CloudKit.
+
 ### 2026-09-09 — Engine/Model boundary (from the M1 architecture review)
 `Engine/` takes plain values plus an explicit `Calendar` and `today`/`generatedOn` dates, and returns plain values
 (a generated program, or an index → date map for re-slotting). It never imports SwiftData or SwiftUI. Applying a
@@ -93,6 +107,9 @@ strictly after today, and later pending sessions follow. Otherwise the missed se
 skipped sessions never move; sessions earlier than the missed one never move.
 
 ### 2026-09-09 — Accepted v1 limitations (from the M1 spec's open questions)
+Only the iOS 17.5, 18.0 and 26.5 simulator runtimes are installed; the schema's Codable collections
+(`[PlannedExercise]`, `[Int]`, `[String: Double]`) were verified on 17.5 and 26.5, not on 17.0–17.4. The user's
+phone is the effective floor. If a 17.0 runtime is ever installed, run the persistence suites on it once.
 Scheduled dates are stored as local midnight and compared by calendar day; a time-zone change may shift a day.
 If the on-disk store fails to open: crash in debug, plain error screen in release, never silently recreate an
 empty store (formalized in M4).
@@ -103,6 +120,10 @@ empty store (formalized in M4).
 on the iOS 17.5 simulator. No xcodegen or tuist. Keep the Xcode 26 defaults: `SWIFT_VERSION = 5.0`,
 `SWIFT_APPROACHABLE_CONCURRENCY = YES`, `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` (app target). Do not move to
 Swift 6 language mode; it only adds friction with SwiftData's non-Sendable `ModelContext`.
+Observed 2026-09-10 after Step 0 of M1: `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` is set on the **app target only**
+(both Debug and Release); the `HomeGymLogTests` target has no default isolation. Both targets: iOS 17.0,
+`SUPPORTED_PLATFORMS = iphoneos iphonesimulator`, `TARGETED_DEVICE_FAMILY = 1`. Shared scheme lives at
+`HomeGymLog.xcodeproj/xcshareddata/xcschemes/HomeGymLog.xcscheme`.
 
 ### 2026-09-09 — Tab bar is TabView + hidden system bar + safeAreaInset pill
 `TabView(selection:)` keeps per-tab state and each tab's `NavigationStack` alive (like keeping every panel
@@ -174,4 +195,23 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
 
 ## Patterns
 
-(none yet)
+### 2026-09-10 — Test fixtures: fixed calendar, fresh in-memory store per test, one sample-graph helper
+`HomeGymLogTests/Support/` holds three pieces every suite reuses. `TestCalendar.calendar` is Gregorian,
+`America/New_York`, `en_US_POSIX`, with Sunday as first weekday on purpose (the app's Monday-based helpers
+must not depend on that setting); `TestCalendar.day(y, m, d)` gives local midnight, and `exampleASlots` /
+`exampleAInputs` are the spec's Example A (1 month, Mon/Wed/Fri from Mon 2026-09-07). `makeTestStore()`
+returns a `TestStore` holding both the in-memory `ModelContainer` and a `ModelContext` (the struct keeps
+the container alive for the context's lifetime); call it inside each test, never share across tests.
+`insertSampleGraph(in:)` inserts one program, N sessions, one log with two exercises × three sets, and
+one note, deliberately appending children in shuffled order so `sorted*` accessors are exercised. Suites
+that touch app-target types are `@MainActor` (the app target defaults to main-actor isolation); Engine
+suites are plain. Analogy: `TestCalendar` is a frozen clock/TZ fixture, `makeTestStore` is a per-test
+fresh in-memory DB, `insertSampleGraph` is a seed script.
+
+### 2026-09-10 — Diagnose a SwiftData behavior with a throwaway test-only experiment
+When SwiftData does something surprising (the `.cascade` no-op on iOS 17.5), do not reason from docs:
+write a temporary test that builds the smallest graph reproducing it, run it on each installed runtime,
+and read values back through a fresh `ModelContext` (`ModelContext(container).fetchCount(...)`) so the
+result reflects the store, not the in-memory object graph. Because `print` is invisible under
+xcodebuild, surface values via a failing `#expect(Bool(false), Comment(rawValue:))` and read the result
+bundle. Delete the experiment once the finding is recorded in gotchas; keep only the regression test.

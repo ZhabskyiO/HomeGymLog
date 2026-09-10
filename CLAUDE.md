@@ -36,16 +36,22 @@ from five onboarding answers, then tracks every set. One athlete, fixed home-gym
 - Update `insights/gotchas.md` whenever a build error, simulator quirk, or API surprise costs more than a few minutes.
 - Update `insights/INSIGHTS.md` when an architecture decision is made or changed.
 
-## Layout (target; created as milestones land)
+## Layout (as of M1, 2026-09-10)
 
 ```
-HomeGymLog/                Xcode project root
-  App/                     entry point, app-level environment
-  Models/                  SwiftData models
-  Engine/                  pure logic: ProgramGenerator, Stats, ExerciseLibrary
-  Features/<Screen>/       one folder per screen: Onboarding, Home, Program, Progress, Settings, Workout
-  Shared/                  theme, reusable components, extensions
-HomeGymLogTests/           unit tests for Engine
+HomeGymLog/                app target (synchronized folder: every .swift under it is compiled)
+  App/                     HomeGymLogApp (entry point), RootView, AppTab, StoreErrorView
+  Models/                  AppSchema, six @Model classes (Program, PlannedSession, WorkoutLog, LoggedExercise,
+                           LoggedSet, ExerciseNote), write helpers ProgramStore, WorkoutLogStore, ExerciseNoteStore
+  Engine/                  pure logic, no SwiftData/SwiftUI: EngineTypes, Equipment, ExerciseLibrary, SplitPlans,
+                           PhaseSplit, WeightFormula, CalendarRules, Reslot, ProgramGenerator
+  Shared/                  Theme, FloatingTabBar, TabIcon, PlaceholderScreen
+  Assets.xcassets/         theme color sets (bg, sf, sf2, bd, tx, mu, success, warning, phaseFoundation, phaseDeload)
+  Features/<Screen>/       arrives in M2: one folder per screen (Onboarding, Home, Program, Progress, Settings, Workout)
+HomeGymLogTests/           Swift Testing target
+  Support/                 TestCalendar (fixed calendar), TestContainer (makeTestStore, insertSampleGraph), TestInputs
+  Engine/                  one suite per Engine file plus StaticTableTests
+  Persistence/             ModelRoundTrip, ProgramStore, ExerciseNoteStore, StatusInvariant, CascadeDelete suites
 design/                    prototype export (read-only reference)
 docs/specs, docs/plans     specs from spec-creator, plans from implementation-planner (dated status when done)
 insights/                  INSIGHTS.md, gotchas.md
@@ -68,13 +74,21 @@ The Xcode project is created once through Xcode's wizard; `HomeGymLog/` and `Hom
 folders, so any `.swift` file written under them is compiled with no project-file edits. Never hand-edit `project.pbxproj`.
 
 ```
-xcodebuild -scheme HomeGymLog -destination 'platform=iOS Simulator,name=iPhone 16' build
-xcodebuild -scheme HomeGymLog -destination 'platform=iOS Simulator,name=iPhone 16' test
+# iOS 17.5 (primary): iPhone 15. iOS 26.5: iPhone 17. The OS must be given or xcodebuild picks the newest runtime.
+xcodebuild -scheme HomeGymLog -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.5' -derivedDataPath build/DerivedData build
+xcodebuild -scheme HomeGymLog -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.5' -derivedDataPath build/DerivedData test
+xcodebuild -scheme HomeGymLog -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.5' -derivedDataPath build/DerivedData test
+# To count or inspect results, write a result bundle (delete a stale one first; xcodebuild refuses to overwrite it):
+rm -rf build/tests.xcresult && xcodebuild -scheme HomeGymLog -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.5' \
+  -derivedDataPath build/DerivedData -resultBundlePath build/tests.xcresult test
+xcrun xcresulttool get test-results summary --path build/tests.xcresult   # totals; use `tests` for every test
 ```
+`/run-tests` wraps this. `print` inside a test never reaches xcodebuild output; see `insights/gotchas.md`.
 
 ## Milestones
 
 1. Skeleton and engine: project, SwiftData container, tab bar, theme, exercise library, tested program generator. On device.
+   — done 2026-09-10 (80 tests on iOS 17.5 and 26.5; device install pending the user's iPhone).
 2. Onboarding → generated program → Home and Program tabs.
 3. Workout flow: swipe logging, RPE, rest timer with local notification, adjust/swap/notes, summary, resume.
 4. Progress (Swift Charts, calendar), PRs, streak, missed-day handling, settings, daily reminder.
