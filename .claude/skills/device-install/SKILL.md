@@ -24,7 +24,7 @@ Install the app on the physical iPhone. Free-tier signing rules apply (see `insi
    ```
    APP=$(find build/DerivedData/Build/Products/Debug-iphoneos -maxdepth 1 -name "*.app" | head -1)
    xcrun devicectl device install app --device <identifier> "$APP"
-   xcrun devicectl device process launch --device <identifier> com.zhabskyi.homegymlog
+   xcrun devicectl device process launch --device <identifier> com.zhabskyi.homegymlog.ios
    ```
 5. First install of a personal-team app on a phone needs trust: Settings → General → VPN & Device
    Management → tap the developer email → Trust. Say this only when the launch fails with an untrusted

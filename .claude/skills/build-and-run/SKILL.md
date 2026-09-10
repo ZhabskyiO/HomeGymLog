@@ -29,7 +29,7 @@ build, with the errors.
    ```
    APP=$(find build/DerivedData/Build/Products/Debug-iphonesimulator -maxdepth 1 -name "*.app" | head -1)
    xcrun simctl install booted "$APP"
-   xcrun simctl launch --console-pty booted com.zhabskyi.homegymlog
+   xcrun simctl launch --console-pty booted com.zhabskyi.homegymlog.ios
    ```
    Report the app launched, or the launch error verbatim.
 

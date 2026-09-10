@@ -149,7 +149,8 @@ session skipped. Implication: `PlannedSession.scheduledDate` is mutable and the 
 from index alone after a shift.
 
 ### 2026-09-09 — Product name is HomeGymLog, not Benchmark
-Display name HomeGymLog, bundle id com.zhabskyi.homegymlog. The design's "Benchmark" branding is a
+Display name HomeGymLog, bundle id `com.zhabskyi.homegymlog.ios` (changed 2026-09-10 from
+`com.zhabskyi.homegymlog`, which collided with the wizard-registered `com.zhabskyi.HomeGymLog`; see gotchas). The design's "Benchmark" branding is a
 prototype artifact. Do not put the word Benchmark in UI strings.
 
 ### 2026-09-09 — SwiftUI + SwiftData over Expo/React Native

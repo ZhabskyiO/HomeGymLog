@@ -1,6 +1,6 @@
 # HomeGymLog
 
-Free iPhone-only workout app. Display name **HomeGymLog**, bundle id **com.zhabskyi.homegymlog**.
+Free iPhone-only workout app. Display name **HomeGymLog**, bundle id **com.zhabskyi.homegymlog.ios**.
 The design prototype calls it "Benchmark"; that name is not used in the app. Generates a phased strength program (Foundation → Build → Peak → Deload)
 from five onboarding answers, then tracks every set. One athlete, fixed home-gym equipment
 (dumbbells 5–52.5 lb in 2.5 lb steps, adjustable bench, Marcy MWM-8147 150 lb stack in 10 lb plates). Never charges users; no backend.
@@ -88,7 +88,7 @@ xcrun xcresulttool get test-results summary --path build/tests.xcresult   # tota
 ## Milestones
 
 1. Skeleton and engine: project, SwiftData container, tab bar, theme, exercise library, tested program generator. On device.
-   — done 2026-09-10 (80 tests on iOS 17.5 and 26.5; device install pending the user's iPhone).
+   — done 2026-09-10 (80 tests on iOS 17.5 and 26.5; installed and launched on the user's iPhone 14 Pro Max 2026-09-10).
 2. Onboarding → generated program → Home and Program tabs.
 3. Workout flow: swipe logging, RPE, rest timer with local notification, adjust/swap/notes, summary, resume.
 4. Progress (Swift Charts, calendar), PRs, streak, missed-day handling, settings, daily reminder.

@@ -9,6 +9,14 @@ new bites: what happened, the fix, and how to recognize it next time. Date each 
   launch with an "unable to verify" message. Fix: run from Xcode again. Nothing is wrong with the code.
 - 2026-09-09 — No TestFlight, no App Store, max 3 devices and 10 App IDs. Some entitlements are blocked;
   Live Activities and local notifications do not need any, so they work on the free tier.
+- 2026-09-10 — First device build fails with "Developer Mode disabled … enable Developer Mode in Settings → Privacy
+  & Security" (xcodebuild reports it as "Timed out waiting for all destinations"). The phone needs Developer Mode on
+  (iOS 16+): Settings → Privacy & Security → Developer Mode → on → restart → confirm. Only appears once.
+- 2026-09-10 — The wizard registers the bundle id the moment a team is selected, and Apple compares App IDs
+  case-insensitively. `com.zhabskyi.HomeGymLog` got registered before it was lowercased, so
+  `com.zhabskyi.homegymlog` then failed with "cannot be registered … not available". Resolution: the app uses
+  `com.zhabskyi.homegymlog.ios` (2 of 10 free-tier App IDs used). Diagnose such cases with an xcodebuild
+  override, `PRODUCT_BUNDLE_IDENTIFIER=... build`, before touching the project.
 - 2026-09-09 — Changing the bundle id burns one of the 10 App IDs and they do not free up for a week.
   Decide the id once.
 

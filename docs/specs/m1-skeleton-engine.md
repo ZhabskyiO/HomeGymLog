@@ -2,7 +2,7 @@
 
 **Status: implemented 2026-09-10.** 80 Swift Testing tests pass on iPhone 15 / iOS 17.5 and iPhone 17 /
 iOS 26.5; shell verified by screenshot on both (dark and light, no system tab bar on iOS 26). Physical
-device install pending the user's iPhone. Recorded deviations from this spec:
+installed and launched on the user's iPhone 14 Pro Max 2026-09-10. Recorded deviations from this spec:
 (a) `.cascade` delete rules are not honored on the iOS 17.5 runtime, so deletes go through
 `ProgramStore.delete(_:in:)` and `WorkoutLogStore.delete(_:in:)`, which delete children explicitly;
 AC-10 and AC-11 are satisfied via those helpers, and the rules stay declared for iOS 18+ and CloudKit.
