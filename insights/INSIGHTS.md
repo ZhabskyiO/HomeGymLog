@@ -6,6 +6,61 @@ Keep entries short. Date them. Newest at the top within each section.
 
 ## Architecture decisions
 
+### 2026-09-10 — M2 onboarding architecture (from the architecture review)
+- **Router view** beneath `.modelContainer`: `@Query(filter: #Predicate<Program> { $0.archivedAt == nil })`, body
+  switches on `isEmpty`. Nothing navigates to the shell explicitly; `ProgramStore.start` saving flips it, M4's archive
+  flips it back. M3 adds the in-progress-log route to the same view.
+- **One environment clock.** `AppClock { now: () -> Date; calendar: Calendar }` is a SwiftUI environment value set at
+  the app root (real clock, or the seed's frozen day). Views and feature stores read it and pass `now()`/`calendar` down;
+  nothing below the root calls `Date()` or `Calendar.current`. Extends the Engine rule to the view layer.
+- **`WorkoutLogStore.finish(_:at:in:)` is the single writer** of `finishedAt` + `status == .completed` (one save).
+  Introduced in M2 for the seeder, reused by M3. `WorkoutLogStore.start(session:at:in:)` creates a log with exercises
+  and pending sets from a `PlannedSession`. The seeder uses only these store functions, model inits, and direct
+  `LoggedSet` field mutations (weight, reps, status, rpe, loggedAt), exactly as M3's swipe-to-log will.
+- **`ProgramStore.start(...)` owns "at most one current program" on the create side**: returns nil without writing when
+  a current program exists; otherwise generates and applies. `apply` stays unguarded for tests.
+- **Onboarding draft** is one `@Observable final class OnboardingDraft` owned by the flow root (`.id(step)` would reset
+  step-local state). Clamped mutations live on the draft; buttons call methods. The A6 preview is computed once on
+  entering step 5 and held on the draft.
+- **Starting-weight rows** = `SplitPlans.exerciseKeys(frequency:sessionLengthMinutes:)`, first appearance walking the
+  split days truncated to the exercise count; the generator's `usedKeys` uses the same function.
+- **Unit preference** `@AppStorage("units")` stores `WeightUnit.rawValue` ("lb"/"kg"), default "lb". `WeightDisplay`
+  in Engine formats lb/kg text; views only concatenate. Seeded launches use `.defaultAppStorage` on a cleared
+  `UserDefaults(suiteName: "seed")`; `@AppStorage` never lives in the `App` struct.
+- **DebugSeed** lives in `App/DebugSeed/`, whole file under `#if DEBUG`; tests build Debug so it is unit-testable.
+
+### 2026-09-10 — DEBUG seeding: `-seed <name>` launch argument, in-memory container
+`xcrun simctl launch <udid> <bundle> -seed ob3` (and Xcode's Arguments Passed On Launch) arrive verbatim in
+`ProcessInfo.processInfo.arguments` inside `App.init`. Parse under `#if DEBUG` (DEBUG is defined only by the Debug
+configuration, which the shared scheme's Run action uses); a seeded run builds `AppSchema.makeContainer(inMemory: true)`
+so screenshots never touch the on-disk store. Verified on iOS 17.5 and 26.5 in the app target under MainActor default
+isolation. Seed names follow the prototype snapshots: `onboarding`, `ob1`…`ob5`, `midProgram`, `missed`. Device form:
+`xcrun devicectl device process launch --console --device <udid> com.zhabskyi.homegymlog.ios -seed midProgram`,
+phone unlocked. Compute `inMemory` into a local before the `Result { }` closure in `init`.
+
+### 2026-09-10 — Onboarding is one screen with a `@State step`
+`ScrollView { switch step }` with `.id(step)` + `.transition` + `.animation(value: step)`; the CTA is a
+`.safeAreaInset(edge: .bottom)` over a gradient that `.ignoresSafeArea(edges: .bottom)`. Not `NavigationStack`
+(system back, path state) and not a page `TabView` (swipeable). Steppers are two Buttons around a Text; no keyboard.
+Because `.id(step)` resets step-local `@State`, every answer lives in one draft owned by the parent. Verified identical
+on iOS 17.5 and 26.5; all APIs iOS 15 or earlier.
+
+### 2026-09-10 — Root routing is `@Query(filter: #Predicate<Program> { $0.archivedAt == nil })`
+An optional Date compared to nil compiles and filters correctly on iOS 17.5 and 26.5. The route flips live on insert and
+on `archivedAt = Date()` + save, so restart is a model mutation with no navigation state. The M1 tab-shell `RootView`
+becomes `ShellView`; the new root switches on `currentPrograms.isEmpty`. Analogy: a live `useQuery` selector.
+
+### 2026-09-10 — M2 milestone-wide decisions (from the onboarding slice spec)
+- **Restart archives, never deletes.** "Build a new program" sets `archivedAt = now` on the old program; its logs
+  and PRs stay for Progress. Routing shows onboarding iff no program has `archivedAt == nil`.
+- **kg display is one decimal** (42.5 lb → 19.3 kg); body weight and volume totals show integer kg. Storage and
+  steppers stay in pounds; a stepper moves one equipment step (2.5 / 10 lb) whatever the display unit.
+- **Body weight stepper is ±5 lb always, bounded 50…500 lb.**
+- **Seeded launches use frozen reference dates** (onboarding seeds: Mon 2026-08-31; `midProgram`/`missed`:
+  Tue 2026-09-15) and an in-memory store, so `/design-compare` sees identical screens every run.
+- **No draft persistence in onboarding**: relaunch mid-onboarding starts over.
+- Welcome tile letter is "H" until the M5 icon; the A4 subtitle stays verbatim until the M5 copy audit.
+
 ### 2026-09-10 — Open for M4: does an occupied day block re-slotting?
 `Reslot` steps over completed and skipped sessions without reserving their day, exactly as the M1 spec says,
 so a pending session can be re-dated onto a day a completed or skipped session already holds (only when that
@@ -41,7 +96,8 @@ Not a separate `@Model`. Swap replaces one element (key + recomputed target) and
 
 ### 2026-09-09 — Status invariants have one writer
 `WorkoutLog` is in progress iff `finishedAt == nil` (no separate status field). `PlannedSession.status ==
-.completed` iff `workoutLog?.finishedAt != nil`; the single finish function (M3) writes both in one save.
+.completed` iff `workoutLog?.finishedAt != nil`; the single finish function `WorkoutLogStore.finish` (M2, reused by M3)
+writes both in one save.
 `.skipped` is stored because it is not derivable. One `WorkoutLog` per `PlannedSession`; exiting a workout
 without finishing deletes its log so the session can be started again (M3 implements; the 1:1 depends on it).
 

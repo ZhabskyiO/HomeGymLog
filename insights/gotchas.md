@@ -47,6 +47,10 @@ new bites: what happened, the fix, and how to recognize it next time. Date each 
 
 ## SwiftUI
 
+- 2026-09-10 — In `App.init`, `Result { try AppSchema.makeContainer(inMemory: seed != nil) }` fails with "constant
+  'self.containerResult' captured by a closure before being initialized" when `seed` is a stored property. Compute the
+  flag into a local first.
+
 - 2026-09-09 — Put `.toolbar(.hidden, for: .tabBar)` on each tab's `NavigationStack`, not on views inside it,
   or the system tab bar reappears on push. Use `toolbar(_:for:)` (iOS 16), not `toolbarVisibility` (iOS 18).
 - 2026-09-09 — `tabBarMinimizeBehavior` / `tabViewBottomAccessory` are iOS 26-only: a compile error at iOS 17
@@ -55,6 +59,13 @@ new bites: what happened, the fix, and how to recognize it next time. Date each 
   timers surviving background)
 
 ## Xcode / build
+
+- 2026-09-10 — `simctl launch --stdout=<path>` may write nothing; `--console` attaches silently to a running instance,
+  so `simctl terminate` first. App-side `print` needs `fflush(stdout)` to show up.
+- 2026-09-10 — `devicectl device process launch` fails with `FBSOpenApplicationErrorDomain error 7 … Locked` while the
+  phone's screen is locked; install still works. Unlock before launching from the CLI.
+- 2026-09-10 — The first device `xcodebuild … -allowProvisioningUpdates` of a session can fail with no compiler error
+  (signing race); re-run once before diagnosing.
 
 - 2026-09-10 — **Xcode 26's App wizard defaults need five corrections** before the project matches the plan:
   it creates iPhone + iPad + Mac + Apple Vision destinations (remove all but iPhone under General →
