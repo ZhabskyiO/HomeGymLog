@@ -47,9 +47,20 @@ HomeGymLog/                Xcode project root
   Shared/                  theme, reusable components, extensions
 HomeGymLogTests/           unit tests for Engine
 design/                    prototype export (read-only reference)
+docs/specs, docs/plans     specs from spec-creator, plans from implementation-planner (dated status when done)
 insights/                  INSIGHTS.md, gotchas.md
 .claude/agents, .claude/skills
 ```
+
+## Agent flow for a milestone
+
+researcher (if platform questions) → spec-creator → architecture-reviewer → implementation-planner →
+plan-verifier → implement → test-writer → swift-reviewer → doc-writer. Details in `.claude/agents/README.md`.
+Agents that write only touch their own output (specs, plans, tests, docs); production Swift is written in the main session.
+
+Skills (`.claude/skills/README.md`): `/milestone <name>` runs that flow up to plan approval. `/build-and-run`,
+`/run-tests`, `/device-install` drive Xcode. `/ship-check` before a commit, `/pr-self-review` before a PR,
+`/security-audit` before a release, `/swift-best-practices` for house style, `/engineering-insight` at session end.
 
 ## Commands
 
