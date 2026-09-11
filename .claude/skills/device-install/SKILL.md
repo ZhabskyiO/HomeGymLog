@@ -26,13 +26,23 @@ Install the app on the physical iPhone. Free-tier signing rules apply (see `insi
    Signing & Capabilities, (b) the personal team's 7-day profile expired, (c) the 10 App ID limit.
    Tell the user to open the project in Xcode, select their personal team under Signing, and press Run
    once; Xcode handles the profile. Do not fiddle with certificates from the command line.
-4. Install and launch:
+4. If the build compiles but never finishes (log ends in `DVTDeviceOperation: Encountered a build number ""`), kill it
+   after a few minutes (no `timeout` on macOS: `cmd & PID=$!; (sleep 240; kill $PID) & wait $PID`), then sign the
+   compiled app by hand and install it, see gotchas "Xcode / build":
+   ```
+   APP=build/DerivedData/Build/Products/Debug-iphoneos/HomeGymLog.app
+   ENT=$(find build/DerivedData -name "HomeGymLog.app.xcent" | head -1)
+   ID=$(security find-identity -v -p codesigning | awk '/Apple Development/ {print $2; exit}')
+   codesign --force --sign "$ID" --timestamp=none --generate-entitlement-der --entitlements "$ENT" "$APP"
+   codesign --verify --deep --strict "$APP"
+   ```
+5. Install and launch:
    ```
    APP=$(find build/DerivedData/Build/Products/Debug-iphoneos -maxdepth 1 -name "*.app" | head -1)
    xcrun devicectl device install app --device <identifier> "$APP"
    xcrun devicectl device process launch --device <identifier> com.zhabskyi.homegymlog.ios
    ```
-5. First install of a personal-team app on a phone needs trust: Settings → General → VPN & Device
+6. First install of a personal-team app on a phone needs trust: Settings → General → VPN & Device
    Management → tap the developer email → Trust. The launch error for this case reads "invalid code
    signature, inadequate entitlements or its profile has not been explicitly trusted". Give the steps
    only then, and ask the user to open the app from the home screen afterward.

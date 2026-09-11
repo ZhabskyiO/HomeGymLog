@@ -80,6 +80,14 @@ new bites: what happened, the fix, and how to recognize it next time. Date each 
   phone's screen is locked; install still works. Unlock before launching from the CLI.
 - 2026-09-10 — The first device `xcodebuild … -allowProvisioningUpdates` of a session can fail with no compiler error
   (signing race); re-run once before diagnosing.
+- 2026-09-10 — A device build can **hang forever after compiling**, with only
+  `DVTDeviceOperation: Encountered a build number "" that is incompatible with DVTBuildVersion` in the log; it stalls
+  even for `generic/platform=iOS`, and the keychain is not the cause (manual `codesign` returns instantly). macOS has
+  no `timeout`; cap it with `cmd & PID=$!; (sleep 240; kill $PID) & wait $PID`. Workaround that worked: the
+  compiled `.app` in `Debug-iphoneos` already has `embedded.mobileprovision`; sign it by hand
+  (`codesign --force --sign <identity> --timestamp=none --generate-entitlement-der --entitlements <HomeGymLog.app.xcent> <app>`,
+  identity from `security find-identity -v -p codesigning`, xcent under `Intermediates.noindex`), verify with
+  `codesign --verify --deep --strict`, then `devicectl device install` and `process launch`.
 
 - 2026-09-10 — **Xcode 26's App wizard defaults need five corrections** before the project matches the plan:
   it creates iPhone + iPad + Mac + Apple Vision destinations (remove all but iPhone under General →
