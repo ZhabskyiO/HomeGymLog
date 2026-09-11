@@ -21,6 +21,10 @@ Review the files or diff you are pointed at. Look for, in priority order:
 4. **Readability for a Swift newcomer.** Clever operators, deep generic constraints, or force-casts where
    a plain `if let` or a named helper would do.
 
+Always build the Release configuration as part of the review
+(`xcodebuild -scheme HomeGymLog -configuration Release -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.5' -derivedDataPath build/DerivedData CODE_SIGNING_ALLOWED=NO build`):
+a `#if DEBUG`-only type referenced outside its guard fails only there, and nothing else builds Release before an archive.
+
 Do not comment on formatting, naming preferences, or hypothetical scale problems.
 
 For every finding give: file and line, what is wrong, a concrete failure scenario, and the fix as a short

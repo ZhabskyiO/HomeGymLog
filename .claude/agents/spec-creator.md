@@ -31,7 +31,9 @@ Write the spec to `docs/specs/<milestone-or-feature>.md` with these sections:
    snapshot explicitly so the comparison can skip it.
 9. **Open questions.** Only things the prototype and decisions do not settle. Propose a default for each.
 
-Rules: keep the spec under 400 lines unless numeric tables require more; prefer tables to prose.
+Rules: keep the spec under 400 lines unless numeric tables require more; prefer tables to prose. For any table
+derived from existing Engine code (row lists, schedules, weights), show the derivation per row (the intermediate
+walk or formula inputs) so a reviewer can check it without recomputing; derive by reading the code, never from memory.
 Describe behavior, not implementation. No SwiftUI view names, no code. Engine functions are
 specified over plain values with an explicit calendar and reference date, never as mutations on stored
 rows; input validation throws a typed error, never traps. Where the prototype is

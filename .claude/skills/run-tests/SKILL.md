@@ -8,7 +8,9 @@ Run the test suite and report results honestly. Never edit production code from 
 ## Steps
 
 1. If no `*.xcodeproj` exists, stop and say so.
-2. Choose a simulator the same way `build-and-run` does (booted first, else newest iPhone).
+2. Choose a simulator the same way `build-and-run` does (booted first, else newest iPhone). A test run on another
+   runtime can shut down other booted simulators; after the run, re-boot the one used for screenshots
+   (`xcrun simctl boot <udid>; xcrun simctl bootstatus <udid> -b`) before any install or screenshot.
 3. Run. If an argument was given, treat it as a filter for `-only-testing:` (e.g. `HomeGymLogTests/ProgramGeneratorTests`).
    ```
    xcodebuild test -scheme HomeGymLog -destination "platform=iOS Simulator,name=<name>" \

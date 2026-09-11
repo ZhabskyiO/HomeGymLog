@@ -256,6 +256,27 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
 
 ## Agent tuning
 
+- 2026-09-10 (m2-onboarding) — **swift-reviewer** built the Release configuration on its own initiative and found
+  that `App.init` referenced the `#if DEBUG`-only `DebugSeed` outside the guard (Release did not compile). Codified:
+  the reviewer always builds Release; `/ship-check` and CLAUDE.md carry the command.
+- 2026-09-10 (m2-onboarding) — **architecture-reviewer** caught that the seeder would have been a second writer
+  of the completed-status invariant and that "today" had no injection point; both became decisions
+  (`WorkoutLogStore.finish`, `AppClock`). Nothing to change.
+- 2026-09-10 (m2-onboarding) — **spec-creator** got two of five derived starting-weight rows wrong (5.1); the
+  reviewer recomputed them. Prompt edit: show the derivation for any table derived from existing Engine code.
+- 2026-09-10 (m2-onboarding) — **researcher** verified all three questions with a probe project (excellent) but
+  proposed its own seed naming (`onboarding<N>`) although the brief fixed the prototype's snapshot names. Prompt
+  edit: adopt names the brief already fixes.
+- 2026-09-10 (m2-onboarding) — **implementation-planner** sketched a ternary between two View types (compile
+  error) and a test that could not fail after its own refactor; the verifier caught both in round 1. Prompt edit:
+  sketches must be compilable in principle; every planned test must be able to fail.
+- 2026-09-10 (m2-onboarding) — **test-writer** added 44 tests including a static AC-27 scan and flagged a weak
+  `||` assertion in the implementer's test. Prompt edit: always report existing assertions that cannot fail.
+- 2026-09-10 (m2-onboarding) — **implementer (main session)**: shipped a `containerRelativeFrame` phase bar that
+  rendered a black screen (caught by the seeded screenshot, not by a test) and one tautological assertion. What
+  worked: implementing independent plan steps in pairs (1+2, 3+4, 5a+5b, 7+8+9) with one build each, and
+  screenshotting every seed before moving on.
+
 - 2026-09-10 — **researcher**: its "no `@MainActor` needed in tests" finding was true for raw `ModelContext` but
   was quoted broadly and became a plan defect (persistence suites calling app-target types under MainActor
   default isolation). Findings must state the exact configuration they were verified under, including build
@@ -279,6 +300,8 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
   spec-creator in parallel at the start of `/milestone` saved a full round.
 
 ### Skill tuning
+- 2026-09-10 — **run-tests / build-and-run**: an `xcodebuild test` on the iOS 26.5 runtime shut down the booted
+  iOS 17.5 simulator (twice); both skills now boot the simulator before installing or screenshotting.
 
 - 2026-09-10 — **design-compare**: step 1 rewritten to the headless-Chrome recipe (Patterns, below): local
   `http.server`, `--headless=new` screenshot of the whole flows page, `sips` crops with the recorded row-A offsets.

@@ -21,7 +21,9 @@ For each question:
    assuming versions.
 5. Give a minimal, correct code example that compiles against iOS 17 when the question is "how do I".
    Mark anything you could not verify as unverified.
-6. State the exact configuration every claim was verified under: OS runtime, build settings (language
+6. Use the names and shapes the brief or spec already fixes (seed names, keys, file names); do not propose
+   alternatives unless the fixed one is wrong, and then say so explicitly.
+7. State the exact configuration every claim was verified under: OS runtime, build settings (language
    mode, default actor isolation), and which target the calling code lives in. A claim verified for one
    target does not transfer to another; say so explicitly.
 

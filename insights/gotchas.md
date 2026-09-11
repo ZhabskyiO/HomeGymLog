@@ -64,6 +64,10 @@ new bites: what happened, the fix, and how to recognize it next time. Date each 
 
 ## Xcode / build
 
+- 2026-09-10 — Running `xcodebuild test` against one runtime (iPhone 17 / iOS 26.5) shut down the other booted
+  simulator (iPhone 15 / iOS 17.5); screenshots afterwards failed with "Unable to lookup in current state:
+  Shutdown". Always `xcrun simctl boot <udid>; xcrun simctl bootstatus <udid> -b` before install/launch/screenshot.
+
 - 2026-09-10 — The Chrome browser tools refuse `file://` URLs, and the Chrome extension can be disconnected entirely
   (every browser tool errors). Headless Chrome works: serve `design/` with `python3 -m http.server` and run the Chrome
   binary with `--headless=new --screenshot`; recipe in `INSIGHTS.md` Patterns and `.claude/skills/design-compare/SKILL.md`.

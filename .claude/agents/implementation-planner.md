@@ -31,7 +31,10 @@ changes a SwiftData relationship, delete, or `#Predicate` must include a persist
 iPhone 15 / iOS 17.5 simulator (runtime behavior differs from newer OS; see gotchas "SwiftData"). Any step
 that adds a screen must (a) name the `-seed` launch state that shows it, extending `App/DebugSeed` when
 none fits, and (b) verify with `/design-compare <snapshot>` against the prototype snapshot the spec names,
-not by eye. Keep the plan under 400 lines; put long tables in the spec and reference them. Every helper, fixture,
+not by eye. Keep the plan under 400 lines; put long tables in the spec and reference them. Code sketches must be compilable in
+principle (an `if/else` inside `body`, never a ternary between different View types). Every planned test must be
+able to fail when the rule is wrong: assert against an independently built value, never against the same function
+the refactor made both sides depend on. Every helper, fixture,
 file, or artifact a step uses must be declared in that step or an earlier one, and every verify command
 may read only files an earlier command writes. Pure Engine code, views
 separate. Prefer the smallest plan that fully meets the spec. Do not write Swift code beyond signatures

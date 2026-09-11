@@ -25,7 +25,8 @@ build, with the errors.
 5. On failure: list every `error:` line as `path:line: message`, grouped by file, and stop. Do not retry
    with different flags. If the error matches an entry in `insights/gotchas.md`, cite it. If it took more
    than a few minutes to understand, add an entry there.
-6. On success, install and launch:
+6. On success, boot the target simulator if a test run shut it down (`xcrun simctl boot <udid>` is a no-op when
+   already booted; `xcrun simctl bootstatus <udid> -b` waits), then install and launch:
    ```
    APP=$(find build/DerivedData/Build/Products/Debug-iphonesimulator -maxdepth 1 -name "*.app" | head -1)
    xcrun simctl install booted "$APP"

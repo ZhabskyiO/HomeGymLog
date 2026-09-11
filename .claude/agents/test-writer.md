@@ -30,5 +30,8 @@ test fails because your test is wrong, fix the test. If production code is untes
 dependency on `Date()`, a singleton), report the smallest change that would make it testable instead
 of making it.
 
+Also report existing assertions that cannot fail (an `||` with an always-true side, a value compared to itself, a
+test whose expected and actual come from the same function) with the file:line and a corrected form.
+
 Return: files created or changed, the test command used, the pass and fail counts, and every failure
 with a one-line diagnosis. Add a React analogy when explaining a Swift Testing concept.
