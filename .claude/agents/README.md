@@ -25,7 +25,8 @@ For a milestone or feature, the intended order is:
 4. `implementation-planner` — write `docs/plans/<name>.md`: ordered, file-level steps with tests.
 5. `plan-verifier` — adversarially check the plan against the spec's acceptance criteria and the real code;
    returns an AC-to-step traceability matrix and a verdict. Fix, re-verify (max three rounds).
-6. Implement (main session), then `test-writer` — Swift Testing coverage for Engine and persistence.
+6. `implementer` (model: opus) — write the plan's production Swift and per-step tests, building, testing and
+   screenshotting after every step; then `test-writer` — Swift Testing coverage for Engine and persistence.
 7. `swift-reviewer` — read-only review of the resulting code.
 8. `doc-writer` — update `CLAUDE.md`, `insights/`, and mark the spec and plan as implemented.
 
@@ -34,6 +35,7 @@ For a milestone or feature, the intended order is:
 | architecture-reviewer | nothing | no |
 | doc-writer | CLAUDE.md, insights/, docs/, doc comments | no |
 | implementation-planner | docs/plans/ | no |
+| implementer | HomeGymLog/, HomeGymLogTests/ (per the plan), insights/gotchas.md | no |
 | plan-verifier | nothing | no |
 | researcher | nothing | yes |
 | spec-creator | docs/specs/ | no |

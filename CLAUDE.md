@@ -91,8 +91,9 @@ insights/                  INSIGHTS.md, gotchas.md
 ## Agent flow for a milestone
 
 researcher (if platform questions) → spec-creator → architecture-reviewer → implementation-planner →
-plan-verifier → implement → test-writer → swift-reviewer → doc-writer. Details in `.claude/agents/README.md`.
-Agents that write only touch their own output (specs, plans, tests, docs); production Swift is written in the main session.
+plan-verifier → implementer → test-writer → swift-reviewer → doc-writer. Details in `.claude/agents/README.md`.
+Agents that write only touch their own output (specs, plans, tests, docs); production Swift is written by the
+`implementer` agent (model: opus, added 2026-09-11) from the verified plan, one step per build, and never committed by it.
 
 Work happens in slices on branches `m<N>-<slice>` created by `/milestone`, merged to `main` after
 `/pr-self-review`. UI slices are verified against the prototype with `/design-compare`, which renders the design
