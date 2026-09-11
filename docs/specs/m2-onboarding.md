@@ -92,7 +92,7 @@ copy audit, although only session length is used by a formula). Three cards:
 
 | Card | Controls |
 |---|---|
-| Body weight (lb / kg pill under the title) | Its own unit toggle, initially the welcome-step unit, changeable independently (decision 2026-09-10); the choice is saved as the `bodyWeightUnits` preference at Start program. − / + 34 pt round buttons around a 22 pt bold value. Step ±5 lb regardless of unit, bounded 50…500 lb (5.4). Default 180 lb (shows "180" / "82" kg). |
+| Body weight (lb / kg pill under the title) | Its own unit toggle, initially the welcome-step unit, changeable independently (decision 2026-09-10); the choice is saved as the `bodyWeightUnits` preference at Start program. − / + 34 pt round buttons around a 22 pt bold value. Step one unit per tap in the body-weight display unit: 1 lb, or 1 kg stored as 2.20462 lb (decision 2026-09-10, replaces the prototype's ±5); clamped to 50…500 lb (5.4). Default 180 lb (shows "180" / "82" kg). |
 | Experience | Beginner / Intermediate / Advanced segments; default Intermediate. Stored, unused by any formula (decision). |
 | Session length (caption = "N exercises per session") | 20m / 30m / 45m / 60m segments; default 45m. Caption 3 / 4 / 5 / 6 exercises. |
 
@@ -158,7 +158,7 @@ held inside a step). The draft clamps every mutation (bounds, grids, day count).
 | `months` | 1, 2, 3, 6 | 1 | A2 |
 | `frequency` | 3, 4, 5 | 4 | A3 (also resets `days`) |
 | `days` | set of 0…6, size ≤ frequency | `defaultWeekdays(4)` = {0,1,3,4} | A3 day buttons |
-| `bodyWeightLb` | 50…500, multiple of 5 | 180 | A4 ±5 |
+| `bodyWeightLb` | 50…500, any value (kg steps are non-integer pounds) | 180 | A4 ±1 in the display unit |
 | `experience` | Beginner / Intermediate / Advanced | Intermediate | A4 |
 | `sessionLengthMinutes` | 20, 30, 45, 60 | 45 | A4 |
 | `startingWeightsLb` | key → loadable lb (user-touched keys only) | empty | A5 steppers |
@@ -305,7 +305,8 @@ Volumes and body weight (prototype `Dk`): integer kg, `round(lb × 0.45359237)`:
 
 ### 5.4 Body weight (decided)
 
-Stepper ±5 lb in both units (prototype `bwDown`/`bwUp`), bounded 50…500 lb (the prototype has no bounds;
+Stepper ±1 in the body-weight display unit (1 lb, or 1 kg = 2.20462 lb; decision 2026-09-10, the prototype's
+`bwDown`/`bwUp` were ±5 lb), clamped to 50…500 lb (the prototype has no bounds;
 at a bound the button does nothing). Display: lb integer; kg per `Dk`. Stored on `Program.bodyWeightLb`;
 unused by any formula (decision).
 

@@ -29,7 +29,6 @@ final class OnboardingDraft {
     private(set) var preview: ProgramSummary?
 
     static let ctaLabels = ["Set up my program", "Continue", "Continue", "Continue", "Generate program", "Start program"]
-    static let bodyWeightStepLb = 5.0
     static let bodyWeightRangeLb = 50.0...500.0
 
     init(units: WeightUnit = .lb, months: Int = 1, frequency: Int = 4) {
@@ -72,11 +71,12 @@ final class OnboardingDraft {
         days.sort()
     }
 
-    /// ±5 lb; no-op when the result would leave 50…500.
-    func adjustBodyWeight(by lb: Double) {
-        let result = bodyWeightLb + lb
-        guard Self.bodyWeightRangeLb.contains(result) else { return }
-        bodyWeightLb = result
+    /// One unit per tap in the body-weight display unit (1 lb, or 1 kg = 2.20462 lb), clamped to 50…500 lb.
+    /// Storage stays in pounds; a kg user's value is therefore a non-integer number of pounds.
+    func adjustBodyWeight(steps: Int) {
+        let stepLb = bodyWeightUnit == .lb ? 1.0 : 1.0 / WeightDisplay.kgPerLb
+        let result = bodyWeightLb + Double(steps) * stepLb
+        bodyWeightLb = min(max(result, Self.bodyWeightRangeLb.lowerBound), Self.bodyWeightRangeLb.upperBound)
     }
 
     /// Moves one row by equipment steps; no-op at the equipment bound.

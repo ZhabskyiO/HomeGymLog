@@ -42,17 +42,27 @@ import Testing
         #expect(!d.days.contains(6) && d.canContinue, "only step 2 gates Continue")
     }
 
-    @Test("body weight steps by 5 within 50…500")
+    @Test("body weight steps by 1 lb in lb mode and 1 kg in kg mode, clamped to 50…500 lb")
     func bodyWeight() {
         let d = OnboardingDraft()
-        d.adjustBodyWeight(by: 5)
-        #expect(d.bodyWeightLb == 185)
+        d.adjustBodyWeight(steps: 1)
+        #expect(d.bodyWeightLb == 181)
+        d.adjustBodyWeight(steps: -3)
+        #expect(d.bodyWeightLb == 178)
         d.bodyWeightLb = 50
-        d.adjustBodyWeight(by: -5)
+        d.adjustBodyWeight(steps: -1)
         #expect(d.bodyWeightLb == 50)
         d.bodyWeightLb = 500
-        d.adjustBodyWeight(by: 5)
+        d.adjustBodyWeight(steps: 1)
         #expect(d.bodyWeightLb == 500)
+        d.bodyWeightLb = 180
+        d.bodyWeightUnit = .kg
+        d.adjustBodyWeight(steps: 1)
+        #expect(abs(d.bodyWeightLb - 182.2046) < 0.001, "one kg is 2.2046 lb")
+        #expect(WeightDisplay.wholeText(lb: d.bodyWeightLb, unit: .kg) == "83", "the displayed kg moves by exactly one")
+        d.bodyWeightLb = 499.5
+        d.adjustBodyWeight(steps: 1)
+        #expect(d.bodyWeightLb == 500, "a kg step that would overshoot clamps to the bound")
     }
 
     @Test("starting weights step by equipment and stop at bounds; overrides survive a hidden row")
@@ -125,9 +135,9 @@ import Testing
         d.bodyWeightUnit = .lb
         d.units = .kg
         #expect(d.bodyWeightUnit == .lb, "an explicit choice sticks")
-        d.adjustBodyWeight(by: 5)
-        #expect(d.bodyWeightLb == 185, "stepper stays in pounds whatever the display unit")
-        #expect(WeightDisplay.wholeText(lb: d.bodyWeightLb, unit: .kg) == "84")
+        d.adjustBodyWeight(steps: 1)
+        #expect(d.bodyWeightLb == 181, "lb mode steps one pound")
+        #expect(WeightDisplay.wholeText(lb: d.bodyWeightLb, unit: .kg) == "82")
     }
 
     @Test("changing the unit never changes stored values (AC-10)")

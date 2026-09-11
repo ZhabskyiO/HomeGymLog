@@ -58,7 +58,8 @@ becomes `ShellView`; the new root switches on `currentPrograms.isEmpty`. Analogy
   and PRs stay for Progress. Routing shows onboarding iff no program has `archivedAt == nil`.
 - **kg display is one decimal** (42.5 lb → 19.3 kg); body weight and volume totals show integer kg. Storage and
   steppers stay in pounds; a stepper moves one equipment step (2.5 / 10 lb) whatever the display unit.
-- **Body weight stepper is ±5 lb always, bounded 50…500 lb.** Body weight has its own lb/kg toggle on the About
+- **Body weight stepper is ±1 in the display unit** (1 lb, or 1 kg = 2.20462 lb; user request 2026-09-10 after
+  device use replaced the ±5 lb rule), clamped to 50…500 lb. Body weight has its own lb/kg toggle on the About
   you step (user request 2026-09-10): it starts as the welcome-step unit but can differ; saved as the
   `bodyWeightUnits` preference. Storage stays pounds.
 - **Day picker swaps instead of refusing** (user request 2026-09-10): with N days selected, tapping another day

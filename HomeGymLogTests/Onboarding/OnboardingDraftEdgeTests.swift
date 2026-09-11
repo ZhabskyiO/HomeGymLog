@@ -122,13 +122,13 @@ import Testing
     @Test("body weight reaches both bounds by stepping and stops there")
     func bodyWeightBoundsByStepping() {
         let d = OnboardingDraft()
-        for _ in 0..<26 { d.adjustBodyWeight(by: -5) }
+        for _ in 0..<131 { d.adjustBodyWeight(steps: -1) }
         #expect(d.bodyWeightLb == 50)
-        d.adjustBodyWeight(by: -5)
+        d.adjustBodyWeight(steps: -1)
         #expect(d.bodyWeightLb == 50)
-        for _ in 0..<90 { d.adjustBodyWeight(by: 5) }
+        for _ in 0..<450 { d.adjustBodyWeight(steps: 1) }
         #expect(d.bodyWeightLb == 500)
-        d.adjustBodyWeight(by: 5)
+        d.adjustBodyWeight(steps: 1)
         #expect(d.bodyWeightLb == 500)
         #expect(d.bodyWeightLb.truncatingRemainder(dividingBy: 5) == 0)
     }

@@ -16,13 +16,13 @@ struct AboutYouStep: View {
                     }
                     Spacer()
                     HStack(spacing: 12) {
-                        StepperButton(symbol: "−", size: 34) { draft.adjustBodyWeight(by: -OnboardingDraft.bodyWeightStepLb) }
+                        StepperButton(symbol: "−", size: 34) { draft.adjustBodyWeight(steps: -1) }
                         Text(WeightDisplay.wholeText(lb: draft.bodyWeightLb, unit: draft.bodyWeightUnit))
                             .font(.system(size: 22, weight: .bold))
                             .monospacedDigit()
                             .foregroundStyle(Theme.tx)
                             .frame(minWidth: 44)
-                        StepperButton(symbol: "+", size: 34) { draft.adjustBodyWeight(by: OnboardingDraft.bodyWeightStepLb) }
+                        StepperButton(symbol: "+", size: 34) { draft.adjustBodyWeight(steps: 1) }
                     }
                 }
                 .padding(.horizontal, 16)
