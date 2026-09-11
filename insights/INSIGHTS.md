@@ -6,6 +6,35 @@ Keep entries short. Date them. Newest at the top within each section.
 
 ## Architecture decisions
 
+### 2026-09-11 — M2 Program tab decisions (from the program-tab slice spec, user-answered)
+
+- **Week chips are calendar windows**, Mon–Sun, anchored on the Monday of the earliest session's week; count =
+  days(anchor → latest session) / 7 + 1. A mid-week start therefore shows one more chip than `Program.weeks` and a
+  re-slotted session sits under the week it actually falls in. Chip phase = recorded phase of the highest-index
+  session in the window (never recomputed). `Program.startDate` is not the anchor (a weekend generation would leave
+  window 1 empty).
+- **Initial week is the window containing today** (prototype `curWeek`), not `HomeStats.currentWeek`; they differ on
+  `restDay` (Sat: window 3 with the rest card, vs stored week 4 of Monday's next session).
+- **Skipped** session card status reads "Skipped" in `mu`; day dot `mu` like pending.
+- **Selected chip scrolls minimally into view** on appear (`scrollTo(id, anchor: nil)`): never scrolls when already
+  visible, so the `program` snapshot stays exact. "Center only when off-screen" was dropped (architecture review B4:
+  not implementable on iOS 17 without a layout read; user chose minimal scroll).
+- **Selection resets on every return to the tab** (user choice over the prototype's persistent state): each appear
+  of the Program screen snaps week/day back to today's; taps persist only while the tab stays visible.
+- **DEBUG launch arguments `-programWeek <n> -programDay <d>`** preselect the week and day so the "Missed" card is
+  screenshot-checkable from `-seed missed`. Delivery is the `seedDraft` pattern generalized: a production value type
+  `ProgramTabPreselection` in an `@Entry` environment value that defaults to nil and is populated only inside the
+  root's `#if DEBUG` block; the view has no `#if`, and on every appear `selection = preselection ?? followToday`.
+- **DEBUG `-tab <name>` launch argument** opens the shell on a given tab (planner addition): scripted taps are refused
+  here, so every seeded Program screenshot launches with `-seed <s> -tab program`. Same nil-by-default `@Entry` shape.
+- **Out-of-range selection (tap or DEBUG) falls back to follow-today; nothing is clamped** (B1).
+- **The Program tab does not run `HomeStatsInput` validation**: `ProgramTabStats` has no uniqueness precondition and
+  reads `HomeSnapshotBuilder.sessionSummaries` directly, so there is no Release fallback to get wrong (B2).
+- **Reused Home views live in `Shared/`**: `ExerciseInfoSheet` moves there with a `View` extension for its four
+  presentation modifiers (NB1). `HomeStats.sessionState(_:today:calendar:)` is the one derivation of a session's state
+  relative to today, used by the week strip and the Program card (NB2). `CalendarRules.days(from:to:)` is the one
+  day-difference helper (NB3). Selection is `enum ProgramSelection { followToday, week, day }` (NB4).
+
 ### 2026-09-10 — M2 Home architecture (from the architecture review; revised 2026-09-11 as implemented)
 - **Home owns its own `@Query` on `PlannedSession`** (`#Predicate { $0.program?.id == programID }`, sorted by
   index), built in `init(program:)`; the `Program` is passed from the router only for its immutable fields. Verified
