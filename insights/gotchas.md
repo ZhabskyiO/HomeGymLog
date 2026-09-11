@@ -43,7 +43,21 @@ new bites: what happened, the fix, and how to recognize it next time. Date each 
 - 2026-09-10 — `print` inside a test never reaches xcodebuild's output. To see a value from a test, put it in
   a failing `#expect(Bool(false), Comment(rawValue: ...))` and read it from the result bundle with
   `xcrun xcresulttool get test-results tests --path build/tests.xcresult`.
-- (expected areas still open: `@Query` sorting on relationships, migrations, previews)
+- 2026-09-11 — **iOS 17.5 does not retain unheld model instances**: `weak var w = program.sortedSessions[1]` is nil at
+  once, so a `body` that only traverses `program.sessions` observes objects gone before the next write; nothing
+  re-renders (a `let program: Program` view stayed stale through five saves). Hold rows via `@Query`. iOS 26.5 retains.
+- 2026-09-11 — A child whose only input is an unchanged `Program` reference is skipped by SwiftUI even when the parent's
+  `@Query` re-fetched; give the child its own `@Query` or a changing value input.
+- 2026-09-11 — `#Predicate` on 17.5/26.5: `$0.program == program` does not compile (use `$0.program?.id == id`);
+  `$0.loggedAt!` throws `unsupportedPredicate` at runtime (use `($0.loggedAt ?? distantPast)` with `distantPast` a
+  local; `Date.distantPast` inline does not compile); a two-level optional chain (`$0.exercise?.workout?.finishedAt`)
+  **crashes the process**; `$0.program?.archivedAt == nil` also matches orphans.
+- 2026-09-11 — Relationship traversal on 17.5 costs ~90 µs per row, is not cached between accesses (2 125 sets: 365 ms
+  then 379 ms), to-one chains upward ~300 µs each, and `relationshipKeyPathsForPrefetching` made it 4× slower. Never
+  traverse the whole log history in `body`.
+- 2026-09-11 — Writes through a second `ModelContext` are not reliably visible to objects already registered in another
+  context (stale on 17.5 even after re-fetch). Keep every writer on `mainContext`.
+- (expected areas still open: migrations, previews)
 
 ## SwiftUI
 
@@ -51,6 +65,10 @@ new bites: what happened, the fix, and how to recognize it next time. Date each 
   screen black: no crash, no console message. Fix: wrap the row in a `GeometryReader`, compute each segment width from
   `geometry.size.width`, and pin the reader's height with `.frame(height:)` (`Shared/PhaseBar.swift`). Recognize it: a
   black screen with no error right after adding a proportional-width layout.
+- 2026-09-11 — `Dictionary(uniqueKeysWithValues:)` **traps at runtime on a duplicate key** ("Duplicate values for key"),
+  it does not overwrite like a JS object literal. Fix: use `Dictionary(_, uniquingKeysWith: { first, _ in first })`, or
+  reject duplicates at the boundary that builds the values (`HomeStatsInput.init` throws `duplicateLogIndex`) — Home
+  does both. Recognize it: a crash inside a one-line `Dictionary(...)` built from data rather than from a literal.
 - 2026-09-10 — In `App.init`, `Result { try AppSchema.makeContainer(inMemory: seed != nil) }` fails with "constant
   'self.containerResult' captured by a closure before being initialized" when `seed` is a stored property. Compute the
   flag into a local first.
@@ -64,6 +82,17 @@ new bites: what happened, the fix, and how to recognize it next time. Date each 
 
 ## Xcode / build
 
+- 2026-09-11 — **Launch arguments override any `UserDefaults` suite**, not just `.standard`: `-units kg` after
+  `-seed midProgram` makes `@AppStorage("units")` read "kg" even though the seed swaps in a cleared
+  `UserDefaults(suiteName: "seed")`. Use it to screenshot the kg path without tapping through onboarding.
+  Recognition: a preference "changes on its own" in a seeded run → check the launch arguments.
+
+- 2026-09-11 — `xcodebuild` refuses to write a result bundle over an existing one: it fails before running anything
+  with "Existing file at -resultBundlePath". Fix: `rm -rf build/tests.xcresult` first (every documented command does).
+  Recognize it: a test run that ends immediately with no compile output and no test counts.
+- 2026-09-11 — `-only-testing` for a Swift Testing function needs the parentheses (`Suite/test()`); without them 0
+  tests run and xcodebuild still prints TEST SUCCEEDED. Parallel test clones can shut down the booted simulator;
+  `-parallel-testing-enabled NO` avoids it.
 - 2026-09-10 — Running `xcodebuild test` against one runtime (iPhone 17 / iOS 26.5) shut down the other booted
   simulator (iPhone 15 / iOS 17.5); screenshots afterwards failed with "Unable to lookup in current state:
   Shutdown". Always `xcrun simctl boot <udid>; xcrun simctl bootstatus <udid> -b` before install/launch/screenshot.

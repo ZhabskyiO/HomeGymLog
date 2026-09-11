@@ -26,7 +26,9 @@ Verify the working tree is ready to commit. Report failures; do not hide them.
    lines are updated. If a spec or plan was implemented, it gets a dated implemented line.
 7. Run `/engineering-insight` for this slice so the retrospective lands before the commit (the Stop hook
    would otherwise demand it right after the commit anyway).
-8. Draft a commit message: a one-line summary in imperative mood, a blank line, then what and why in
+8. After the user says yes and the commit lands, run `git rev-parse HEAD > .claude/.last-retro` so the Stop hook
+   does not demand a second retrospective for a commit this run already covered.
+9. Draft a commit message: a one-line summary in imperative mood, a blank line, then what and why in
    three to six lines. End with the Co-Authored-By trailer from `CLAUDE.md` conventions.
 
 ## Report

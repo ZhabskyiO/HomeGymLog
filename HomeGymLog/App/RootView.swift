@@ -11,10 +11,10 @@ struct RootView: View {
 
     var body: some View {
         // if/else, not a ternary: a ternary needs one View type; @ViewBuilder wraps both branches.
-        if currentPrograms.isEmpty {
-            OnboardingView(initialDraft: seedDraft ?? OnboardingDraft(units: WeightUnit(rawValue: unitsRaw) ?? .lb))
+        if let program = currentPrograms.first {
+            ShellView(program: program)
         } else {
-            ShellView()
+            OnboardingView(initialDraft: seedDraft ?? OnboardingDraft(units: WeightUnit(rawValue: unitsRaw) ?? .lb))
         }
     }
 }

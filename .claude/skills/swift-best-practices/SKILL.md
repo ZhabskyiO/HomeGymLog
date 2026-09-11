@@ -29,6 +29,10 @@ fix. When invoked with a topic, explain that section with a short example and it
   store), `@Environment` for injected services (≈ context), `@Observable` classes for shared mutable
   state (≈ a store). Never copy a `@Query` result into `@State`.
 - Sheets and alerts driven by one optional enum with `.sheet(item:)`, not stacked booleans.
+- A `catch` in a view must still render something useful: `assertionFailure` is a no-op in Release, so the
+  fallback value is what users see. Degrade to the valid part of the data, never to an empty screen.
+- A screen whose `@State` derives from a model prop gets `.id(model.id)` at the call site (≈ `key={id}`), so the
+  state resets when the parent passes a different model.
 - Side effects in `.task {}` (cancelled on disappear, ≈ effect with cleanup) or `.onChange(of:)`.
   Timers must be cancelled; prefer `Date`-based computation over incrementing counters so backgrounding
   does not drift.

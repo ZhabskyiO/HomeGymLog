@@ -6,14 +6,21 @@ Keep entries short. Date them. Newest at the top within each section.
 
 ## Architecture decisions
 
-### 2026-09-10 — M2 Home architecture (from the architecture review)
-- **The current `Program` is passed as a prop** from `RootView`'s query into `ShellView(program:)` and the tab
-  screens. No second `@Query` for "current". The `@Model → HomeStatsInput` mapping runs inside `body` so Observation
-  registers every nested read (`statusRaw`, `workoutLog?.finishedAt`, set weights). Fallback if 17.5 does not
-  re-render through relationships: an unfiltered `@Query` on `PlannedSession` filtered in memory by
-  `persistentModelID`, plus a `@Query` on `WorkoutLog.finishedAt != nil`.
-- **Screens that depend on "today" hold one `@State today`**, set on appear and when the scene becomes active;
-  `clock.now()` is never read inside `body`. Analogy: `useEffect` on `visibilitychange` calling `setToday`.
+### 2026-09-10 — M2 Home architecture (from the architecture review; revised 2026-09-11 as implemented)
+- **Home owns its own `@Query` on `PlannedSession`** (`#Predicate { $0.program?.id == programID }`, sorted by
+  index), built in `init(program:)`; the `Program` is passed from the router only for its immutable fields. Verified
+  2026-09-11 on iOS 17.5: the context does not retain traversed instances, so a view holding a `Program` (or receiving
+  the same instance from the router's `@Query`) never re-renders on session/log/set changes, while a `@Query` retains
+  its rows and re-fetches on every save. Session-derived stats are computed from the retained rows in `body`;
+  `[FinishedLogValue]` (PRs, week volume) is built once per data change in `.task(id: fingerprint)` because a full
+  log traversal costs ~0.4 s at program end on 17.5 and is never cached. Analogy: `useQuery` for rows, `useMemo`
+  keyed on a fingerprint for the expensive mapping. All writers stay on `mainContext`.
+- **Screens that depend on "today" hold one `@State now`**, written in `.onAppear` and in `.onChange(of: scenePhase)`
+  when `.active` (verified: a bare `clock.now()` in `body` never refreshes on foreground); `now ?? clock.now()` covers
+  only the pre-appear frame. Analogy: a `visibilitychange` effect.
+- **The screen carries `.id(program.id)`** (`ShellView` applies it to `HomeView`): its `@State` is derived from the
+  program prop, so a different program must reset it rather than show one frame of the old program's values. Analogy:
+  `key={program.id}`.
 - **Streak**: consecutive completed sessions walking back from today; a pending or skipped session dated today is
   stepped over; a pending or skipped session dated before today stops the walk.
 - **Stats are scoped to the current program**: PRs, streak and volume ignore archived programs (restart resets the
@@ -23,9 +30,18 @@ Keep entries short. Date them. Newest at the top within each section.
   second sheet lands. **Tab selection is owned by `ShellView`** and passed as a `Binding` (same shape as the pill).
 - **Seed recipe reuse**: `restDay` = `MidProgramSeed` with completed indexes 0–14 minus 7; `freshProgram` is built
   from `OnboardingDraft()` defaults so "defaults" is true by construction.
-- Validation lives in the Engine's throwing `HomeStatsInput.init(sessions:logs:)`; the Models-layer
-  `@MainActor` `init(program:)` only maps rows and delegates. `HomeStats` functions are non-throwing over a valid input.
+- Validation lives in the Engine's throwing `HomeStatsInput.init(sessions:logs:)`, the single validating step:
+  duplicate session index, a log whose session index is unknown, and two logs for the same session
+  (`duplicateSessionIndex` / `unknownSessionIndex` / `duplicateLogIndex`). `HomeSnapshotBuilder` (Models, `@MainActor`)
+  only maps rows and never validates. `HomeStats` functions are non-throwing over a valid input; `personalRecords`
+  still builds its index with `Dictionary(uniquingKeysWith:)` as a backstop so a caller bypassing the validator gets
+  the first log instead of a trap. A validation failure in the view falls back to sessions-only (header, tiles, strip
+  and cards stay correct; PRs and volume drop for that frame), because `assertionFailure` is a no-op in Release.
   Engine stays text-free (`greeting` returns an enum; `kfmt` lives in Shared; `WeightDisplay.whole(lb:unit:) -> Int`).
+- 2026-09-11 — **The `.task` fingerprint (index | statusRaw | scheduledDate per session) omits set-level fields by
+  design**: finished sets never change in v1, so no edit to a logged weight or rep can happen without a session's
+  status or date changing first. If M4 (or any later slice) lets a finished set be edited, widen the fingerprint or
+  the PR and volume numbers will stay stale until the next status change.
 
 ### 2026-09-10 — M2 Home decisions (from the home slice spec)
 - **Week window is the calendar week Mon–Sun containing today** for the week strip and the "this week" volume
@@ -295,6 +311,31 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
 
 ## Agent tuning
 
+- 2026-09-11 (m2-home) — **researcher** ran in parallel with spec-creator and its iOS 17.5 probe (a view holding
+  only a `Program` never re-renders; `#Predicate` hazards) rewrote the data flow after the spec and plan were
+  written, costing a planner revision and a third verifier round. Rule: when the platform question decides the
+  data flow (observation, queries, persistence), run researcher first and hand its findings to spec-creator; run
+  them in parallel only for API-availability questions. (`/milestone` step 3 updated.)
+- 2026-09-11 (m2-home) — **plan-verifier** round 3 (scoped, ~195k tokens) found the two things a rewrite leaves
+  behind: the old artifact name still in the spec and INSIGHTS, and a spec invariant ("`now` set on appear") the
+  new sketch dropped. Rule: after a plan revision that renames or removes an artifact, grep spec and INSIGHTS for
+  the old name before re-verifying. (`/milestone` step 7 updated.)
+- 2026-09-11 (m2-home) — **swift-reviewer** found three real issues with no re-prompt: a `Dictionary(uniqueKeysWithValues:)`
+  trap on input the validator accepted, a `catch` fallback that renders a blank Home in Release because
+  `assertionFailure` is a no-op there (plus `@State` outliving its program → `.id(program.id)`), and a
+  double-negated filter. All applied. Codified the Release-fallback rule in `/swift-best-practices`.
+- 2026-09-11 (m2-home) — **test-writer** added 36 tests (223 total), fixed its own wrong DST fact, and absorbed a
+  mid-run production change (`duplicateLogIndex`) sent with SendMessage. What worked: message a running agent
+  about a production change instead of waiting and re-launching. Prompt edit: never pass `-resultBundlePath`
+  (a stale bundle fails the run).
+- 2026-09-11 (m2-home) — **doc-writer** correctly declined to write `docs/learning/` notes (that folder belongs to
+  `/learning-notes`); do not ask it for study notes. It edited three `///` comments in Swift; rebuilt after.
+- 2026-09-11 (m2-home) — **implementer (main session)**: all nine view files compiled first time; the seeded
+  screenshots (not tests) caught two layout misses against the prototype: long exercise names truncated and the
+  records row scrolled where the design fits four cards. The spec's CSS-derived numbers (min width 130) lost to
+  the rendered prototype; the spec now records the deviation. What worked: every screenshot compared before
+  moving on, `-units kg` for the kg path, pinned status bar for the byte-identical relaunch check.
+
 - 2026-09-10 (m2-onboarding) — **swift-reviewer** built the Release configuration on its own initiative and found
   that `App.init` referenced the `#if DEBUG`-only `DebugSeed` outside the guard (Release did not compile). Codified:
   the reviewer always builds Release; `/ship-check` and CLAUDE.md carry the command.
@@ -339,6 +380,14 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
   spec-creator in parallel at the start of `/milestone` saved a full round.
 
 ### Skill tuning
+- 2026-09-11 — **design-compare**: recorded the row-B `home` crop (`sips -c 900 700 --cropOffset 930 40`), the
+  status-bar pin (`xcrun simctl status_bar <udid> override --time 9:41`) so two screenshots can be `cmp`-identical,
+  and the `-units kg` launch argument for the kg path (launch arguments land in every `UserDefaults` suite,
+  including the seed suite).
+- 2026-09-11 — **milestone**: step 3 runs researcher *before* spec-creator when the question decides the data flow;
+  step 7 greps spec and INSIGHTS for renamed artifacts after a plan revision.
+- 2026-09-11 — **ship-check**: after the commit, refresh `.claude/.last-retro` to the new sha (step 8), otherwise the
+  Stop hook demands a second retrospective for a commit the retro already covered.
 - 2026-09-10 — **run-tests / build-and-run**: an `xcodebuild test` on the iOS 26.5 runtime shut down the booted
   iOS 17.5 simulator (twice); both skills now boot the simulator before installing or screenshotting.
 
@@ -349,6 +398,14 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
   `DebugSeed` reference outside `#if DEBUG` that only Release could catch.
 
 ## Patterns
+
+### 2026-09-11 — `.id(model.id)` on a screen that keeps `@State` derived from a model prop
+A view whose `@State` (cached values, a sheet item, a "now") is only valid for the model it was given must be keyed
+on that model, exactly like a React `key`: without it SwiftUI reuses the view and its stale state for the new model.
+
+```swift
+case .home: HomeView(program: program, selectedTab: $selected).id(program.id)   // ≈ key={program.id}
+```
 
 ### 2026-09-10 — Render the prototype with headless Chrome over a local http.server
 The browser tools refuse `file://` URLs and the Chrome extension may not be connected at all, so render the design

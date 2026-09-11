@@ -13,6 +13,8 @@ import Testing
         let expectedDay: Date
         switch seed {
         case .midProgram, .missed: expectedDay = TestCalendar.day(2026, 9, 15)
+        case .restDay: expectedDay = TestCalendar.day(2026, 9, 19)
+        case .freshProgram: expectedDay = TestCalendar.day(2026, 8, 31)
         default: expectedDay = TestCalendar.day(2026, 8, 31)
         }
         #expect(seed.referenceDate(calendar: cal) == expectedDay.addingTimeInterval(12 * 3600))
@@ -38,6 +40,8 @@ import Testing
         #expect(ob5.step == 5 && ob5.preview?.totalSessions == 120)
         #expect(DebugSeed.midProgram.initialDraft(calendar: cal) == nil)
         #expect(DebugSeed.missed.forcesMissedDayPrompt && !DebugSeed.midProgram.forcesMissedDayPrompt)
+        #expect(DebugSeed.restDay.initialDraft(calendar: cal) == nil && DebugSeed.freshProgram.initialDraft(calendar: cal) == nil)
+        #expect(!DebugSeed.restDay.forcesMissedDayPrompt && !DebugSeed.freshProgram.forcesMissedDayPrompt)
     }
 }
 #endif

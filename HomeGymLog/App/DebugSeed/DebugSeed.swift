@@ -11,6 +11,10 @@ enum DebugSeedError: Error, Equatable {
 /// A seeded run uses an in-memory store, a throwaway preferences suite, and a frozen clock.
 enum DebugSeed: String, CaseIterable {
     case onboarding, ob1, ob2, ob3, ob4, ob5, midProgram, missed
+    /// midProgram data with sessions 11–14 also completed; today is Sat 2026-09-19, a rest day.
+    case restDay
+    /// A program from the onboarding defaults with no logs; today is Mon 2026-08-31.
+    case freshProgram
 
     /// nil when no `-seed` is present; throws for an unknown name or a trailing `-seed` with no value.
     static func parse(arguments: [String]) throws -> DebugSeed? {
@@ -25,6 +29,8 @@ enum DebugSeed: String, CaseIterable {
         let day: DateComponents
         switch self {
         case .midProgram, .missed: day = DateComponents(year: 2026, month: 9, day: 15, hour: 12)
+        case .restDay: day = DateComponents(year: 2026, month: 9, day: 19, hour: 12)
+        case .freshProgram: day = DateComponents(year: 2026, month: 8, day: 31, hour: 12)
         default: day = DateComponents(year: 2026, month: 8, day: 31, hour: 12)
         }
         return calendar.date(from: day)!
@@ -43,7 +49,7 @@ enum DebugSeed: String, CaseIterable {
             let draft = OnboardingDraft(months: 6, frequency: 5)
             for _ in 0..<onboardingSteps { draft.advance(now: referenceDate(calendar: calendar), calendar: calendar) }
             return draft
-        case .midProgram, .missed:
+        case .midProgram, .missed, .restDay, .freshProgram:
             return nil
         }
     }
@@ -54,6 +60,10 @@ enum DebugSeed: String, CaseIterable {
         switch self {
         case .midProgram, .missed:
             try MidProgramSeed.populate(in: container.mainContext, calendar: calendar)
+        case .restDay:
+            try MidProgramSeed.populate(in: container.mainContext, calendar: calendar, completedIndexes: Array(0...14).filter { $0 != 7 })
+        case .freshProgram:
+            try FreshProgramSeed.populate(in: container.mainContext, calendar: calendar)
         default:
             break
         }

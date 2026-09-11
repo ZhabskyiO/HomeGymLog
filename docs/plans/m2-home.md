@@ -1,17 +1,19 @@
 # M2 slice 2 — Home tab, exercise info sheet, Home stats engine: implementation plan
 
-Plan drafted 2026-09-10, revised 2026-09-11 after verifier round 1 (`docs/reviews/m2-home-verifier-1.md`), for
-`docs/specs/m2-home.md`. Spec sections 2–6 and 8 are the contract; ACs are `AC-N` (1–23). Branch `m2-home`.
+**Status: implemented 2026-09-11 on branch `m2-home`.** Steps 1–9 done. 187 Swift Testing tests pass on iOS 17.5 and iOS 26.5 before the test-writer pass; Release build green; `home`, `home-light`, `restDay`, `freshProgram` and kg screenshots match the prototype (`build/sim-home-*.png`); AC-10 relaunch screenshots byte-identical. Round-3 verifier: PASS WITH FIXES (`docs/reviews/m2-home-verifier-3.md`), both fixes applied. Layout deviations from the plan sketch: exercise rows shrink long names (`minimumScaleFactor(0.8)`) and record cards are four equal-width columns with three-line names instead of a horizontal scroll, matching the prototype.
+
+Plan drafted 2026-09-10, revised 2026-09-11 after verifier round 1 (`docs/reviews/m2-home-verifier-1.md`) and the
+researcher's iOS 17.5 probe (`docs/reviews/m2-home-researcher.md`), for `docs/specs/m2-home.md`. Spec sections 2–6 and 8 are the contract; ACs are `AC-N` (1–23). Branch `m2-home`.
 
 ---
 
 ## 1. Goal and scope
 
-Land, in this order, the pure `HomeStats` engine and its value types with unit tests against typed-in `midProgram` /
-`restDay` / `freshProgram` numbers, the `@Model → HomeStatsInput` mapping with iOS 17.5 persistence tests, the two new
-seeds, the shell's per-tab switch with the current `Program` threaded as a prop, and the Home screen (header, tiles,
-week strip, Today / Rest-day card, Recent records, exercise info sheet) so `/design-compare home` and `home-light`
-match via `-seed midProgram`. Every step builds with all tests green on iPhone 15 / iOS 17.5.
+Land, in this order, the pure `HomeStats` engine and value types with unit tests against typed-in `midProgram` / `restDay` /
+`freshProgram` numbers, the row → value mapping and Home's session predicate with iOS 17.5 persistence tests, the two new
+seeds, the shell's per-tab switch, and the Home screen owning its `@Query` on `PlannedSession` (header, tiles, week strip,
+Today / Rest-day card, Recent records, info sheet) so `/design-compare home` and `home-light` match via `-seed midProgram`.
+Every step builds with all tests green on iPhone 15 / iOS 17.5.
 
 Out of scope (spec 7): starting a workout, resume routing, notes (M3); missed-day prompt, shift/skip UI, Settings, appearance
 preference, Program/Progress/Settings tab content (placeholders stay); exercise images; PR history beyond the current best
@@ -21,9 +23,9 @@ per key; any write from Home. No AC is excluded.
 
 ## 2. Decisions this plan relies on
 
-From `insights/INSIGHTS.md` (2026-09-10): **M2 Home architecture** (Program as a prop, mapping in `body`, `@State
-today`, streak/skip rule, stats scoped to the current program, one sheet item per screen, tab selection owned by
-`ShellView`, seed recipe reuse, `HomeStatsInput(program:)` the validating step, Engine text-free) → Steps 1, 3–8.
+From `insights/INSIGHTS.md` (2026-09-10/11): **M2 Home architecture** (Home owns a `@Query` on `PlannedSession` by program
+id, `Program` prop for immutable fields only, log values built in `.task(id: fingerprint)`, `@State now`, streak/skip rule, stats scoped to the current program, one sheet item per screen, tab selection owned by
+`ShellView`, seed recipe reuse, Engine `init(sessions:logs:)` the validating step, text-free Engine) → Steps 1, 3–8.
 **M2 Home decisions** (calendar-week window, skipped in strip, rest card after completion, inert Start, `kfmt` after
 conversion, greeting bands, `restDay`/`freshProgram`) → Steps 1, 2, 4, 7. **M2 onboarding architecture** (AppClock,
 single writers, `@AppStorage("units")`, DebugSeed under `#if DEBUG`) → Steps 3–6. **DEBUG seeding** → Step 4.
@@ -33,20 +35,20 @@ From the spec: 2.1–2.7 layout, 3 states, 4.1–4.3 value types, 5.1–5.10 rul
 
 Plan-level choices (challengeable by the verifier):
 
-- **`HomeStatsInput` is an Engine struct with a throwing `init(sessions:logs:)`** that performs the validation (duplicate
-  index, unknown session index), unit-testable without SwiftData; the Models `init(program:)` maps rows and delegates to it
-  (the INSIGHTS "single validating step" is this pair). `HomeStats` functions stay non-throwing.
+- **`HomeStatsInput` is an Engine struct with a throwing `init(sessions:logs:)`**, the single validating step (duplicate
+  index, unknown session index), unit-testable without SwiftData. `Models/HomeSnapshotBuilder` maps `[PlannedSession]`
+  rows to `[SessionSummary]` (cheap, in `body`) and `[FinishedLogValue]` (expensive, in `.task`); it never validates.
 - **`currentWeek` returns `CurrentWeek { week: Int; phase: Phase }?`** (an `Equatable` struct) instead of a bare tuple, for
   one-line test assertions. Same content as spec 5.3.
-- **Home fixtures** (`HomeGymLogTests/Support/HomeFixtures.swift`) build plain inputs from `ProgramGenerator.generate`
-  plus a typed-in top-weight table (spec 4.4 rows 0–10 and the week-3 rows 11–14 from spec 5.6); they never call the
-  seeder or `HomeStats`. Expected outputs (streaks, PR lists, strip rows) are typed literals from spec 5.
-- **`today` is `@State private var today: Date?`**, nil until `onAppear`; `body` renders `Theme.bg` while nil so the
-  clock is never read in `body` and no wrong frame is drawn.
-- **Simulator status bar pinned** to 9:41 before screenshots so AC-10's before/after PNGs compare with `cmp`.
-  **Text helpers** live in `Shared/HomeText.swift` (dates, greeting, letters) and `Shared/VolumeText.swift` (`kfmt`).
+- **Home fixtures** (`HomeGymLogTests/Support/HomeFixtures.swift`) build plain inputs from `ProgramGenerator.generate` plus a
+  typed-in top-weight table (spec 4.4 rows 0–10, week-3 rows 11–14 from 5.6); never the seeder or `HomeStats`. Expected outputs are spec-5 literals.
+- **"Today" is `@State private var now: Date?`** written on scene-active; the first render uses `now ?? clock.now()`
+  (researcher: a bare clock read in `body` never refreshes on foreground, so the state write is what re-renders).
+- **Home's session predicate is declared once**, `HomeSnapshotBuilder.sessionPredicate(programID:)`, used by the view's
+  `Query(filter:)` and by the 17.5 persistence test, as `ProgramStore.currentPredicate` is.
+- **Status bar pinned** to 9:41 before screenshots (AC-10 `cmp`). **Text helpers**: `Shared/HomeText.swift`, `Shared/VolumeText.swift`.
 
-Open questions: none; the researcher's re-render probe only selects between the primary mechanism and the section 5 fallback.
+Open questions: none.
 
 ---
 
@@ -63,20 +65,19 @@ BOOT() { xcrun simctl boot "$UDID" 2>/dev/null; xcrun simctl bootstatus "$UDID" 
 LAUNCH() { xcrun simctl terminate "$UDID" com.zhabskyi.homegymlog.ios 2>/dev/null; xcrun simctl install "$UDID" "$APP" && xcrun simctl launch "$UDID" com.zhabskyi.homegymlog.ios "$@"; }
 SHOT() { sleep 3; xcrun simctl io "$UDID" screenshot "build/shot-$1.png"; }
 DARK() { xcrun simctl ui "$UDID" appearance dark; }; LIGHT() { xcrun simctl ui "$UDID" appearance light; }
+ONLY() { rm -rf build/tests.xcresult; xcodebuild test -scheme HomeGymLog -destination "$DEST" -derivedDataPath build/DerivedData -resultBundlePath build/tests.xcresult -parallel-testing-enabled NO -only-testing:"HomeGymLogTests/$1" 2>&1 | grep -E "✘|error:|Test run with|TEST (SUCCEEDED|FAILED)"; }   # ONLY 'HomeStatsTests/streak()' — parentheses required, else 0 tests run and SUCCEEDED is reported
 ```
 
-Test files are `@Suite struct <Name>Tests`, `@MainActor` when touching app-target types; `/design-compare <snapshot> "-seed <name>"`
-writes `build/compare-<snapshot>.png`. Existing: `TestCalendar.calendar/day`, `exampleAInputs()`, `makeTestStore()`, `insertSampleGraph(in:)`, `DebugSeed.midProgram`, `MidProgramSeed.completedIndexes`.
+Test files are `@Suite struct <Name>Tests`, `@MainActor` when touching app-target types; `/design-compare <snapshot> "-seed <name>"` writes `build/compare-<snapshot>.png`.
+Existing: `TestCalendar.calendar/day`, `exampleAInputs()`, `makeTestStore()`, `insertSampleGraph(in:)`, `DebugSeed.midProgram`, `MidProgramSeed.completedIndexes`.
 
 ### Step 1 — Engine: value types, `HomeStatsInput` validation, `HomeStats`
 
 Files: `Engine/HomeStatsTypes.swift` (new, all `nonisolated`, `Equatable, Sendable`)
 ```swift
 struct SessionSummary { let index, week: Int; let phase: Phase; let name: String; let scheduledDate: Date; let status: SessionStatus; let sets, reps: Int; let exercises: [PlannedExercise] }
-struct LoggedSetValue { let weightLb: Double; let reps: Int; let status: SetStatus }
-struct LoggedExerciseValue { let order: Int; let exerciseKey: String; let sets: [LoggedSetValue] }
-struct FinishedLogValue { let sessionIndex: Int; let exercises: [LoggedExerciseValue] }
-enum HomeStatsInputError: Error, Equatable { case duplicateSessionIndex(Int), unknownSessionIndex(Int) }
+struct LoggedSetValue { let weightLb: Double; let reps: Int; let status: SetStatus };  struct LoggedExerciseValue { let order: Int; let exerciseKey: String; let sets: [LoggedSetValue] }
+struct FinishedLogValue { let sessionIndex: Int; let exercises: [LoggedExerciseValue] };  enum HomeStatsInputError: Error, Equatable { case duplicateSessionIndex(Int), unknownSessionIndex(Int) }
 struct HomeStatsInput { let sessions: [SessionSummary]; let logs: [FinishedLogValue]
     init(sessions: [SessionSummary], logs: [FinishedLogValue]) throws   // the only validation; sorts nothing
     private init(validated sessions: [SessionSummary], logs: [FinishedLogValue])   // shared by the throwing init and `empty`
@@ -145,10 +146,9 @@ Files: `Engine/WeightDisplay.swift` (add) `static func whole(lb: Double, unit: W
 `round(lb × kgPerLb)`); `wholeText` becomes `"\(whole(lb:unit:))"`. `Shared/VolumeText.swift` (new)
 ```swift
 enum VolumeText {
-    static func kfmt(_ n: Int) -> String                       // spec 5.10: < 1000 → "\(n)"; else one decimal half-away-from-zero + "k"
+    static func kfmt(_ n: Int) -> String                              // spec 5.10: < 1000 → "\(n)"; else one decimal half-away-from-zero + "k"
     static func weekVolume(lb: Double, unit: WeightUnit) -> String   // kfmt(WeightDisplay.whole(lb:unit:))
-    static func caption(unit: WeightUnit) -> String             // "lb this week" / "kg this week"
-}
+    static func caption(unit: WeightUnit) -> String }                 // "lb this week" / "kg this week"
 ```
 `Shared/HomeText.swift` (new)
 ```swift
@@ -158,8 +158,7 @@ enum HomeText {
     static func greeting(_ g: Greeting) -> String                       // "Good morning" / "Good afternoon" / "Good evening"
     static func weekStripLetters(calendar: Calendar) -> [String]        // veryShortWeekdaySymbols[(d + 1) % 7] for d in 0…6
     static func weekPill(_ w: CurrentWeek) -> String                    // "Week 3 · Foundation"
-    static func sessionMeta(exercises: Int, sets: Int, reps: Int, minutes: Int?) -> String   // "5 exercises · 3 × 12" [+ " · ~45 min"]
-}
+    static func sessionMeta(exercises: Int, sets: Int, reps: Int, minutes: Int?) -> String }   // "5 exercises · 3 × 12" [+ " · ~45 min"]
 ```
 
 Tests: `HomeGymLogTests/Engine/WeightDisplayWholeTests.swift` — `whole` 7 560 lb → 7 560 / kg 3 429; 180 → 180 / 82;
@@ -173,27 +172,30 @@ Sunday-first fixture (AC-18 letters).
 
 Verify: `$BUILD && $TEST`. AC-17, AC-18 (view-level letters).
 
-### Step 3 — Models: `HomeStatsInput(program:)` mapping with persistence tests
+### Step 3 — Models: `HomeSnapshotBuilder` (session predicate, row → value mapping) with persistence tests
 
-File: `Models/HomeStatsInput.swift` (new)
+File: `Models/HomeSnapshotBuilder.swift` (new)
 ```swift
-@MainActor extension HomeStatsInput {   // Program is main-actor isolated (app target default); HomeStatsInput is nonisolated
-    /// Maps the current program's rows to plain values. Reads every session, its log (finished only), exercises and sets,
-    /// so calling it inside `body` registers each of those with Observation. Throws only for corrupt data.
-    init(program: Program) throws   // sessions from program.sessions (unsorted; Engine sorts); logs from session.workoutLog where finishedAt != nil,
-                                    // exercises by order, sets by order; then self = try HomeStatsInput(sessions:logs:)
+@MainActor enum HomeSnapshotBuilder {   // rows are main-actor isolated; outputs are nonisolated Engine values
+    static func sessionPredicate(programID: UUID) -> Predicate<PlannedSession>   // #Predicate { $0.program?.id == programID }; the view's Query uses it
+    static func sessionSummaries(from rows: [PlannedSession]) -> [SessionSummary]   // scalar reads only (~3 ms for 120 rows); safe in body
+    static func finishedLogs(from rows: [PlannedSession]) -> [FinishedLogValue]     // workoutLog → exercises → sets where finishedAt != nil, by order; ~70 ms midProgram, ~0.4 s full program on 17.5: .task only
+    static func fingerprint(of rows: [PlannedSession]) -> String                    // rows.map { "\($0.index)|\($0.statusRaw)|\($0.scheduledDate.timeIntervalSinceReferenceDate)" }.joined(separator: ",")
 }
 ```
-
-Tests (`HomeGymLogTests/Persistence/HomeStatsInputMappingTests.swift`, `@MainActor`, `#if DEBUG` for the seed, run on
-iPhone 15 / iOS 17.5): on `DebugSeed.midProgram.makeContainer(calendar:)` read through `ModelContext(container)`:
-120 sessions, 10 logs, log for index 10 has 5 exercises × 3 sets with `topWeightLb` 42.5/37.5/32.5/80/17.5 (typed);
-`WorkoutLogStore.start(session: sessions[11], at: 09-15 07:00)` then map → still 10 logs and session 11 `.pending`
-(in-progress omitted); mark that log's 15 sets done at target and `WorkoutLogStore.finish(at: 09-22 08:00)`, map →
-11 logs, `HomeStats.weekVolumeLb` on Tue 09-15 == 7 560 + 12 150 = 19 710 and on Tue 09-22 == 0 (attributed to
-`scheduledDate`, not the finish day; AC-16 last clause); `insertSampleGraph` plus a second `PlannedSession(index: 0…)`
-appended and saved → `init(program:)` throws `.duplicateSessionIndex(0)`; a program with no sessions → `.empty`
-equivalent (sessions and logs empty) without throwing (AC-21).
+Tests (`HomeGymLogTests/Persistence/HomeSnapshotBuilderTests.swift`, `@MainActor`, `#if DEBUG` for the seed, iPhone 15 /
+iOS 17.5): on `DebugSeed.midProgram.makeContainer(calendar:)` with `context = container.mainContext` (all writers on the
+main context): `rows = fetch(FetchDescriptor(predicate: sessionPredicate(programID: program.id), sortBy: [SortDescriptor(\.index)]))`
+→ 120 rows in index order; after `insertSampleGraph(in: context)` still 120, the sample program's id fetches 3, and a
+`PlannedSession` inserted with `program == nil` matches neither (predicate test); `sessionSummaries(from: rows)` → 120
+values, index 11 `.pending` Pull on 09-15 with 5 exercises; `finishedLogs` → 10 logs, log 10's `topWeightLb` 42.5/37.5/32.5/80/17.5 (typed);
+`WorkoutLogStore.start(session: rows[11], at: 09-15 07:00)` → still 10 logs (in-progress omitted) and `fingerprint`
+unchanged; mark its 15 sets done at target and `WorkoutLogStore.finish(at: 09-22 08:00)` → 11 logs, `fingerprint` differs
+from before (statusRaw changed), `HomeStats.weekVolumeLb` on Tue 09-15 == 7 560 + 12 150 = 19 710 and on Tue 09-22 == 0
+(attributed to `scheduledDate`, not the finish day; AC-16 last clause); `insertSampleGraph` plus a second
+`PlannedSession(index: 0…)` appended and saved → `try HomeStatsInput(sessions: sessionSummaries(from: rows), logs:
+finishedLogs(from: rows))` throws `.duplicateSessionIndex(0)`; a program with no sessions → both arrays empty and the
+Engine init does not throw (AC-21).
 
 Verify: `$BUILD && $TEST`. AC-21 (mapping half), AC-16 (finish-day clause).
 
@@ -216,7 +218,7 @@ pending; sessions 11–14 top weights equal the four typed week-3 rows (Pull 110
 `isStoredInMemoryOnly == true`; 16 sessions, 0 logs, months 1, frequency 4, `trainingWeekdays == [0, 1, 3, 4]`, 45 min, 180 lb, "Intermediate",
 `startingWeightsLb` all library defaults, session 0 "Upper A" on 08-31 with targets `[40, 100, 30, 90, 25]`, session 15
 on Fri 09-25, `createdAt` 08-31 06:00. `HomeGymLogTests/Seed/SeedHomeStatsTests.swift` — end to end for the three seeds:
-`HomeStatsInput(program:)` on each container, `today` = the seed's `referenceDate`, then streak / completedCount /
+rows fetched with `sessionPredicate`, `HomeStatsInput(sessions: sessionSummaries(from:), logs: finishedLogs(from:))`, `today` = the seed's `referenceDate`, then streak / completedCount /
 total / `weekVolumeLb` equal (3, 10, 120, 7 560), (7, 14, 120, 49 320), (0, 0, 16, 0); `recentRecords` keys
 `[dbBench, inclineDb, shoulderPress, pecDeck]`, `[chestPress, skull, latPull, lowRow]`, `[]`; `currentWeek` (3, F), (4, F), (1, F).
 
@@ -229,7 +231,7 @@ Files: `App/RootView.swift` — `if let program = currentPrograms.first { ShellV
 `App/ShellView.swift`
 ```swift
 struct ShellView: View {
-    let program: Program
+    let program: Program                          // immutable fields only (id, sessionLengthMinutes, frequency, …); rows come from Home's own @Query
     @State private var selected: AppTab = .home
     var body: some View { TabView(selection: $selected) { ForEach(AppTab.allCases) { tab in NavigationStack { screen(for: tab) }.toolbar(.hidden, for: .tabBar).tag(tab) } } … }
     @ViewBuilder private func screen(for tab: AppTab) -> some View {
@@ -240,45 +242,46 @@ struct ShellView: View {
     }
 }
 #if DEBUG
-#Preview { let container = try! DebugSeed.midProgram.makeContainer(calendar: AppClock.live().calendar)
-    ShellView(program: try! ProgramStore.current(in: container.mainContext)!).modelContainer(container)
-        .environment(\.appClock, DebugSeed.midProgram.clock(calendar: AppClock.live().calendar)) }
+#Preview { let container = try! DebugSeed.midProgram.makeContainer(calendar: AppClock.live().calendar)   // seeded preview
+    ShellView(program: try! ProgramStore.current(in: container.mainContext)!).modelContainer(container).environment(\.appClock, DebugSeed.midProgram.clock(calendar: AppClock.live().calendar)) }
 #endif
 ```
-Tests: none new (previews read `AppClock.live()`, not `Calendar.current`, so `ClockUsageTests` still passes).
-Verify: `$BUILD && $TEST`; `LAUNCH -seed midProgram; SHOT shell` → unchanged placeholder shell. Groundwork for AC-1, AC-6.
+Tests: none new (previews read `AppClock.live()`, so `ClockUsageTests` still passes). Verify: `$BUILD && $TEST`;
+`LAUNCH -seed midProgram; SHOT shell` → unchanged placeholder shell. Groundwork for AC-1, AC-6.
 
-### Step 6 — `HomeView`: state, mapping, header, stat tiles, week strip
+### Step 6 — `HomeView`: own `@Query`, `now` state, fingerprint task, header, stat tiles, week strip
 
 Files: `Features/Home/HomeView.swift`
 ```swift
 struct HomeView: View {
-    let program: Program
+    let program: Program                             // immutable fields only: id, sessionLengthMinutes
     @Binding var selectedTab: AppTab
-    @Environment(\.appClock) private var clock
-    @Environment(\.scenePhase) private var scenePhase
-    @AppStorage("units") private var unitsRaw = WeightUnit.lb.rawValue
-    @State private var today: Date?                 // ≈ useState(null); set in effects, never from the clock during render
-    @State private var infoExercise: Exercise?      // Step 8
+    @Query private var sessions: [PlannedSession]    // retained rows, re-fetched on every save (17.5 verified) ≈ useQuery
+    @State private var logs: [FinishedLogValue] = [] // rebuilt only when the fingerprint changes ≈ useMemo keyed on a fingerprint
+    @State private var now: Date?                    // written on scene-active
+    @State private var infoExercise: Exercise?       // Step 8
+    @Environment(\.appClock) private var clock;  @Environment(\.scenePhase) private var scenePhase
+    @AppStorage("units") private var unitsRaw = WeightUnit.lb.rawValue;  private var unit: WeightUnit { WeightUnit(rawValue: unitsRaw) ?? .lb }
+    init(program: Program, selectedTab: Binding<AppTab>) {
+        self.program = program; _selectedTab = selectedTab
+        _sessions = Query(filter: HomeSnapshotBuilder.sessionPredicate(programID: program.id), sort: \PlannedSession.index)
+    }
     var body: some View {
-        Group {
-            if let today { HomeContent(program: program, input: input, today: today, unit: unit, calendar: clock.calendar, selectedTab: $selectedTab, infoExercise: $infoExercise) }
-            else { Theme.bg }
-        }
-        .background(Theme.bg.ignoresSafeArea()).toolbar(.hidden, for: .navigationBar)
-        .onAppear { today = clock.now() }
-        .onChange(of: scenePhase) { _, phase in if phase == .active { today = clock.now() } }
+        HomeContent(program: program, input: input, today: now ?? clock.now(), unit: unit, calendar: clock.calendar,
+                    selectedTab: $selectedTab, infoExercise: $infoExercise)
+            .background(Theme.bg.ignoresSafeArea()).toolbar(.hidden, for: .navigationBar)
+            .task(id: HomeSnapshotBuilder.fingerprint(of: sessions)) { logs = HomeSnapshotBuilder.finishedLogs(from: sessions) }
+            .onChange(of: scenePhase) { _, phase in if phase == .active { now = clock.now() } }
     }
-    private var input: HomeStatsInput {             // called from body → nested reads are observed
-        do { return try HomeStatsInput(program: program) } catch { assertionFailure("\(error)"); return .empty }
+    private var input: HomeStatsInput {              // session values mapped per render (scalar reads); logs from state
+        do { return try HomeStatsInput(sessions: HomeSnapshotBuilder.sessionSummaries(from: sessions), logs: logs) }
+        catch { assertionFailure("\(error)"); return .empty }
     }
-    private var unit: WeightUnit { WeightUnit(rawValue: unitsRaw) ?? .lb }
 }
 ```
 `Features/Home/HomeContent.swift` — the `ScrollView` (18 pt sides) composing `HomeHeader`, `StatTiles`, `WeekStrip`, and
-(from Step 7) the cards and records; derives `greeting`, `currentWeek`, `streak`, `completed`, `weekVolumeLb`, `strip`,
-`todaySession`, `nextSession`, `records` once per render from `HomeStats`. `Features/Home/HomeHeader.swift` — date label,
-greeting, week pill (`Theme.phaseColor`).
+(from Step 7) the cards and records; derives greeting, currentWeek, streak, completed, weekVolumeLb, strip, today/next,
+records once per render from `HomeStats`. `Features/Home/HomeHeader.swift` — date label, greeting, week pill (`Theme.phaseColor`).
 `Features/Home/StatTiles.swift` — `StatTile(value: String, suffix: String? = nil, caption: String)` ×3 in an `HStack(spacing: 8)`,
 each `.frame(maxWidth: .infinity)` (never `containerRelativeFrame`, gotcha: black screen). `Features/Home/WeekStrip.swift` —
 `WeekStrip(days: [WeekStripDay], letters: [String])`, seven `.frame(maxWidth: .infinity)` columns in an `HStack(spacing: 4)`, the 2.3 table as a `switch` on
@@ -335,40 +338,44 @@ grep -rniI benchmark HomeGymLog/                                                
 xcodebuild build -scheme HomeGymLog -destination "$DEST" -configuration Release -derivedDataPath build/DerivedData 2>&1 | grep -E "error:|BUILD (SUCCEEDED|FAILED)"
 xcodebuild test -scheme HomeGymLog -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.5' -derivedDataPath build/DerivedData 2>&1 | grep -E "✘|TEST (SUCCEEDED|FAILED)"
 ```
-`ClockUsageTests` scans `Features/Home` automatically (it enumerates `Features/`). Then set the status lines of this
-plan and the spec. AC-3, AC-4, AC-9, AC-10, AC-23.
+`ClockUsageTests` scans `Features/Home` automatically. Live re-render after a save cannot be checked here (Home has no
+writer); M3's plan must add a manual simulator check: finish today's session → rest card, strip ✓ and new PRs appear
+without relaunch. Then set the status lines of this plan and the spec. AC-3, AC-4, AC-9, AC-10, AC-23.
 
 ---
 
 ## 4. Data model changes
 
-None. No `@Model` added or altered, no field, relationship, delete rule or `#Predicate` changed; no migration.
-`Models/HomeStatsInput.swift` only reads `Program → PlannedSession → WorkoutLog → LoggedExercise → LoggedSet`; Step 3's
-iOS 17.5 persistence tests cover that traversal. The section 5 fallback would add one `#Predicate<WorkoutLog>` and,
-if taken, a `RoutingPredicateTests`-style 17.5 test in the same change.
+No `@Model` added or altered, no field, relationship or delete rule changed; no migration. One new `#Predicate`,
+`HomeSnapshotBuilder.sessionPredicate(programID:)` (`$0.program?.id == programID`, one-level optional chain), covered by
+Step 3's iOS 17.5 persistence test together with the `PlannedSession → WorkoutLog → LoggedExercise → LoggedSet` traversal.
 
 ---
 
 ## 5. Risks and gotchas
 
-- **Re-render through relationships on iOS 17.5 (researcher pending).** Primary: mapping in `body`. If the probe shows
-  a save to a nested row does not re-render Home, switch `HomeView` to `@Query(sort: \PlannedSession.index) private var
-  allSessions` and `@Query(filter: #Predicate<WorkoutLog> { $0.finishedAt != nil }) private var finishedLogs`, filter both
-  in memory by `program.persistentModelID`, and add `HomeStatsInput.init(sessions: [PlannedSession], logs: [WorkoutLog])`
-  in Models beside `init(program:)` (same Engine validation, also `@MainActor`); add the predicate's 17.5 persistence test.
-  No step other than 6 changes. Home writes nothing in this slice, so the probe result is recorded in INSIGHTS when known
-  and the switch decision is deferred to M3's plan (the first slice that writes while Home is mounted).
-- **Optional `@State today`**: `onAppear` fires before the first visible frame; if a flash appears on device, set `today`
-  in `.task` as well. `.cascade` no-op (gotchas): nothing here deletes. Two sessions on one day: lowest index (Step 1 test).
-- **Mapping cost**: `HomeStatsInput(program:)` faults up to ~2 500 rows per render; accepted by the review. Memoize on
-  `(program.persistentModelID, today)` only if a measured stutter appears.
+- **iOS 17.5 does not retain traversed instances (verified, gotchas SwiftData 2026-09-11)**: a view holding a `Program`
+  never re-renders on session/log/set saves; one owning `@Query<PlannedSession>` re-renders on every save. Hence Step 6's
+  query; `program` is for immutable fields only, and no child may depend on the `Program` reference alone (SwiftUI skips
+  it even when the parent re-fetched). Analogy: subscribe to the rows, not to the parent object.
+- **Traversal cost on 17.5**: ~90 µs per row, uncached (midProgram ≈ 70 ms, full program ≈ 0.4 s), to-one chains upward
+  ~300 µs, prefetching 4× slower. Hence `finishedLogs` runs only in `.task(id: fingerprint)` and `sessionSummaries` (scalar
+  reads) is the only mapping in `body`. The first frame may show volume 0 / no records for < 0.1 s; if visible on device,
+  seed `logs` synchronously in `onAppear`.
+- **`#Predicate` hazards**: `$0.program == program` does not compile; `$0.program?.archivedAt == nil` matches orphans; a
+  two-level optional chain (`$0.exercise?.workout?.finishedAt`) crashes the process; `$0.loggedAt!` throws. Only the
+  one-level `program?.id` predicate is used here. All writers (seeds, tests, M3) stay on `mainContext`: a second context's
+  writes are not reliably visible to registered objects.
+- **`now ?? clock.now()`** serves the first frame only; every refresh comes from the `scenePhase` write.
+  `.onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged))` for midnight while foregrounded is
+  unverified and not planned (spec 6 accepts the gap). `.cascade` no-op: nothing deletes. Two sessions one day: Step 1 test.
 - **`try!` and `DebugSeed` in previews** stay inside `#if DEBUG` (the onboarding slice broke Release this way; Step 9 builds Release).
-- **Locale**: `HomeText` uses `calendar.locale ?? .current` and `calendar.timeZone` like `ProgramSummaryText`; tests pin
-  `en_US`; `veryShortWeekdaySymbols` vary by locale, only the order rule is ours.
-- **Sheet modifiers**: `.presentationCornerRadius` / `.presentationBackground` are iOS 16.4+, fine at iOS 17 minimum. If
-  the sheet shows a system background behind `sf`, drop `.presentationBackground` and put `Theme.sf` on the sheet's root.
-- **Tooling** (gotchas): pass `OS=17.5`; boot before install/screenshot (a 26.5 test run shuts 17.5 down); terminate
-  before launch; `print` in tests is invisible; `BOOT` pins the status bar to 9:41 so AC-10's `cmp` is meaningful.
+  **Locale**: `HomeText` uses `calendar.locale ?? .current` and `calendar.timeZone`; tests pin `en_US`; only the letter order rule is ours.
+- **Sheet modifiers** (`presentationCornerRadius` / `presentationBackground`, iOS 16.4+): if a system background shows
+  behind `sf`, drop `.presentationBackground` and put `Theme.sf` on the sheet's root.
+- **Tooling** (gotchas): pass `OS=17.5`; boot before install/screenshot (a 26.5 test run and parallel test clones shut
+  17.5 down: `ONLY` passes `-parallel-testing-enabled NO`); `-only-testing` names need `()`; terminate before launch;
+  `print` in tests is invisible; `BOOT` pins the status bar to 9:41 so AC-10's `cmp` is meaningful.
 
 ---
 
@@ -376,24 +383,19 @@ if taken, a `RoutingPredicateTests`-style 17.5 test in the same change.
 
 Screens (`/design-compare`, iPhone 15 / iOS 17.5):
 
-- [ ] AC-1 `home` via `-seed midProgram`, dark (Step 8; deviations: greeting, "7.6k", inert Start, M1 pill)
-- [ ] AC-2 `home-light` via `-seed midProgram`, light (Step 8)
+- [ ] AC-1 `home` via `-seed midProgram`, dark (Step 8; deviations: greeting, "7.6k", inert Start, M1 pill) · [ ] AC-2 `home-light`, light (Step 8)
 - [ ] AC-3 `-seed restDay` screenshot: date, pill, 7 · 14/120 · 49.3k, five ✓ + accent "·", rest card, four PR cards (Step 9)
 - [ ] AC-4 `-seed freshProgram` screenshot: date, pill, 0 · 0/16 · 0, strip 31 1 · 3 4 · ·, "Upper A" 40/100/30/90/25 lb, no records (Step 9)
 - [ ] AC-5 info sheet for row 1: "Back · Marcy · high pulley", "Lat Pulldown", three cues, Done, no image tiles (Step 8)
 
 Behavior (simulator):
-
-- [ ] AC-6 "Progress ›" selects Progress; pill follows; Home unchanged on return (Step 8)
-- [ ] AC-7 "i" opens that row's sheet; Done and scrim tap close it (Step 8)
+- [ ] AC-6 "Progress ›" selects Progress; pill follows; Home unchanged on return (Step 8) · [ ] AC-7 "i" opens that row's sheet; Done and scrim tap close it (Step 8)
 - [ ] AC-8 "Start workout" does nothing (Step 7)
-- [ ] AC-9 `-seed onboarding` → kg → defaults → Home "kg this week", "0", "18.1 kg" Dumbbell Bench Press (Step 9)
-- [ ] AC-10 kill and relaunch `-seed midProgram` → byte-identical screenshot (Step 9)
+- [ ] AC-9 `-seed onboarding` → kg → defaults → "kg this week", "0", "18.1 kg" Dumbbell Bench Press (Step 9) · [ ] AC-10 relaunch `-seed midProgram` → identical screenshot (Step 9)
 
 Unit and persistence tests (`$TEST` green on iPhone 15 / iOS 17.5; Step 9 also on iPhone 17 / iOS 26.5):
-
 - [ ] AC-11, AC-12, AC-13, AC-14, AC-15, AC-16, AC-18 (rows), AC-19, AC-20 (Step 1) · [ ] AC-17, AC-18 (letters) (Step 2)
 - [ ] AC-21 (Steps 1 and 3) · [ ] AC-22 (Step 4) · [ ] AC-23 grep and `ClockUsageTests` with `Features/Home` present (Step 9)
 
-Process: after every step `$BUILD` and `$TEST` succeed; Release builds (Step 9); no dependency, entitlement or
-capability added; `project.pbxproj` untouched; no `@Model` changed; `DebugSeed` referenced only inside `#if DEBUG`.
+Process: after every step `$BUILD` and `$TEST` succeed; Release builds (Step 9); no dependency, entitlement or capability
+added; `project.pbxproj` untouched; no `@Model` changed; `DebugSeed` only inside `#if DEBUG`; `finishedLogs` never called from `body`.

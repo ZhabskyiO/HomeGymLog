@@ -14,8 +14,9 @@ enum MidProgramSeed {
         return target
     }
 
+    /// `completedIndexes` defaults to the prototype's list; the `restDay` seed passes 0…14 minus 7.
     @discardableResult
-    static func populate(in context: ModelContext, calendar: Calendar) throws -> Program {
+    static func populate(in context: ModelContext, calendar: Calendar, completedIndexes: [Int] = MidProgramSeed.completedIndexes) throws -> Program {
         let day0 = calendar.date(from: DateComponents(year: 2026, month: 8, day: 31))!
         let createdAt = calendar.date(byAdding: .hour, value: 6, to: day0)!
         let inputs = ProgramInputs(months: 6, frequency: 5, trainingWeekdays: [0, 1, 2, 3, 4], sessionLengthMinutes: 45,

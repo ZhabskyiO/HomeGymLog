@@ -23,8 +23,9 @@ multiple-choice question when the slicing is not obvious.
 2. Read `CLAUDE.md`, `insights/INSIGHTS.md`, `insights/gotchas.md`, and any earlier spec of the same
    milestone under `docs/specs/`. Note any platform question the slice raises (an API, an entitlement, an
    iOS 17 availability doubt). Skip `researcher` when there are none.
-3. If there are platform questions, launch `researcher` with them and, in parallel, `spec-creator` (step
-   4); they are independent. Save the researcher's reply verbatim to
+3. If there are platform questions, launch `researcher` with them. If a question decides the data flow
+   (SwiftData observation, queries, what a view must own to re-render), wait for its answer and hand it to
+   `spec-creator`; only API-availability questions run in parallel with step 4. Save the researcher's reply verbatim to
    `docs/reviews/<slug>-researcher.md`. Record findings that matter in `insights/`.
 4. Launch `spec-creator` for the slice → `docs/specs/<slug>.md`. For a UI slice the brief must name the
    prototype snapshots it covers, require a `-seed` launch state per screen (M2 adds the seeder; specs
@@ -38,7 +39,8 @@ multiple-choice question when the slicing is not obvious.
 6. Launch `implementation-planner` → `docs/plans/<slug>.md`.
 7. Launch `plan-verifier` on the plan. Save its reply to `docs/reviews/<slug>-verifier-<round>.md`. If
    not PASS, fix the plan (resume the planner with the finding ids) and re-verify scoped to those ids.
-   Maximum three rounds; after that, show the user the remaining findings and ask how to proceed.
+   If the revision renamed or removed an artifact, grep the spec and `insights/INSIGHTS.md` for the old name
+   and fix them before re-verifying. Maximum three rounds; after that, show the user the remaining findings and ask how to proceed.
 8. Commit the spec, plan and reviews on the branch (`git add docs insights && git commit`).
 9. Stop. Present to the user: branch, spec path, plan path, the step list in five lines or fewer,
    definition of done, risks, and any question only they can answer. Ask for approval to implement. Do

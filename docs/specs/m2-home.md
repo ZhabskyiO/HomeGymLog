@@ -1,6 +1,6 @@
 # M2 slice 2 — Home tab, exercise info sheet, Home stats engine
 
-**Status: revised 2026-09-10 after the user accepted Q1–Q7 ("M2 Home decisions") and after the architecture review (`docs/reviews/m2-home-architecture.md`, decisions in INSIGHTS "M2 Home architecture"); branch `m2-home`.** Depends on `m2-onboarding` (merged): routing, app clock,
+**Status: implemented 2026-09-11 on branch `m2-home` (plan `docs/plans/m2-home.md`); text below revised 2026-09-10 after the user accepted Q1–Q7 ("M2 Home decisions") and after the architecture review (`docs/reviews/m2-home-architecture.md`, decisions in INSIGHTS "M2 Home architecture"); branch `m2-home`.** Depends on `m2-onboarding` (merged): routing, app clock,
 unit preference, `WorkoutLogStore`, the `midProgram` seed. Source: `design/BenchmarkApp.prototype.html`
 (markup `tabHome` block and `showAppDetail`; script `greeting`, `curWeek`, `streak`, `weekVolume`/`kfmt`,
 `weekStrip`, `todaySess`/`nextSess`, `best`/`prList`, `fmt`/`fmtS`), `CLAUDE.md` product decisions,
@@ -83,9 +83,9 @@ Also shown after today's session is completed (decided Q7: prototype behavior; n
 ### 2.6 Recent records (shown only when at least one PR exists; 5.9)
 
 Row: "Recent records" (15 pt bold) and a "Progress ›" text button (13 pt accent semibold) that selects the
-Progress tab (placeholder in this slice) through the tab-selection binding the shell owns (decided). Below, a horizontal scroll of up to four cards (min width 130,
-padding 12, radius 12, `sf`): "`w` `unit`" (18 pt bold, unit 11 pt `mu` medium), exercise name (12 pt),
-date "MMM d" (11 pt `mu`). `midProgram`: 42.5 lb Dumbbell Bench Press Sep 14 · 37.5 lb Incline Dumbbell
+Progress tab (placeholder in this slice) through the tab-selection binding the shell owns (decided). Below, up to four equal-width cards in one row, no scrolling (revised 2026-09-11 to match the
+prototype, which fits four; padding 10, radius 12, `sf`): "`w` `unit`" (17 pt bold, unit 10 pt `mu` medium), exercise
+name (11 pt, up to three lines), date "MMM d" (10.5 pt `mu`). `midProgram`: 42.5 lb Dumbbell Bench Press Sep 14 · 37.5 lb Incline Dumbbell
 Press Sep 14 · 32.5 lb Seated Shoulder Press Sep 14 · 80 lb Pec Deck Fly Sep 14.
 
 ### 2.7 Exercise info sheet (`showAppDetail`)
@@ -124,7 +124,7 @@ shows the identical Home; an open sheet is not restored. Backgrounding changes n
 
 | Source | Fields used |
 |---|---|
-| `Program` (current, `archivedAt == nil`) | **Passed as a prop** from the router's query into the shell and then Home (decided, B1); no second query. `sessions` and everything under them are read while rendering, through the one mapping `HomeStatsInput(program:)` (4.3), so Observation tracks nested reads and Home updates when a session's `statusRaw` or `scheduledDate` changes, a log's `finishedAt` is set, a log is deleted, or sets change. **Fallback** if the researcher's probe shows no re-render through relationships on iOS 17.5: an unfiltered query on `PlannedSession` sorted by `index`, filtered in memory by the program's persistent id, plus a query on `WorkoutLog` with `finishedAt != nil`. Stats are scoped to this program only (archived programs are Progress-only; a restart resets the PR baseline). |
+| `Program` (current, `archivedAt == nil`) | Passed from the router into the shell and Home **for its immutable fields only** (`frequency`, `trainingWeekdays`, `startDate`, `months`, `id`). **Home owns its own live query on `PlannedSession`** filtered by `program?.id == programID` and sorted by `index` (decided 2026-09-11 from the researcher's iOS 17.5 probe, replacing the earlier "prop + mapping in body": on 17.5 the context does not retain traversed instances, so a view holding a `Program` never re-renders on session/log/set changes, while a query retains its rows and re-fetches on every save). Session-derived stats (streak, counts, strip, today/next, current week) are computed from the retained rows while rendering. Log-derived values (`[FinishedLogValue]` for PRs and week volume) are built once per data change, keyed on a fingerprint of the rows (`index|statusRaw|scheduledDate`), never on every render (a full log traversal costs ~0.4 s at program end on 17.5 and is not cached). All writers stay on the main context. Stats are scoped to this program only (archived programs are Progress-only; a restart resets the PR baseline). |
 | `PlannedSession` | `index`, `week`, `phaseRaw`, `name`, `scheduledDate` (local midnight), `sets`, `reps`, `exercises` (`order`, `exerciseKey`, `targetWeightLb`), `statusRaw`, `workoutLog` |
 | `WorkoutLog` → `LoggedExercise` → `LoggedSet` | `finishedAt`; `order`, `exerciseKey`; `weightLb` (lb), `reps`, `statusRaw` |
 | Preferences | `units` (`WeightUnit` raw, default lb) |
@@ -132,7 +132,8 @@ shows the identical Home; an open sheet is not restored. Backgrounding changes n
 | Static | `ExerciseLibrary` (name, muscle, equipment, cues), `Phase` (name, color) |
 
 The shell becomes a per-tab switch that hands the program to each real screen (its preview needs a seeded
-container) and owns the selected tab, passed to Home as a binding for "Progress ›".
+container) and owns the selected tab, passed to Home as a binding for "Progress ›". "Today" is one `@State now`
+written when the scene becomes active (a bare clock read while rendering never refreshes on foreground; verified).
 
 ### 4.2 Derived (never stored)
 
@@ -143,7 +144,7 @@ week-strip states, today/next session, per-session volume and top weights, PR li
 
 | Value | Fields | Built from |
 |---|---|---|
-| `HomeStatsInput` | `sessions: [SessionSummary]`, `logs: [FinishedLogValue]` — the **only validating step**, `HomeStatsInput(program:)` in `Models/`, throws `HomeStatsInputError.duplicateSessionIndex(Int)` / `.unknownSessionIndex(Int)` (a finished log without a session); never traps | the current `Program` |
+| `HomeStatsInput` | `sessions: [SessionSummary]`, `logs: [FinishedLogValue]` — the **only validating step**, `HomeStatsInput(sessions: HomeSnapshotBuilder.sessionSummaries(from:), logs: HomeSnapshotBuilder.finishedLogs(from:))`; the Engine init is the only validating step, throws `HomeStatsInputError.duplicateSessionIndex(Int)` / `.unknownSessionIndex(Int)` (a finished log without a session); never traps | the current `Program` |
 | `SessionSummary` | `index`, `week`, `phase`, `name`, `scheduledDate`, `status`, `sets`, `reps`, `exercises: [PlannedExercise]` | one `PlannedSession` |
 | `LoggedSetValue` | `weightLb`, `reps`, `status` | one `LoggedSet` |
 | `LoggedExerciseValue` | `order`, `exerciseKey`, `sets: [LoggedSetValue]` | one `LoggedExercise` (sets by `order`) |
@@ -325,7 +326,7 @@ Unit tests (Engine, `TestCalendar`, plain values; `midProgram` values built from
     today → nil; program over → last session as next.
 20. `personalRecords`: the two lists of 5.9 (order included); ties are not PRs; a swapped key is credited
     to the performed key; `recentRecords` caps at 4.
-21. `HomeStatsInput(program:)` (persistence test): the `midProgram` program maps to 120 sessions and 10 finished
+21. `HomeSnapshotBuilder` + `HomeStatsInput(sessions:logs:)` (persistence test): the `midProgram` program maps to 120 sessions and 10 finished
     logs, an in-progress log is omitted; a duplicate session index or a finished log without a session throws
     `HomeStatsInputError`; an empty input gives `HomeStats` zeros / nil / empty without throwing.
 22. Seeds: `restDay` and `freshProgram` parse from `-seed`, use the reference days below, have no initial draft,

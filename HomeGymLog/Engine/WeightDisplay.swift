@@ -19,9 +19,14 @@ nonisolated enum WeightDisplay {
         return fraction == 0 ? "\(whole)" : "\(whole).\(fraction)"
     }
 
-    /// Body weight and volume totals: integer lb, or integer kg = round(lb × kgPerLb).
-    static func wholeText(lb: Double, unit: WeightUnit) -> String {
+    /// Body weight and volume totals as a whole number: lb rounded, or kg = round(lb × kgPerLb).
+    static func whole(lb: Double, unit: WeightUnit) -> Int {
         let value = unit == .lb ? lb : lb * kgPerLb
-        return "\(Int(value.rounded()))"
+        return Int(value.rounded())
+    }
+
+    /// `whole` as text.
+    static func wholeText(lb: Double, unit: WeightUnit) -> String {
+        "\(whole(lb: lb, unit: unit))"
     }
 }

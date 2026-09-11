@@ -1,16 +1,20 @@
 import SwiftUI
+import SwiftData
 
-/// The tab shell (M1's root; the router in RootView shows it once a program exists). `TabView(selection:)` keeps every tab's `NavigationStack` mounted, like tabs that
-/// hide panels with display:none instead of unmounting them. The system bar is hidden on every tab
-/// and the pill is supplied as a bottom safe-area inset so content scrolls under it.
+/// The tab shell. `TabView(selection:)` keeps every tab's `NavigationStack` mounted, like tabs that hide
+/// panels with display:none instead of unmounting them. The system bar is hidden on every tab and the pill
+/// is supplied as a bottom safe-area inset so content scrolls under it.
 struct ShellView: View {
-    @State private var selected: AppTab = .home   // ≈ useState
+    /// The current program, for its immutable fields only (id, frequency, session length). Screens that
+    /// need live rows own their own `@Query`; a view depending on this reference alone never re-renders (iOS 17).
+    let program: Program
+    @State private var selected: AppTab = .home   // ≈ useState; passed down as a Binding for "Progress ›"
 
     var body: some View {
         TabView(selection: $selected) {
             ForEach(AppTab.allCases) { tab in
                 NavigationStack {
-                    PlaceholderScreen(tab: tab)
+                    screen(for: tab)
                 }
                 .toolbar(.hidden, for: .tabBar)
                 .tag(tab)
@@ -22,8 +26,22 @@ struct ShellView: View {
         .ignoresSafeArea(edges: .bottom)
         .background(Theme.bg.ignoresSafeArea())
     }
+
+    @ViewBuilder
+    private func screen(for tab: AppTab) -> some View {
+        switch tab {
+        case .home: HomeView(program: program, selectedTab: $selected).id(program.id)   // ≈ key={program.id}: resets @State with the program
+        default: PlaceholderScreen(tab: tab)
+        }
+    }
 }
 
+#if DEBUG
 #Preview {
-    ShellView()
+    let calendar = AppClock.live().calendar
+    let container = try! DebugSeed.midProgram.makeContainer(calendar: calendar)
+    return ShellView(program: try! ProgramStore.current(in: container.mainContext)!)
+        .modelContainer(container)
+        .environment(\.appClock, DebugSeed.midProgram.clock(calendar: calendar))
 }
+#endif
