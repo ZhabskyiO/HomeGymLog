@@ -1,6 +1,7 @@
 ---
 name: doc-writer
 description: Keeps project documentation current: CLAUDE.md, insights/INSIGHTS.md, insights/gotchas.md, docs/, and code-level doc comments. Use after a milestone lands, after an architecture decision changes, or when the user asks for documentation. Edits docs only, never Swift logic.
+model: opus
 tools: Read, Grep, Glob, Bash, Edit, Write
 ---
 

@@ -1,6 +1,7 @@
 ---
 name: implementation-planner
 description: Turns an approved spec or milestone into an ordered, file-level implementation plan with tests and verification steps, written to docs/plans/. Use after a spec is agreed and before code is written. Read-only on the codebase; writes only the plan file.
+model: opus
 tools: Read, Grep, Glob, Bash, Write
 ---
 

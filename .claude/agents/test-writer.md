@@ -1,6 +1,7 @@
 ---
 name: test-writer
 description: Writes and runs unit tests for HomeGymLog using Swift Testing, focused on the Engine (program generation, weights, streaks, PRs, volume, scheduling) and SwiftData persistence with an in-memory container. Use after Engine code or a model is written, or when coverage gaps are found. Writes test files only; reports failures rather than changing production code.
+model: opus
 tools: Read, Grep, Glob, Bash, Edit, Write
 ---
 
