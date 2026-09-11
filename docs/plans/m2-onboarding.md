@@ -1,6 +1,14 @@
 # M2 slice 1 — Onboarding, root routing, units, seeded states: implementation plan
 
-**Status: draft 2026-09-10** for `docs/specs/m2-onboarding.md` (revised 2026-09-10). Sections 2–5 and 8 of the
+**Status: implemented 2026-09-10 on branch `m2-onboarding`.** Steps 1–10 done. 162 Swift Testing tests pass on
+iPhone 15 / iOS 17.5 and iPhone 17 / iOS 26.5; the Release configuration builds; `ob0`–`ob5` compared against the
+prototype rendered with headless Chrome (all match with the deviations the spec records: "H" tile, 52.5 lb, 17
+starting-weight rows, A6 split-name tile wrapping to two lines). Pending the user: manual behaviors AC-8–13 and the
+device install. Post-review changes: `WorkoutLogStore.start` returns the existing log on a second call; "Start program"
+alerts on a save failure in Release; `isStarting` stays set after success; `DebugSeed` uses an explicit
+`onboardingSteps` switch; `App.init` keeps every `DebugSeed` reference inside `#if DEBUG` (Release had been broken);
+a Release build step was added to `/ship-check` and CLAUDE.md.
+Plan drafted 2026-09-10 for `docs/specs/m2-onboarding.md` (revised 2026-09-10). Sections 2–5 and 8 of the
 spec are the contract; acceptance criteria are referenced as `AC-N` (1–27). Branch `m2-onboarding`.
 
 ---

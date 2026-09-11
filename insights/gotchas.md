@@ -47,6 +47,10 @@ new bites: what happened, the fix, and how to recognize it next time. Date each 
 
 ## SwiftUI
 
+- 2026-09-10 — `containerRelativeFrame` on the segments of an `HStack` (the proportional phase bar) rendered the whole
+  screen black: no crash, no console message. Fix: wrap the row in a `GeometryReader`, compute each segment width from
+  `geometry.size.width`, and pin the reader's height with `.frame(height:)` (`Shared/PhaseBar.swift`). Recognize it: a
+  black screen with no error right after adding a proportional-width layout.
 - 2026-09-10 — In `App.init`, `Result { try AppSchema.makeContainer(inMemory: seed != nil) }` fails with "constant
   'self.containerResult' captured by a closure before being initialized" when `seed` is a stored property. Compute the
   flag into a local first.
@@ -60,6 +64,12 @@ new bites: what happened, the fix, and how to recognize it next time. Date each 
 
 ## Xcode / build
 
+- 2026-09-10 — The Chrome browser tools refuse `file://` URLs, and the Chrome extension can be disconnected entirely
+  (every browser tool errors). Headless Chrome works: serve `design/` with `python3 -m http.server` and run the Chrome
+  binary with `--headless=new --screenshot`; recipe in `INSIGHTS.md` Patterns and `.claude/skills/design-compare/SKILL.md`.
+- 2026-09-10 — Scripted simulator taps via `osascript` (System Events) need Accessibility permission for the terminal
+  app (System Settings → Privacy & Security → Accessibility). It is not granted, so the script is refused; the
+  tap-through acceptance checks (M2 spec AC-8–13) are done by hand on the device instead.
 - 2026-09-10 — `simctl launch --stdout=<path>` may write nothing; `--console` attaches silently to a running instance,
   so `simctl terminate` first. App-side `print` needs `fflush(stdout)` to show up.
 - 2026-09-10 — `devicectl device process launch` fails with `FBSOpenApplicationErrorDomain error 7 … Locked` while the

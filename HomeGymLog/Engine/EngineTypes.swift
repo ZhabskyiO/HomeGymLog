@@ -63,6 +63,13 @@ nonisolated enum SetStatus: String, CaseIterable, Codable, Sendable {
     case pending, done, skipped
 }
 
+/// Onboarding experience level. Stored on `Program.experience` as the raw string; unused by any formula in v1.
+nonisolated enum Experience: String, CaseIterable, Codable, Sendable {
+    case beginner = "Beginner"
+    case intermediate = "Intermediate"
+    case advanced = "Advanced"
+}
+
 /// Muscle groups used by the exercise library and the swap sheet.
 nonisolated enum MuscleGroup: String, CaseIterable, Codable, Sendable {
     case chest = "Chest"

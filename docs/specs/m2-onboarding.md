@@ -1,6 +1,16 @@
 # M2 slice 1 — Onboarding, root routing, units, seeded states
 
-**Status: revised 2026-09-10 after the architecture review and researcher report; all open questions decided.**
+**Status: implemented 2026-09-10 on branch `m2-onboarding`.** 162 Swift Testing tests pass on iPhone 15 / iOS 17.5
+and iPhone 17 / iOS 26.5; the Release configuration builds. `ob0`–`ob5` (AC-1–6) compared against the prototype
+rendered with headless Chrome: all match with the recorded deviations ("H" tile and HomeGymLog copy, "up to 52.5 lb",
+17 starting-weight rows in 5.1 order, and the A6 split-name tile wrapping to two lines at phone width). Pending the
+user on the device: the manual tap-through behaviors AC-8–13 and the device install. Post-review changes
+(`docs/reviews/m2-onboarding-swift-review.md`): `WorkoutLogStore.start` returns the session's existing log on a
+second call instead of replacing it; "Start program" shows an alert when the save fails in Release (assertion in
+Debug); `isStarting` stays set after a successful start until the route flips; `DebugSeed` maps `obN` to a step
+count with an explicit switch; `App.init` keeps every `DebugSeed` reference inside `#if DEBUG` (the Release build had
+been broken); a Release build step was added to `/ship-check` and CLAUDE.md.
+(Earlier: revised 2026-09-10 after the architecture review and researcher report; all open questions decided.)
 Source: `design/BenchmarkApp.prototype.html` (markup `<!-- ONBOARDING -->`; logic `obNext`, `obDots`,
 `obNextLabel`, `lengthOpts`, `freqOpts`, `dayOpts`, `expOpts`, `lenOpts`, `calibRows`, `unitOpts`, `phaseBar`,
 `phaseList`, `firstSessionLabel`, `D`, `Dk`; Tweaks `startState`, `theme`, `missedDayPrompt`), `CLAUDE.md`,

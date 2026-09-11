@@ -74,7 +74,8 @@ nonisolated enum ProgramGenerator {
         let startDate = CalendarRules.monday(ofWeekContaining: inputs.generatedOn, calendar: calendar)
 
         var sessions: [GeneratedSession] = []
-        var usedKeys: Set<String> = []
+        // Same rule as the onboarding starting-weight rows, so stored keys and rows never differ.
+        let usedKeys = Set(SplitPlans.exerciseKeys(frequency: inputs.frequency, sessionLengthMinutes: inputs.sessionLengthMinutes)!)
         for index in 0..<(weeks * inputs.frequency) {
             let week = index / inputs.frequency + 1
             let phase = PhaseSplit.phaseOf(week: week, weeks: weeks)
@@ -87,7 +88,6 @@ nonisolated enum ProgramGenerator {
                     targetWeightLb: WeightFormula.targetWeightLb(key: key, week: week, phase: phase, startingWeightsLb: inputs.startingWeightsLb)!
                 )
             }
-            usedKeys.formUnion(keys)
             let baseDate = CalendarRules.day(startDate, adding: 7 * (week - 1) + days[index % inputs.frequency], calendar: calendar)
             sessions.append(GeneratedSession(
                 index: index, week: week, phase: phase, name: day.name, scheduledDate: baseDate,

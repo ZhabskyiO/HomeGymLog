@@ -12,7 +12,8 @@ Verify the working tree is ready to commit. Report failures; do not hide them.
    does not ship. If the diff touches `Models/` or any SwiftData call, also run the persistence suites on
    iPhone 17 / iOS 26.5 (runtime behavior differs between the two; see gotchas "SwiftData").
 3. Run the `build-and-run` skill build step only (no launch) if the diff touches anything outside
-   tests and docs. If the diff touches `Features/` or `Shared/`, run `/design-compare` for every prototype
+   tests and docs. Also build the Release configuration once, since `#if DEBUG`-only types leak silently
+   otherwise: `xcodebuild -scheme HomeGymLog -configuration Release -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.5' -derivedDataPath build/DerivedData CODE_SIGNING_ALLOWED=NO build`. If the diff touches `Features/` or `Shared/`, run `/design-compare` for every prototype
    snapshot the slice's spec names and attach the verdicts; a visible difference is a blocking finding
    unless the spec records it as a deviation.
 4. Launch `swift-reviewer` on the diff (`git diff main...HEAD` plus untracked files). Save its reply to

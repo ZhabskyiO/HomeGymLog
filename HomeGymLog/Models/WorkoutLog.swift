@@ -5,7 +5,7 @@ import SwiftData
 @Model
 final class WorkoutLog {
     var id: UUID = UUID()
-    var startedAt: Date = Date()
+    var startedAt: Date = Date.distantPast
     /// nil while in progress. The only in-progress indicator.
     var finishedAt: Date?
     var session: PlannedSession?

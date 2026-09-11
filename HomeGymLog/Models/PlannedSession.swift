@@ -13,7 +13,7 @@ final class PlannedSession {
     var phaseRaw: String = Phase.foundation.rawValue
     var name: String = ""
     /// Start of the scheduled calendar day. Mutable: re-slotting moves it.
-    var scheduledDate: Date = Date()
+    var scheduledDate: Date = Date.distantPast
     var sets: Int = 3
     var reps: Int = 12
     var restSeconds: Int = 75

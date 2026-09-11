@@ -7,11 +7,11 @@ import SwiftData
 final class Program {
     var id: UUID = UUID()
     /// When the program was generated.
-    var createdAt: Date = Date()
+    var createdAt: Date = Date.distantPast
     /// nil while current. Reserved so "Build a new program" can archive or delete without a migration.
     var archivedAt: Date?
     /// Monday of the week containing the generation day; used for week numbering.
-    var startDate: Date = Date()
+    var startDate: Date = Date.distantPast
     /// Program length: 1, 2, 3 or 6 (four weeks per month).
     var months: Int = 1
     /// Sessions per week: 3, 4 or 5.

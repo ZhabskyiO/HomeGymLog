@@ -15,7 +15,8 @@ Keep entries short. Date them. Newest at the top within each section.
   nothing below the root calls `Date()` or `Calendar.current`. Extends the Engine rule to the view layer.
 - **`WorkoutLogStore.finish(_:at:in:)` is the single writer** of `finishedAt` + `status == .completed` (one save).
   Introduced in M2 for the seeder, reused by M3. `WorkoutLogStore.start(session:at:in:)` creates a log with exercises
-  and pending sets from a `PlannedSession`. The seeder uses only these store functions, model inits, and direct
+  and pending sets from a `PlannedSession`, or returns the session's existing log (never a second one: reassigning
+  the link would orphan every set already swiped). The seeder uses only these store functions, model inits, and direct
   `LoggedSet` field mutations (weight, reps, status, rpe, loggedAt), exactly as M3's swipe-to-log will.
 - **`ProgramStore.start(...)` owns "at most one current program" on the create side**: returns nil without writing when
   a current program exists; otherwise generates and applies. `apply` stays unguarded for tests.
@@ -36,7 +37,9 @@ configuration, which the shared scheme's Run action uses); a seeded run builds `
 so screenshots never touch the on-disk store. Verified on iOS 17.5 and 26.5 in the app target under MainActor default
 isolation. Seed names follow the prototype snapshots: `onboarding`, `ob1`…`ob5`, `midProgram`, `missed`. Device form:
 `xcrun devicectl device process launch --console --device <udid> com.zhabskyi.homegymlog.ios -seed midProgram`,
-phone unlocked. Compute `inMemory` into a local before the `Result { }` closure in `init`.
+phone unlocked. In `App.init`, decide plain locals first (container factory, clock, defaults, seed draft) with the
+seed branch entirely inside `#if DEBUG`, then `Result(catching:)`; naming `DebugSeed` outside the guard breaks the
+Release build, which is why `/ship-check` now builds Release once.
 
 ### 2026-09-10 — Onboarding is one screen with a `@State step`
 `ScrollView { switch step }` with `.id(step)` + `.transition` + `.animation(value: step)`; the CTA is a
@@ -98,8 +101,9 @@ Not a separate `@Model`. Swap replaces one element (key + recomputed target) and
 `WorkoutLog` is in progress iff `finishedAt == nil` (no separate status field). `PlannedSession.status ==
 .completed` iff `workoutLog?.finishedAt != nil`; the single finish function `WorkoutLogStore.finish` (M2, reused by M3)
 writes both in one save.
-`.skipped` is stored because it is not derivable. One `WorkoutLog` per `PlannedSession`; exiting a workout
-without finishing deletes its log so the session can be started again (M3 implements; the 1:1 depends on it).
+`.skipped` is stored because it is not derivable. One `WorkoutLog` per `PlannedSession`: `WorkoutLogStore.start`
+returns the session's existing log instead of creating another (that is the resume path), and exiting a workout
+without finishing deletes its log so the session can be started fresh (M3 implements the exit).
 
 ### 2026-09-09 — Preferences live in UserDefaults via @AppStorage, not SwiftData
 Units, appearance, reminder, haptics. Analogy: `useState` backed by `localStorage`.
@@ -274,7 +278,25 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
   verifier ×1) kept its context and produced tighter revisions than a fresh launch. Launching researcher and
   spec-creator in parallel at the start of `/milestone` saved a full round.
 
+### Skill tuning
+
+- 2026-09-10 — **design-compare**: step 1 rewritten to the headless-Chrome recipe (Patterns, below): local
+  `http.server`, `--headless=new` screenshot of the whole flows page, `sips` crops with the recorded row-A offsets.
+  The Chrome extension was unavailable during the onboarding slice; the `ob0`–`ob5` comparison ran on this recipe.
+- 2026-09-10 — **ship-check**: builds the Release configuration once (step 3) after the onboarding slice shipped a
+  `DebugSeed` reference outside `#if DEBUG` that only Release could catch.
+
 ## Patterns
+
+### 2026-09-10 — Render the prototype with headless Chrome over a local http.server
+The browser tools refuse `file://` URLs and the Chrome extension may not be connected at all, so render the design
+with the Chrome binary itself: serve the export with `(cd design && python3 -m http.server 8765 --bind 127.0.0.1 &)`,
+then `"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --disable-gpu --hide-scrollbars
+--window-size=3000,5600 --virtual-time-budget=20000 --screenshot=build/proto-all.png "http://127.0.0.1:8765/<page>"`.
+The window is large enough for the whole flows page and the virtual-time budget lets its scripts finish before the
+shot. Crop one frame with `sips -c <h> <w> --cropOffset <y> <x>`; the row-A (ob0–ob5) offsets are recorded in
+`.claude/skills/design-compare/SKILL.md`, and for other rows view a `sips -Z 1500` thumbnail first to locate the frame.
+Re-render only when the export changes; compare with the simulator screenshot as in the entry below.
 
 ### 2026-09-10 — Verify UI on the simulator by screenshot, not by eye
 Build, install, launch, then `xcrun simctl io <udid> screenshot build/shot.png` and read the PNG (the Read

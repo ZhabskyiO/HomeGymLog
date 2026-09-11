@@ -7,7 +7,7 @@ final class ExerciseNote {
     var id: UUID = UUID()
     var exerciseKey: String = ""
     var text: String = ""
-    var updatedAt: Date = Date()
+    var updatedAt: Date = Date.distantPast
 
     init(exerciseKey: String, text: String, updatedAt: Date) {
         self.exerciseKey = exerciseKey

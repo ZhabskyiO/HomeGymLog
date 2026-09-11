@@ -52,6 +52,15 @@ nonisolated enum EquipmentKind: String, CaseIterable, Codable, Sendable {
         return tenths >= minTenths && tenths <= maxTenths && tenths % stepTenths == 0
     }
 
+    /// `lb` moved by `steps` equipment steps (negative to go down); nil when the result would leave
+    /// min…max, which is the stepper's no-op at a bound.
+    func stepped(lb: Double, by steps: Int) -> Double? {
+        guard let tenths = Self.tenths(fromLb: lb) else { return nil }
+        let result = tenths + steps * stepTenths
+        guard result >= minTenths && result <= maxTenths else { return nil }
+        return Self.lb(fromTenths: result)
+    }
+
     /// Converts pounds to integer tenths; nil unless `lb` is an exact tenth (e.g. 15.75 → nil).
     static func tenths(fromLb lb: Double) -> Int? {
         let scaled = lb * 10

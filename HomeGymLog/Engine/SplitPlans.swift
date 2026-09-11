@@ -63,6 +63,24 @@ nonisolated enum SplitPlans {
         defaultDays[frequency]
     }
 
+    /// Every exercise key a program with this frequency and session length uses, in first-appearance
+    /// order walking the split days and taking each day's first `exerciseCount` keys. Shared by the
+    /// generator's starting-weight map and the onboarding rows so they can never differ. nil for bad inputs.
+    static func exerciseKeys(frequency: Int, sessionLengthMinutes: Int) -> [String]? {
+        guard let days = days(frequency: frequency),
+              let count = exerciseCount(sessionLengthMinutes: sessionLengthMinutes) else { return nil }
+        var seen: Set<String> = []
+        var keys: [String] = []
+        for day in days {
+            for key in day.exerciseKeys.prefix(count) {
+                if seen.contains(key) { continue }
+                seen.insert(key)
+                keys.append(key)
+            }
+        }
+        return keys
+    }
+
     /// Exercises per session by session length: 20 → 3, 30 → 4, 45 → 5, 60 → 6; nil otherwise.
     static func exerciseCount(sessionLengthMinutes: Int) -> Int? {
         switch sessionLengthMinutes {
