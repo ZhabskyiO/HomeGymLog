@@ -58,7 +58,11 @@ becomes `ShellView`; the new root switches on `currentPrograms.isEmpty`. Analogy
   and PRs stay for Progress. Routing shows onboarding iff no program has `archivedAt == nil`.
 - **kg display is one decimal** (42.5 lb → 19.3 kg); body weight and volume totals show integer kg. Storage and
   steppers stay in pounds; a stepper moves one equipment step (2.5 / 10 lb) whatever the display unit.
-- **Body weight stepper is ±5 lb always, bounded 50…500 lb.**
+- **Body weight stepper is ±5 lb always, bounded 50…500 lb.** Body weight has its own lb/kg toggle on the About
+  you step (user request 2026-09-10): it starts as the welcome-step unit but can differ; saved as the
+  `bodyWeightUnits` preference. Storage stays pounds.
+- **Day picker swaps instead of refusing** (user request 2026-09-10): with N days selected, tapping another day
+  selects it and drops the earliest selected day (Monday first); Continue therefore stays enabled.
 - **Seeded launches use frozen reference dates** (onboarding seeds: Mon 2026-08-31; `midProgram`/`missed`:
   Tue 2026-09-15) and an in-memory store, so `/design-compare` sees identical screens every run.
 - **No draft persistence in onboarding**: relaunch mid-onboarding starts over.

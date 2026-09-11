@@ -7,14 +7,15 @@ import Testing
 @Suite struct OnboardingDraftEdgeTests {
     private let cal = TestCalendar.calendar
 
-    @Test("with frequency 5 and five days picked, a sixth tap does nothing")
-    func sixthDayIsNoOp() {
+    @Test("with frequency 5 and five days picked, each extra tap swaps out the earliest selected day")
+    func extraDaySwapsEarliest() {
         let d = OnboardingDraft()
         d.step = 2
         d.selectFrequency(5)
         d.toggleDay(5)
+        #expect(d.days == [1, 2, 3, 4, 5])
         d.toggleDay(6)
-        #expect(d.days == [0, 1, 2, 3, 4])
+        #expect(d.days == [2, 3, 4, 5, 6])
         #expect(d.canContinue)
     }
 

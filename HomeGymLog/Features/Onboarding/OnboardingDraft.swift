@@ -7,7 +7,15 @@ import Observation
 final class OnboardingDraft {
     /// 0 = welcome … 5 = generated program.
     var step = 0
-    var units: WeightUnit
+    /// App-wide display unit chosen on the welcome step. Body weight follows it until chosen separately.
+    var units: WeightUnit {
+        didSet { if !bodyWeightUnitChosen { bodyWeightUnit = units } }
+    }
+    /// Unit for the body-weight stepper only; may differ from `units`. Storage stays in pounds.
+    var bodyWeightUnit: WeightUnit {
+        didSet { bodyWeightUnitChosen = true }
+    }
+    private var bodyWeightUnitChosen = false
     var months = 1
     private(set) var frequency = 4
     /// Sorted training weekdays, 0 = Monday.
@@ -26,6 +34,7 @@ final class OnboardingDraft {
 
     init(units: WeightUnit = .lb, months: Int = 1, frequency: Int = 4) {
         self.units = units
+        self.bodyWeightUnit = units
         self.months = months
         self.frequency = frequency
         self.days = SplitPlans.defaultWeekdays(frequency: frequency) ?? [0, 1, 3, 4]
@@ -48,14 +57,19 @@ final class OnboardingDraft {
         days = defaults
     }
 
-    /// Deselect always; select only while fewer than `frequency` days are picked. Keeps `days` sorted.
+    /// Deselect always. Select when fewer than `frequency` days are picked; when the week is already full,
+    /// the new day replaces the earliest selected day (week starts Monday). Keeps `days` sorted.
     func toggleDay(_ day: Int) {
+        guard (0...6).contains(day) else { return }
         if let index = days.firstIndex(of: day) {
             days.remove(at: index)
-        } else if days.count < frequency, (0...6).contains(day) {
-            days.append(day)
-            days.sort()
+            return
         }
+        if days.count >= frequency, let earliest = days.min(), let index = days.firstIndex(of: earliest) {
+            days.remove(at: index)
+        }
+        days.append(day)
+        days.sort()
     }
 
     /// ±5 lb; no-op when the result would leave 50…500.

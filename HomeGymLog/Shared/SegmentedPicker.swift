@@ -14,6 +14,8 @@ struct SegmentedPicker<T: Hashable>: View {
     let options: [(value: T, label: String)]
     @Binding var selection: T
     var style: Style = .pill
+    /// Container color override, e.g. `Theme.sf2` when the picker sits on an `sf` card.
+    var container: Color? = nil
 
     var body: some View {
         HStack(spacing: style == .pill ? 3 : 6) {
@@ -35,7 +37,7 @@ struct SegmentedPicker<T: Hashable>: View {
             }
         }
         .padding(style == .chip ? 0 : (style == .pill ? 3 : 4))
-        .background(style == .chip ? Color.clear : Theme.sf, in: RoundedRectangle(cornerRadius: style == .pill ? 10 : 14))
+        .background(container ?? (style == .chip ? Color.clear : Theme.sf), in: RoundedRectangle(cornerRadius: style == .pill ? 10 : 14))
     }
 
     private var labelSize: CGFloat { style == .wide ? 15 : 13 }

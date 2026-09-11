@@ -80,8 +80,9 @@ split name and description verbatim from `SplitPlans.info` (M1 4.9: "Full body A
 "Push / Pull / Legs + Upper / Lower" with their one-line descriptions).
 
 "Training days · pick N" (N = frequency, `mu`) then seven 44 pt buttons "Mo Tu We Th Fr Sa Su" (0 = Monday).
-Tapping a selected day deselects it; tapping an unselected day selects it only while fewer than N are
-selected (otherwise nothing happens). Selected: accent with white text; unselected: `sf` with `tx`.
+Tapping a selected day deselects it; tapping an unselected day selects it, and when N days are already
+selected the new day replaces the earliest selected day of the week (Monday first), so the count stays N
+(decision 2026-09-10, replaces the prototype's no-op). Selected: accent with white text; unselected: `sf` with `tx`.
 Continue is enabled iff exactly N days are selected.
 
 ### 2.5 A4 · About you (`ob3`)
@@ -91,7 +92,7 @@ copy audit, although only session length is used by a formula). Three cards:
 
 | Card | Controls |
 |---|---|
-| Body weight (caption = unit) | − / + 34 pt round buttons around a 22 pt bold value. Step ±5 lb regardless of unit, bounded 50…500 lb (5.4). Default 180 lb (shows "180" / "82" kg). |
+| Body weight (lb / kg pill under the title) | Its own unit toggle, initially the welcome-step unit, changeable independently (decision 2026-09-10); the choice is saved as the `bodyWeightUnits` preference at Start program. − / + 34 pt round buttons around a 22 pt bold value. Step ±5 lb regardless of unit, bounded 50…500 lb (5.4). Default 180 lb (shows "180" / "82" kg). |
 | Experience | Beginner / Intermediate / Advanced segments; default Intermediate. Stored, unused by any formula (decision). |
 | Session length (caption = "N exercises per session") | 20m / 30m / 45m / 60m segments; default 45m. Caption 3 / 4 / 5 / 6 exercises. |
 
@@ -374,7 +375,7 @@ Behavior (simulator):
 8. From `-seed onboarding`, tapping through with defaults reaches A6 showing the second row of 5.2, and
    "Start program" lands on the shell's Home placeholder with no explicit navigation (the route flips).
 9. On A3, deselecting one default day disables Continue (40 % opacity, no navigation); reselecting any day
-   re-enables it; a fifth tap with 4 selected does nothing.
+   re-enables it; a fifth tap with 4 selected swaps out the earliest selected day and keeps Continue enabled.
 10. Switching to kg on A1 shows "82" with caption "kg" on A4 and "18.1 kg" for Dumbbell Bench Press on
     A5; switching back shows 180 / 40 lb.
 11. Killing the app on A4 and relaunching (no seed, empty store) shows A1 with defaults.

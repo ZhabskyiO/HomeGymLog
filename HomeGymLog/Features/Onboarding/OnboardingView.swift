@@ -8,6 +8,7 @@ struct OnboardingView: View {
     @Environment(\.appClock) private var clock
     @Environment(\.modelContext) private var modelContext
     @AppStorage("units") private var unitsRaw = WeightUnit.lb.rawValue
+    @AppStorage("bodyWeightUnits") private var bodyWeightUnitsRaw = WeightUnit.lb.rawValue
     /// Stays true after a successful start until the route flips, so a second tap cannot land.
     @State private var isStarting = false
     @State private var startError: String?
@@ -82,6 +83,7 @@ struct OnboardingView: View {
                                                  in: modelContext)
             if program != nil {
                 unitsRaw = draft.units.rawValue   // the route flips on its own once the save lands
+                bodyWeightUnitsRaw = draft.bodyWeightUnit.rawValue
             } else {
                 isStarting = false
             }

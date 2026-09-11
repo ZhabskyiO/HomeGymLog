@@ -35,7 +35,8 @@ import Testing
         d.toggleDay(6)
         #expect(d.days == [1, 3, 4, 6] && d.canContinue)
         d.toggleDay(2)
-        #expect(d.days == [1, 3, 4, 6], "fifth day must be a no-op")
+        #expect(d.days == [2, 3, 4, 6], "a fifth day replaces the earliest selected day")
+        #expect(d.canContinue)
         d.step = 3
         d.toggleDay(6)
         #expect(!d.days.contains(6) && d.canContinue, "only step 2 gates Continue")
@@ -113,6 +114,20 @@ import Testing
         var labels: [String] = []
         for step in 0...5 { d.step = step; labels.append(d.ctaLabel) }
         #expect(labels == ["Set up my program", "Continue", "Continue", "Continue", "Generate program", "Start program"])
+    }
+
+    @Test("body weight unit follows the app unit until chosen separately")
+    func bodyWeightUnit() {
+        let d = OnboardingDraft()
+        #expect(d.bodyWeightUnit == .lb)
+        d.units = .kg
+        #expect(d.bodyWeightUnit == .kg, "follows the welcome-step unit while untouched")
+        d.bodyWeightUnit = .lb
+        d.units = .kg
+        #expect(d.bodyWeightUnit == .lb, "an explicit choice sticks")
+        d.adjustBodyWeight(by: 5)
+        #expect(d.bodyWeightLb == 185, "stepper stays in pounds whatever the display unit")
+        #expect(WeightDisplay.wholeText(lb: d.bodyWeightLb, unit: .kg) == "84")
     }
 
     @Test("changing the unit never changes stored values (AC-10)")

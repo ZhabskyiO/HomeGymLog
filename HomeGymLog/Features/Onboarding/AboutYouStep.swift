@@ -9,14 +9,15 @@ struct AboutYouStep: View {
             StepTitle(title: "About you", subtitle: "Used to size sessions and starting loads.")
             VStack(spacing: 10) {
                 HStack {
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 6) {
                         Text("Body weight").font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.tx)
-                        Text(draft.units.rawValue).font(.system(size: 12)).foregroundStyle(Theme.mu)
+                        SegmentedPicker(options: [(WeightUnit.lb, "lb"), (WeightUnit.kg, "kg")], selection: $draft.bodyWeightUnit,
+                                        style: .pill, container: Theme.sf2)
                     }
                     Spacer()
                     HStack(spacing: 12) {
                         StepperButton(symbol: "−", size: 34) { draft.adjustBodyWeight(by: -OnboardingDraft.bodyWeightStepLb) }
-                        Text(WeightDisplay.wholeText(lb: draft.bodyWeightLb, unit: draft.units))
+                        Text(WeightDisplay.wholeText(lb: draft.bodyWeightLb, unit: draft.bodyWeightUnit))
                             .font(.system(size: 22, weight: .bold))
                             .monospacedDigit()
                             .foregroundStyle(Theme.tx)
