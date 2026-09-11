@@ -6,6 +6,40 @@ Keep entries short. Date them. Newest at the top within each section.
 
 ## Architecture decisions
 
+### 2026-09-10 — M2 Home architecture (from the architecture review)
+- **The current `Program` is passed as a prop** from `RootView`'s query into `ShellView(program:)` and the tab
+  screens. No second `@Query` for "current". The `@Model → HomeStatsInput` mapping runs inside `body` so Observation
+  registers every nested read (`statusRaw`, `workoutLog?.finishedAt`, set weights). Fallback if 17.5 does not
+  re-render through relationships: an unfiltered `@Query` on `PlannedSession` filtered in memory by
+  `persistentModelID`, plus a `@Query` on `WorkoutLog.finishedAt != nil`.
+- **Screens that depend on "today" hold one `@State today`**, set on appear and when the scene becomes active;
+  `clock.now()` is never read inside `body`. Analogy: `useEffect` on `visibilitychange` calling `setToday`.
+- **Streak**: consecutive completed sessions walking back from today; a pending or skipped session dated today is
+  stepped over; a pending or skipped session dated before today stops the walk.
+- **Stats are scoped to the current program**: PRs, streak and volume ignore archived programs (restart resets the
+  PR baseline; archived history is Progress-only). Week volume attributes a finished log to its session's
+  `scheduledDate`.
+- **One optional `Identifiable` sheet item per screen** with `.sheet(item:)`; becomes a one-enum-per-screen when a
+  second sheet lands. **Tab selection is owned by `ShellView`** and passed as a `Binding` (same shape as the pill).
+- **Seed recipe reuse**: `restDay` = `MidProgramSeed` with completed indexes 0–14 minus 7; `freshProgram` is built
+  from `OnboardingDraft()` defaults so "defaults" is true by construction.
+- Validation lives in the Engine's throwing `HomeStatsInput.init(sessions:logs:)`; the Models-layer
+  `@MainActor` `init(program:)` only maps rows and delegates. `HomeStats` functions are non-throwing over a valid input.
+  Engine stays text-free (`greeting` returns an enum; `kfmt` lives in Shared; `WeightDisplay.whole(lb:unit:) -> Int`).
+
+### 2026-09-10 — M2 Home decisions (from the home slice spec)
+- **Week window is the calendar week Mon–Sun containing today** for the week strip and the "this week" volume
+  tile; only the "Week N · Phase" pill uses the stored program week (current-week rule in "Mid-week program start").
+- **Skipped sessions** show as a muted day number in the strip and break the streak (streak counts completed
+  sessions only). M4 may revisit when skip exists.
+- **After today's session completes, Home shows the prototype's rest-day card** ("Recover. Next up: …"); no
+  "done for today" variant.
+- **Start workout is present and inert until M3.** Volume counts finished logs only. Volume tile formatting follows
+  the prototype's `kfmt` (≥ 1 000 → one decimal + "k", e.g. "7.6k"), applied after converting to the display unit.
+- **Greeting** is time-based on the app clock: 05–11 morning, 12–16 afternoon, otherwise evening.
+- Seeds added to the catalogue: `restDay` (Sat 2026-09-19, sessions 0–14 except 7 done) and `freshProgram`
+  (Mon 2026-08-31, onboarding defaults, no logs).
+
 ### 2026-09-10 — M2 onboarding architecture (from the architecture review)
 - **Router view** beneath `.modelContainer`: `@Query(filter: #Predicate<Program> { $0.archivedAt == nil })`, body
   switches on `isEmpty`. Nothing navigates to the shell explicitly; `ProgramStore.start` saving flips it, M4's archive
