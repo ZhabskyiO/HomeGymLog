@@ -1,7 +1,8 @@
 import Foundation
 
-/// Home tab statistics over plain values. Every function takes `today` and `calendar` explicitly and returns
-/// no text. Empty input yields zeros, nil, or empty collections.
+/// Home tab statistics over plain values; `ordered` and `sessionState` are also the Program tab's. Every
+/// function takes `today` and `calendar` explicitly and returns no text. Empty input yields zeros, nil, or
+/// empty collections.
 nonisolated enum HomeStats {
     /// 5–11 morning, 12–16 afternoon, otherwise evening.
     static func greeting(hour: Int) -> Greeting {
@@ -92,6 +93,18 @@ nonisolated enum HomeStats {
         return logs.filter { inWindow.contains($0.sessionIndex) }.reduce(0) { $0 + volumeLb($1) }
     }
 
+    /// A session's state relative to `today`. The one derivation shared by the Home week strip and the
+    /// Program tab's card status; `.rest` means "no session" and is never returned here.
+    static func sessionState(_ session: SessionSummary, today: Date, calendar: Calendar) -> WeekStripState {
+        switch session.status {
+        case .completed: return .completed
+        case .skipped: return .skipped
+        case .pending:
+            if isToday(session, today, calendar) { return .today }
+            return isBeforeToday(session, today, calendar) ? .missed : .scheduled
+        }
+    }
+
     /// Seven entries, Monday first, for the calendar week containing `today`.
     static func weekStrip(sessions: [SessionSummary], today: Date, calendar: Calendar) -> [WeekStripDay] {
         let monday = CalendarRules.monday(ofWeekContaining: today, calendar: calendar)
@@ -100,14 +113,7 @@ nonisolated enum HomeStats {
             let date = CalendarRules.day(monday, adding: offset, calendar: calendar)
             let isToday = CalendarRules.isSameDay(date, today, calendar: calendar)
             let session = sorted.first { CalendarRules.isSameDay($0.scheduledDate, date, calendar: calendar) }
-            let state: WeekStripState
-            switch session?.status {
-            case nil: state = .rest
-            case .completed: state = .completed
-            case .skipped: state = .skipped
-            case .pending:
-                if isToday { state = .today } else if date < CalendarRules.startOfDay(today, calendar: calendar) { state = .missed } else { state = .scheduled }
-            }
+            let state = session.map { sessionState($0, today: today, calendar: calendar) } ?? .rest
             return WeekStripDay(date: date, isToday: isToday, state: state, dayNumber: calendar.component(.day, from: date))
         }
     }

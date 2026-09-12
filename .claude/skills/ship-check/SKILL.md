@@ -16,14 +16,17 @@ Verify the working tree is ready to commit. Report failures; do not hide them.
    otherwise: `xcodebuild -scheme HomeGymLog -configuration Release -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.5' -derivedDataPath build/DerivedData CODE_SIGNING_ALLOWED=NO build`. If the diff touches `Features/` or `Shared/`, run `/design-compare` for every prototype
    snapshot the slice's spec names and attach the verdicts; a visible difference is a blocking finding
    unless the spec records it as a deviation.
-4. Launch `swift-reviewer` on the diff (`git diff main...HEAD` plus untracked files). Save its reply to
-   `docs/reviews/<slug>-swift-review.md`. Fix blocking findings in the main session, re-run tests, and
-   re-run the reviewer once. Report non-blocking findings to the user.
+4. Launch `swift-reviewer` on the diff (`git diff main...HEAD` plus untracked files) and `test-writer` in
+   parallel (they are independent). Save the reviewer's reply to `docs/reviews/<slug>-swift-review.md`. Wait for
+   the test-writer before applying anything, then send the reviewer's findings to the `implementer` (resume it
+   with SendMessage so it keeps the slice in context) with the exact fixes and the instruction to re-run the full
+   suite on both runtimes and the Release build. Re-run the reviewer once only for blocking findings. Report
+   non-blocking findings to the user.
 5. Scan the diff for leftovers: `print(`, `TODO`, `FIXME`, `fatalError(` outside tests, force unwraps
    `!` on optionals in new code, hardcoded "Benchmark" strings, and `#if DEBUG` blocks that should not
    ship. List any found.
 6. Launch `doc-writer` with a summary of what changed so `CLAUDE.md`, `insights/`, and `docs/` status
-   lines are updated. If a spec or plan was implemented, it gets a dated implemented line.
+   lines are updated. Do not ask it for study notes; `/learning-notes` owns `docs/learning/`. If a spec or plan was implemented, it gets a dated implemented line.
 7. Run `/engineering-insight` for this slice so the retrospective lands before the commit (the Stop hook
    would otherwise demand it right after the commit anyway).
 8. After the user says yes and the commit lands, run `git rev-parse HEAD > .claude/.last-retro` so the Stop hook

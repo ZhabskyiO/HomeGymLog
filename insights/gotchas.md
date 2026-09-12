@@ -59,16 +59,32 @@ new bites: what happened, the fix, and how to recognize it next time. Date each 
   context (stale on 17.5 even after re-fetch). Keep every writer on `mainContext`.
 - (expected areas still open: migrations, previews)
 
+## Swift language
+
+- 2026-09-11 — **Integer division truncates toward zero, so a negative numerator does not floor.** `days / 7 + 1`
+  is 1 for `days` = −1…−6, the same bucket as day 0 (JS: `Math.trunc`, not `Math.floor`; `Math.floor(-1/7)` is −1).
+  Symptom: `ProgramTabStats.defaultDay` treated a Saturday before the program's first Monday as "today is in week 1"
+  and opened the rest card instead of the week's first session. Fix: guard the negative case before bucketing
+  (`guard days >= 0 else { return 0 }`), or use `Int(floor(Double(days) / 7))` when negative buckets are meaningful.
+  Recognize it: an off-by-one bucket that only appears for dates or offsets before the anchor.
+- 2026-09-11 — `Dictionary(uniqueKeysWithValues:)` **traps at runtime on a duplicate key** ("Duplicate values for key"),
+  it does not overwrite like a JS object literal. Fix: use `Dictionary(_, uniquingKeysWith: { first, _ in first })`, or
+  reject duplicates at the boundary that builds the values (`HomeStatsInput.init` throws `duplicateLogIndex`) — Home
+  does both. Recognize it: a crash inside a one-line `Dictionary(...)` built from data rather than from a literal.
+
 ## SwiftUI
 
 - 2026-09-10 — `containerRelativeFrame` on the segments of an `HStack` (the proportional phase bar) rendered the whole
   screen black: no crash, no console message. Fix: wrap the row in a `GeometryReader`, compute each segment width from
   `geometry.size.width`, and pin the reader's height with `.frame(height:)` (`Shared/PhaseBar.swift`). Recognize it: a
   black screen with no error right after adding a proportional-width layout.
-- 2026-09-11 — `Dictionary(uniqueKeysWithValues:)` **traps at runtime on a duplicate key** ("Duplicate values for key"),
-  it does not overwrite like a JS object literal. Fix: use `Dictionary(_, uniquingKeysWith: { first, _ in first })`, or
-  reject duplicates at the boundary that builds the values (`HomeStatsInput.init` throws `duplicateLogIndex`) — Home
-  does both. Recognize it: a crash inside a one-line `Dictionary(...)` built from data rather than from a literal.
+- 2026-09-11 — **`ScrollViewProxy.scrollTo` inside `.onAppear` runs before the row is laid out on iOS 17.5.** The
+  Program tab's week chips scrolled on launch even though the selected chip was already fully visible (WK 1 slid
+  off the leading edge), because "minimal" (`anchor: nil`) was measured against a viewport that did not exist yet.
+  Fix: defer the call by one main-actor turn — `Task { @MainActor in proxy.scrollTo(id, anchor: nil) }` — and keep
+  the selection write itself synchronous (`Features/Program/WeekChipRow.swift`). Recognize it: a horizontal scroll
+  row that is scrolled "a bit" on first appearance when it should not have moved at all.
+
 - 2026-09-10 — In `App.init`, `Result { try AppSchema.makeContainer(inMemory: seed != nil) }` fails with "constant
   'self.containerResult' captured by a closure before being initialized" when `seed` is a stored property. Compute the
   flag into a local first.
@@ -86,6 +102,12 @@ new bites: what happened, the fix, and how to recognize it next time. Date each 
   `-seed midProgram` makes `@AppStorage("units")` read "kg" even though the seed swaps in a cleared
   `UserDefaults(suiteName: "seed")`. Use it to screenshot the kg path without tapping through onboarding.
   Recognition: a preference "changes on its own" in a seeded run → check the launch arguments.
+
+- 2026-09-11 — **`sips -c <h> <w> --cropOffset <y> <x>` crops from the image centre, not the top-left**, and the
+  offset shifts that centred region (verified: `-c 300 1179 --cropOffset 0 0` on a 1179×2556 screenshot returns
+  rows 1128–1428). Offsets beyond the edge silently return a blank white image, not an error. For a simulator
+  screenshot just read the whole PNG with the Read tool; only crop when a region must be enlarged, and check the
+  crop by reading it before drawing conclusions from it.
 
 - 2026-09-11 — `xcodebuild` refuses to write a result bundle over an existing one: it fails before running anything
   with "Existing file at -resultBundlePath". Fix: `rm -rf build/tests.xcresult` first (every documented command does).
@@ -138,3 +160,10 @@ new bites: what happened, the fix, and how to recognize it next time. Date each 
   `name=iPhone 15,OS=17.5` for iOS 17 runs, `name=iPhone 17,OS=26.5` for iOS 26 runs.
 - 2026-09-09 — `xcodebuild` needs a shared scheme. If "does not contain a scheme named HomeGymLog", tick Shared
   in Product → Scheme → Manage Schemes (creates `HomeGymLog.xcodeproj/xcshareddata/xcschemes/`).
+
+## Agent workflow
+
+- 2026-09-11 — A **new `.claude/agents/<name>.md` is not selectable as a `subagent_type` right away**; the Agent tool
+  reports "Agent type '<name>' not found" until the agent list refreshes (it did a few turns later without a restart).
+  Fix: launch `general-purpose` with the intended `model` and a first line "read .claude/agents/<name>.md and follow it";
+  behavior is identical. Recognition: the error lists every agent except the one just written.

@@ -50,13 +50,7 @@ struct HomeView: View {
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active { now = clock.now() }
             }
-            .sheet(item: $infoExercise) { exercise in
-                ExerciseInfoSheet(exercise: exercise) { infoExercise = nil }
-                    .presentationDetents([.fraction(0.78)])
-                    .presentationCornerRadius(28)
-                    .presentationDragIndicator(.hidden)
-                    .presentationBackground(Theme.sf)
-            }
+            .exerciseInfoSheet(item: $infoExercise)
     }
 }
 

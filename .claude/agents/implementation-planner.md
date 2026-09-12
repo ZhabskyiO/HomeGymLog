@@ -15,7 +15,9 @@ Produce a plan at `docs/plans/<milestone-or-feature>.md` with these sections:
 2. **Decisions this plan relies on.** Bullet references to `insights/INSIGHTS.md` entries or the spec.
    If something needed is undecided, list it under "Open questions" and plan around the recommended
    default, stating it.
-3. **Steps.** An ordered list. Each step names the files to create or change, the types and functions
+3. **Steps.** An ordered list; every step must build and test green using only the files introduced in
+   that step or earlier (a sketch may not name a type a later step creates). Never instruct `git checkout`,
+   `git stash` or `git clean` on files that have no commit yet; say "restore by hand". Each step names the files to create or change, the types and functions
    involved with their signatures, the tests that cover the step, and how to verify it (a command or a
    simulator action), and the spec acceptance criteria it discharges as `AC-N` ids (every AC must appear
    in at least one step; list any AC you deliberately exclude under "Goal and scope" with the reason).

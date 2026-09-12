@@ -6,7 +6,7 @@ Keep entries short. Date them. Newest at the top within each section.
 
 ## Architecture decisions
 
-### 2026-09-11 — M2 Program tab decisions (from the program-tab slice spec, user-answered)
+### 2026-09-11 — M2 Program tab decisions (from the program-tab slice spec, user-answered; implementation notes appended)
 
 - **Week chips are calendar windows**, Mon–Sun, anchored on the Monday of the earliest session's week; count =
   days(anchor → latest session) / 7 + 1. A mid-week start therefore shows one more chip than `Program.weeks` and a
@@ -34,6 +34,21 @@ Keep entries short. Date them. Newest at the top within each section.
   presentation modifiers (NB1). `HomeStats.sessionState(_:today:calendar:)` is the one derivation of a session's state
   relative to today, used by the week strip and the Program card (NB2). `CalendarRules.days(from:to:)` is the one
   day-difference helper (NB3). Selection is `enum ProgramSelection { followToday, week, day }` (NB4).
+- 2026-09-11 (implemented) — **"Minimal scroll" only works one main-actor turn after `.onAppear`**: on iOS 17.5 the
+  chip row is not laid out yet when `onAppear` runs, so `proxy.scrollTo(week, anchor: nil)` measured against a
+  viewport of zero width and moved a row that was already correct. Only the `scrollTo` is wrapped in
+  `Task { @MainActor in … }` (≈ deferring to the next tick after paint); the selection write stays synchronous, so
+  the state and the scroll can never disagree. Details and the recognition cue in `gotchas.md` (SwiftUI).
+- 2026-09-11 (open) — **Whether `.onAppear` fires on every return to the Program tab in this shell is unverified**:
+  the tabs live in one `TabView`, so SwiftUI may keep the screen mounted and skip it. Both triggers ship
+  (`.onAppear` and `.onChange(of: selectedTab)`, calling the same idempotent `reset`), which is correct either way.
+  The user's manual AC-9a check decides; when it comes back, record here which trigger actually fires and drop the
+  other only if the check is conclusive on both 17.5 and 26.5.
+- 2026-09-11 (implemented) — **A window number is 0 before the anchor, never 1.** Swift's `/` on `Int` truncates
+  toward zero (JS `Math.trunc`, not `Math.floor`), so the spec's `days / 7 + 1` mapped days −1…−6 into window 1.
+  `initialWeek`'s `max(…, 1)` hid it, but `defaultDay`'s "today is in this window" test then selected today's
+  weekday instead of the first session's: onboarding on a Saturday opened WK 1 on the rest card rather than on
+  Monday's first session (swift-reviewer finding 1, fixed with an explicit `days >= 0` guard plus a regression test).
 
 ### 2026-09-10 — M2 Home architecture (from the architecture review; revised 2026-09-11 as implemented)
 - **Home owns its own `@Query` on `PlannedSession`** (`#Predicate { $0.program?.id == programID }`, sorted by
@@ -340,6 +355,39 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
 
 ## Agent tuning
 
+- 2026-09-11 (m2-program-tab) — **implementer** (new, model opus) ran all eight plan steps in one 25-minute pass: per-step
+  builds, 438 green runs, every seeded screenshot read and compared, the plan's own fallback applied when `scrollTo`
+  ran before layout, and its own doc comments fixed when the raw flag-string scan caught them. It missed one bug the
+  reviewer found by reading: `days / 7 + 1` on a negative count (Swift truncates toward zero). Prompt edit: any
+  bucketing or windowing function gets a test with an input before the first bucket. What worked: pass verified facts
+  (udid, app path, prototype crops, `-units kg`) in the brief; resume it with SendMessage for review fixes so it keeps
+  the slice in context.
+- 2026-09-11 (m2-program-tab) — **swift-reviewer** found the truncation bug (a Saturday onboarding opened the tab on a
+  rest card) that 438 runs and 15 edge tests had not; its other two items were comment truth and readability. No
+  re-prompt. Reading the arithmetic beats adding rows to a table the code was written from.
+- 2026-09-11 (m2-program-tab) — **test-writer** added 31 functions from a list of named edge cases and pinned parser
+  behavior (first flag wins, case-sensitive `-tab`), but its "before the first bucket" case was not on the list and it
+  did not add one. Prompt edit: for windowed or bucketed functions, always test one input before the first window.
+  It flagged the same pre-existing `&&` chains as last slice; those stay (report-only).
+- 2026-09-11 (m2-program-tab) — **architecture-reviewer** caught four blocking items in a spec that had already
+  passed the user's questions: a clamp/fall-back conflict, a Release blank-screen fallback (the class it learned last
+  slice), an unspecified DEBUG delivery shape, and a user decision ("center only when off-screen") that iOS 17 cannot
+  implement without a layout read. The last one went back to the user as a choice. Nothing to change.
+- 2026-09-11 (m2-program-tab) — **spec-creator** derived every number correctly (the verifier recomputed all tables,
+  0 false) but omitted how a seeded launch reaches a non-default tab; the planner added `-tab`. Prompt edit: a UI
+  slice on a tab other than Home must state the launch argument that opens it.
+- 2026-09-11 (m2-program-tab) — **implementation-planner** round 1: four should-fix items, all mechanical (a Step 6
+  sketch used a Step 7 type; `git checkout --` on an untracked file; an AC with no failing check; a date typo). Applied
+  directly in the main session and re-verified scoped by the same verifier agent in 23 s, instead of a planner round.
+  Prompt edit: every step must build with only the files introduced so far; never use `git checkout` on files that
+  have no commit yet.
+- 2026-09-11 (m2-program-tab) — **plan-verifier**: round 1 recomputed every spec table and found 0 false claims;
+  the scoped round 2 (resumed agent) confirmed seven line-level fixes in one tool call. Cheapest re-verify so far.
+- 2026-09-11 — **process**: a new agent file is not selectable by name until the agent list refreshes (it appeared a
+  few turns later); launching `general-purpose` with `model: opus` and "read .claude/agents/<name>.md first" is an
+  exact substitute. Running swift-reviewer and test-writer in parallel worked; reviewer fixes were queued until the
+  test-writer finished so the two never edited the same test file.
+
 - 2026-09-11 (m2-home) — **researcher** ran in parallel with spec-creator and its iOS 17.5 probe (a view holding
   only a `Program` never re-renders; `#Predicate` hazards) rewrote the data flow after the spec and plan were
   written, costing a planner revision and a third verifier round. Rule: when the platform question decides the
@@ -409,6 +457,12 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
   spec-creator in parallel at the start of `/milestone` saved a full round.
 
 ### Skill tuning
+- 2026-09-11 — **ship-check**: step 4 now launches swift-reviewer and test-writer in parallel and routes reviewer fixes
+  to the `implementer` (resumed with SendMessage) after the test-writer returns; step 6 says not to ask doc-writer for
+  study notes (`/learning-notes` owns `docs/learning/`).
+- 2026-09-11 — **milestone**: step 7 says mechanical should-fix items (one-line edits) are applied directly and
+  re-verified scoped by resuming the same verifier; the planner is resumed only for design changes.
+- 2026-09-11 — **design-compare**: step 2 notes that a screen on a non-Home tab needs `-tab <name>` after the seed.
 - 2026-09-11 — **design-compare**: recorded the row-B `home` crop (`sips -c 900 700 --cropOffset 930 40`), the
   status-bar pin (`xcrun simctl status_bar <udid> override --time 9:41`) so two screenshots can be `cmp`-identical,
   and the `-units kg` launch argument for the kg path (launch arguments land in every `UserDefaults` suite,
@@ -427,6 +481,22 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
   `DebugSeed` reference outside `#if DEBUG` that only Release could catch.
 
 ## Patterns
+
+### 2026-09-11 — DEBUG launch arguments reach a view through a nil-by-default `@Entry` value
+
+A screenshot-only input (`-programWeek`, `-programDay`, `-tab`) must not put `#if DEBUG` in the view. Keep the parser
+Debug-only, keep the value type and the environment value in production code, and let nil mean "behave normally" —
+`@Entry` declares an environment value, ≈ a React context with a default; nil is the undefined prop.
+
+```swift
+enum DebugProgramSelection { static func parse(arguments: [String]) -> ProgramTabPreselection? { … } }  // whole file #if DEBUG
+extension EnvironmentValues { @Entry var programTabPreselection: ProgramTabPreselection? = nil }        // production, nil
+#if DEBUG preselection = DebugProgramSelection.parse(arguments: ProcessInfo.processInfo.arguments) #endif // App.init only
+selection = ProgramSelection.from(preselectedWeek: preselection?.week, …)   // view: no #if, nil → follow today
+```
+
+Generalized from `seedDraft`. Values are passed raw: the screen's existing validity rule (`ProgramTabStats.focus`)
+rejects an out-of-range week, so the debug path cannot reach a state a tap could not.
 
 ### 2026-09-11 — `.id(model.id)` on a screen that keeps `@State` derived from a model prop
 A view whose `@State` (cached values, a sheet item, a "now") is only valid for the model it was given must be keyed

@@ -31,6 +31,10 @@ test fails because your test is wrong, fix the test. If production code is untes
 dependency on `Date()`, a singleton), report the smallest change that would make it testable instead
 of making it.
 
+For any function that buckets or windows its input (weeks from an anchor, ranges, indexes), always add one case
+with an input before the first bucket and one past the last; Swift's `/` truncates toward zero, so negatives are
+where such code breaks.
+
 Also report existing assertions that cannot fail (an `||` with an always-true side, a value compared to itself, a
 test whose expected and actual come from the same function) with the file:line and a corrected form.
 

@@ -1,7 +1,11 @@
 # M2 slice 3 — Program tab (week chips, day row, session card)
 
-**Status: revised 2026-09-11 after the architecture review (`docs/reviews/m2-program-tab-architecture.md`; decisions in
-section 9), branch `m2-program-tab`.** Depends on `m2-onboarding` and `m2-home` (merged). Source: the prototype's
+**Status: implemented 2026-09-11 on branch `m2-program-tab` (plan `docs/plans/m2-program-tab.md`); revised
+2026-09-11 after the architecture review (`docs/reviews/m2-program-tab-architecture.md`; decisions in section 9).
+AC-1 … AC-8 and AC-10a verified by seeded screenshot, AC-13 … AC-23 by the test suite (292 tests / 473 runs green on
+iPhone 15 / iOS 17.5 and iPhone 17 / iOS 26.5, Release build green; swift-reviewer findings 1, 2 and 4 applied,
+`docs/reviews/m2-program-tab-swift-review.md`); the tap-driven AC-9, AC-9a,
+AC-10, AC-11 and AC-12 are left for the user (scripted taps are refused on this machine).** Depends on `m2-onboarding` and `m2-home` (merged). Source: the prototype's
 `tabProgram` markup and the script feeding it (`programTitle`, `splitName`, `weekChips`, `phaseOfWeek`, `selPhase*`,
 `selWeekDays`, `selDayIdx`, `selHasSession`, `selIsRest`, `selName`, `selStatus`, `selExercises`, `detailEx`); `CLAUDE.md`;
 INSIGHTS ("M2 Home architecture/decisions", "Mid-week program start", "Date and weekday conventions", "Engine/Model

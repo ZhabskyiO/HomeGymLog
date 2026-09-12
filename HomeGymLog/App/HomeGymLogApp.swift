@@ -10,6 +10,9 @@ struct HomeGymLogApp: App {
     private let clock: AppClock
     private let defaults: UserDefaults
     private let seedDraft: OnboardingDraft?
+    /// Both nil unless a Debug launch argument set them (see `App/DebugSeed/`); always nil in Release.
+    private let preselection: ProgramTabPreselection?
+    private let initialTab: AppTab?
 
     init() {
         let live = AppClock.live()   // the only place the real clock is read
@@ -18,6 +21,8 @@ struct HomeGymLogApp: App {
         var clock = live
         var defaults = UserDefaults.standard
         var seedDraft: OnboardingDraft? = nil
+        var preselection: ProgramTabPreselection? = nil
+        var initialTab: AppTab? = nil
         #if DEBUG
         do {
             if let seed = try DebugSeed.parse(arguments: ProcessInfo.processInfo.arguments) {
@@ -28,6 +33,9 @@ struct HomeGymLogApp: App {
                 seedDraft = seed.initialDraft(calendar: live.calendar)
                 makeContainer = { try seed.makeContainer(calendar: live.calendar) }
             }
+            // Outside the seed branch: the selection arguments work on their own too.
+            preselection = DebugProgramSelection.parse(arguments: ProcessInfo.processInfo.arguments)
+            initialTab = DebugInitialTab.parse(arguments: ProcessInfo.processInfo.arguments)
         } catch {
             fatalError("Unknown -seed argument: \(error). Valid: \(DebugSeed.allCases.map(\.rawValue).joined(separator: ", "))")
         }
@@ -36,6 +44,8 @@ struct HomeGymLogApp: App {
         self.clock = clock
         self.defaults = defaults
         self.seedDraft = seedDraft
+        self.preselection = preselection
+        self.initialTab = initialTab
         #if DEBUG
         if case .failure(let error) = containerResult {
             fatalError("SwiftData store failed to open: \(error)")
@@ -51,6 +61,8 @@ struct HomeGymLogApp: App {
                     .modelContainer(container)
                     .environment(\.appClock, clock)
                     .defaultAppStorage(defaults)
+                    .environment(\.programTabPreselection, preselection)
+                    .environment(\.initialTab, initialTab)
             case .failure(let error):
                 StoreErrorView(error: error)
             }

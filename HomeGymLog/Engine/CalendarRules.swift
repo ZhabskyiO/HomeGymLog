@@ -49,4 +49,13 @@ nonisolated enum CalendarRules {
     static func isSameDay(_ a: Date, _ b: Date, calendar: Calendar) -> Bool {
         calendar.isDate(a, inSameDayAs: b)
     }
+
+    /// Whole calendar days from `start`'s day to `end`'s day; negative when `end` precedes `start`.
+    /// Counted with `dateComponents`, never `/ 86 400`: a daylight-saving day is 23 or 25 hours long and
+    /// dividing by a fixed day length loses (or invents) a day across the transition.
+    static func days(from start: Date, to end: Date, calendar: Calendar) -> Int {
+        let from = startOfDay(start, calendar: calendar)
+        let to = startOfDay(end, calendar: calendar)
+        return calendar.dateComponents([.day], from: from, to: to).day ?? 0
+    }
 }

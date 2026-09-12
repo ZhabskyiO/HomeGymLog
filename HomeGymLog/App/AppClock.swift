@@ -19,4 +19,9 @@ struct AppClock {
 
 extension EnvironmentValues {
     @Entry var appClock = AppClock.live()
+    /// Nil in every Release build and in any launch without the debug arguments; only the root's `#if DEBUG`
+    /// block ever sets it. Analogy: a context value a test harness may provide, undefined in production.
+    @Entry var programTabPreselection: ProgramTabPreselection? = nil
+    /// The tab the shell opens on; nil means Home. Set the same way, for seeded screenshots.
+    @Entry var initialTab: AppTab? = nil
 }

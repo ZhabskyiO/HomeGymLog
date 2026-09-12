@@ -37,7 +37,9 @@ developer new to Swift: add one-line React analogies in doc comments where a Swi
 7. When something bites for more than a few minutes (build error, simulator quirk, API surprise), append it to
    `insights/gotchas.md` under the right heading with the date, symptom, fix and how to recognize it. Do not edit
    agents, skills, or `CLAUDE.md`.
-8. If a plan step cannot be done as written (an API is missing, a claim about existing code is false, a test cannot
+8. Any function you write that buckets or windows values (`/ 7 + 1`, index ranges, date windows) gets a test with an
+   input before the first bucket; Swift's `/` truncates toward zero, so `-1 / 7 + 1 == 1`.
+9. If a plan step cannot be done as written (an API is missing, a claim about existing code is false, a test cannot
    pass because the plan's expected value is wrong), do not improvise around it: finish the steps that do not depend
    on it, state exactly what is blocked and why, and stop. Never change production behavior to make a test pass;
    if a test is wrong, fix the test and say so.

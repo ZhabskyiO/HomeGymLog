@@ -41,4 +41,18 @@ import Testing
         #expect(CalendarRules.nextTrainingDay(strictlyAfter: TestCalendar.day(2026, 9, 9), trainingWeekdays: mwf, calendar: cal) == TestCalendar.day(2026, 9, 11))
         #expect(CalendarRules.isSameDay(TestCalendar.day(2026, 9, 9), TestCalendar.day(2026, 9, 9).addingTimeInterval(3600), calendar: cal))
     }
+
+    @Test("days between calendar days is DST-safe and signed")
+    func daysBetween() {
+        #expect(CalendarRules.days(from: TestCalendar.day(2026, 8, 31), to: TestCalendar.day(2026, 9, 15), calendar: cal) == 15)
+        #expect(CalendarRules.days(from: TestCalendar.day(2026, 8, 31), to: TestCalendar.day(2027, 2, 12), calendar: cal) == 165)
+        #expect(CalendarRules.days(from: TestCalendar.day(2026, 9, 15), to: TestCalendar.day(2026, 9, 15), calendar: cal) == 0)
+        #expect(CalendarRules.days(from: TestCalendar.day(2026, 9, 15), to: TestCalendar.day(2026, 9, 14), calendar: cal) == -1)
+        // Spring forward 2027-03-14 (America/New_York): that day is 23 hours long, so `/ 86 400` gives 1 and 0.
+        #expect(CalendarRules.days(from: TestCalendar.day(2027, 3, 13), to: TestCalendar.day(2027, 3, 15), calendar: cal) == 2)
+        #expect(CalendarRules.days(from: TestCalendar.day(2027, 3, 14), to: TestCalendar.day(2027, 3, 15), calendar: cal) == 1)
+        // Times of day inside the two days are ignored.
+        #expect(CalendarRules.days(from: TestCalendar.day(2026, 8, 31).addingTimeInterval(12 * 3600),
+                                   to: TestCalendar.day(2026, 9, 15).addingTimeInterval(8 * 3600), calendar: cal) == 15)
+    }
 }

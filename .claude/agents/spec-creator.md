@@ -28,7 +28,8 @@ Write the spec to `docs/specs/<milestone-or-feature>.md` with these sections:
 8. **Acceptance criteria.** Numbered, each verifiable on a simulator or by a unit test. For a screen,
    the criterion names the prototype snapshot it must match (`ob2`, `home`, …), the `-seed` launch state
    that shows it, and "matches by `/design-compare`" as the check; list any deliberate deviation from the
-   snapshot explicitly so the comparison can skip it.
+   snapshot explicitly so the comparison can skip it. A screen on a tab other than Home must also name the
+   launch argument that opens that tab (`-tab program`), since scripted taps are not available.
 9. **Open questions.** Only things the prototype and decisions do not settle. Propose a default for each.
 
 Rules: keep the spec under 400 lines unless numeric tables require more; prefer tables to prose. For any table

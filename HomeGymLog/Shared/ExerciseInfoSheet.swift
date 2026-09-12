@@ -36,3 +36,17 @@ struct ExerciseInfoSheet: View {
         .background(Theme.sf)
     }
 }
+
+extension View {
+    /// The exercise info sheet with its four presentation modifiers, shared by Home and Program so both
+    /// screens present it identically. Analogy: a wrapper component around a shared `<Modal>`.
+    func exerciseInfoSheet(item: Binding<Exercise?>) -> some View {
+        sheet(item: item) { exercise in
+            ExerciseInfoSheet(exercise: exercise) { item.wrappedValue = nil }
+                .presentationDetents([.fraction(0.78)])
+                .presentationCornerRadius(28)
+                .presentationDragIndicator(.hidden)
+                .presentationBackground(Theme.sf)
+        }
+    }
+}

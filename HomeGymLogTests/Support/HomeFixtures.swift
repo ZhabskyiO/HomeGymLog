@@ -51,6 +51,14 @@ enum HomeFixtures {
                                   logs: logs(program, completed: completedIndexes) { $0.exercises.map(\.targetWeightLb) })
     }
 
+    /// Example E: Example A (1 month, Mon/Wed/Fri) generated **Wed 2026-09-09**, so the first two sessions
+    /// re-slot and the schedule spills into a fifth calendar week. Pending, no logs.
+    static func exampleESessions() throws -> [SessionSummary] {
+        let program = try ProgramGenerator.generate(TestCalendar.exampleAInputs(generatedOn: TestCalendar.day(2026, 9, 9)),
+                                                    calendar: TestCalendar.calendar)
+        return summaries(program, completed: [], skipped: [])
+    }
+
     /// Onboarding defaults (1 month, 4 days Mo Tu Th Fr, 45 min) generated Mon 2026-08-31, no logs.
     static func freshProgramInput() throws -> HomeStatsInput {
         let inputs = ProgramInputs(months: 1, frequency: 4, trainingWeekdays: [0, 1, 3, 4], sessionLengthMinutes: 45,

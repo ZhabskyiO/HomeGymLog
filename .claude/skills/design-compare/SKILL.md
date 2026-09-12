@@ -25,11 +25,13 @@ Compare one design state with the app. The output is a list of concrete differen
    The flows page lays rows out left to right; row A (onboarding) starts at y≈200 with frames of varying width.
    Known crops (`sips -c <h> <w> --cropOffset <y> <x>`): ob0 640×720 @ (200, 45); ob1 640×370 @ (200, 790);
    ob2 640×430 @ (200, 1180); ob3 640×340 @ (200, 1620); ob4 640×455 @ (200, 1960); ob5 640×575 @ (200, 2425).
-   Row B: home 900×700 @ (930, 40). For other rows B–E, view `sips -Z 1500 build/proto-all.png` first to locate the frame, then crop. Re-render only
+   Row B: home 900×700 @ (930, 40). Row D: program 720×1620 @ (2530, 30) — that frame renders much wider than a
+   phone, so compare content, not width. For other rows B–E, view `sips -Z 1500 build/proto-all.png` first to locate the frame, then crop. Re-render only
    when the design export changes.
 2. **Capture the app.** Build if needed (`/build-and-run` build step), pick the iPhone 15 / iOS 17.5
    simulator (udid via `xcrun simctl list devices available -j`), install, launch with any launch
-   arguments given (`xcrun simctl launch <udid> com.zhabskyi.homegymlog.ios -seed <state>`), set the
+   arguments given (`xcrun simctl launch <udid> com.zhabskyi.homegymlog.ios -seed <state>`; a screen on a
+   non-Home tab needs `-tab <home|program|progress|settings>` after the seed), set the
    appearance to match the snapshot (`home-light` is light, everything else dark:
    `xcrun simctl ui <udid> appearance dark|light`), wait 3 s, `xcrun simctl io <udid> screenshot build/compare-<snapshot>.png`.
    Pin the clock first when two screenshots must be byte-identical (`xcrun simctl status_bar <udid> override --time 9:41`;

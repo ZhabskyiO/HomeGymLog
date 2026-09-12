@@ -1,6 +1,26 @@
 # M2 slice 3 — Program tab (week chips, day row, session card): implementation plan
 
-**Status: drafted 2026-09-11, branch `m2-program-tab`. Not implemented.**
+**Status: implemented 2026-09-11, branch `m2-program-tab`; swift-reviewer findings 1, 2 and 4 applied
+(`docs/reviews/m2-program-tab-swift-review.md`). Steps 1–8 done; 292 tests green on iPhone 15 / iOS 17.5 and
+iPhone 17 / iOS 26.5 (473 runs incl. parameterised cases and the test-writer's four edge suites), Release build
+green, static scans clean, `build/compare-program.png` byte-identical before and after the review fixes.**
+
+Deviations from the plan as written, all recorded against the rendered prototype:
+- **Step 6, `scrollTo`**: the plan's stated fallback was needed. On iOS 17.5 `proxy.scrollTo(_, anchor: nil)` inside
+  `.onAppear` runs before the row is laid out, so the chips scrolled on launch even with WK 3 already visible (WK 1 slid
+  off the leading edge). Only the `proxy.scrollTo` call is wrapped in `Task { @MainActor in … }`; the selection write
+  stays synchronous. AC-1/AC-3 then show WK 1 flush at the leading edge and AC-10a shows WK 24 flush at the trailing
+  edge. Recorded in `insights/gotchas.md` (SwiftUI).
+- **Chip with no phase** draws a transparent 26 × 3 bar rather than omitting it, so an empty window's chip keeps the
+  same height as its neighbours (the spec's "the view draws no bar" is satisfied; only the layout is pinned).
+- **Day-row letter** is 11 pt `.semibold` (the rendered prototype's weight); colours follow spec 2.4's table unchanged.
+- **AC-1 visible differences against `build/proto-program.png`**: rows 3–5 at 47.5 / 52.5 / 27.5 lb (prototype 55 / 55 /
+  35, its cap-first formula — the known deviation); the M1 tab pill; and "Dumbbell Romanian Deadlift" wrapping to two
+  lines at 393 pt width, which the wide prototype frame never shows (spec §6 "Long names" allows it).
+
+Left for the user (scripted taps are refused on this machine): AC-9, AC-9a, AC-10, AC-11 and AC-12's tap sequences, and
+the Step 8 `.onAppear`-on-tab-return probe, which needs a tab switch. Both triggers (`.onAppear` and
+`.onChange(of: selectedTab)`) ship as the plan specifies, so the behaviour is correct either way.
 
 For `docs/specs/m2-program-tab.md` (revised after `docs/reviews/m2-program-tab-architecture.md`; decisions in its §9). Spec
 §2–6 and §8 are the contract; ACs are `AC-N` (1–23, plus 9a, 10a, 18a). Format follows `docs/plans/m2-home.md`.

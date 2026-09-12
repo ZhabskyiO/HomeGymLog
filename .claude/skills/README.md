@@ -28,7 +28,7 @@ Step-by-step instructions: exact commands, what success looks like, what to do o
 | `/swift-best-practices [file]` | House rules for Swift/SwiftUI/SwiftData with React analogies | no |
 | `/engineering-insight [topic]` | Retrospective: session, diff, build/test logs, agent reports → insights; edits agents and skills directly. Auto-triggered by a Stop hook once per commit touching code | no |
 
-Typical loop for a slice: `/milestone <n> <slice>` (creates the branch) → approve → implement →
+Typical loop for a slice: `/milestone <n> <slice>` (creates the branch) → approve → `implementer` →
 `/run-tests` → `/design-compare` per screen → `/ship-check` → commit → `/pr-self-review` → merge →
 `/learning-notes <slice>` → `/engineering-insight`. `/security-audit` before any release or new capability.
 Agent reports live in `docs/reviews/`, study notes in `docs/learning/`.

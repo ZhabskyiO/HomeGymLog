@@ -39,46 +39,59 @@ from five onboarding answers, then tracks every set. One athlete, fixed home-gym
 - Update `insights/gotchas.md` whenever a build error, simulator quirk, or API surprise costs more than a few minutes.
 - Update `insights/INSIGHTS.md` when an architecture decision is made or changed.
 
-## Layout (as of M2 Home slice, 2026-09-11)
+## Layout (as of M2 Program tab slice, 2026-09-11)
 
 ```
 HomeGymLog/                app target (synchronized folder: every .swift under it is compiled)
   App/                     HomeGymLogApp (entry point: container, clock, DEBUG seed), RootView (router: onboarding while
                            no program is current, else the shell; a live @Query, nothing navigates), ShellView (tab shell),
-                           AppTab, AppClock (the only Date()/Calendar.current in the app; an environment value), StoreErrorView
+                           AppTab, AppClock (the only Date()/Calendar.current in the app; an environment value, and the
+                           file holding the two nil-by-default debug @Entry values: programTabPreselection, initialTab),
+                           StoreErrorView
   App/DebugSeed/           DebugSeed (-seed launch names → frozen clock, in-memory store, prepared draft), MidProgramSeed
-                           (completed indexes are a parameter), FreshProgramSeed; all three files entirely under #if DEBUG
+                           (completed indexes are a parameter), FreshProgramSeed, DebugProgramSelection (-programWeek,
+                           -programDay, -tab parsers); all four files entirely under #if DEBUG
   Models/                  AppSchema, six @Model classes (Program, PlannedSession, WorkoutLog, LoggedExercise,
                            LoggedSet, ExerciseNote), write helpers ProgramStore (current, start, apply, skip, delete),
                            WorkoutLogStore (start, finish, delete), ExerciseNoteStore, HomeSnapshotBuilder
-                           (Home's session predicate + row → Engine value mapping; maps, never validates)
+                           (the session predicate + row → Engine value mapping shared by Home and Program;
+                           maps, never validates)
   Engine/                  pure logic, no SwiftData/SwiftUI: EngineTypes, Equipment, ExerciseLibrary, SplitPlans,
                            PhaseSplit, WeightFormula, CalendarRules, Reslot, ProgramGenerator, ProgramSummary (A6 numbers),
                            StartingWeights (A5 rows), WeightDisplay (lb/kg number text), HomeStatsTypes
-                           (SessionSummary, FinishedLogValue, validating HomeStatsInput), HomeStats (Home tab numbers)
+                           (SessionSummary, FinishedLogValue, validating HomeStatsInput), HomeStats (Home tab numbers,
+                           plus sessionState shared with the Program card), ProgramTabStats (week windows, chips, day
+                           cells, selection → focus); CalendarRules owns days(from:to:), the one day-difference helper
   Features/Onboarding/     OnboardingView (flow root), OnboardingDraft (@Observable answers + step), OnboardingChrome
                            (header, footer), StepTitle, one file per step: WelcomeStep, LengthStep, FrequencyStep,
                            AboutYouStep, StartingWeightsStep, GeneratedProgramStep
   Features/Home/           HomeView (owns the @Query on PlannedSession, `now` state, fingerprint task, info sheet),
                            HomeContent (layout), HomeHeader, StatTiles, WeekStrip, TodayCard (+ExerciseRow),
-                           RestDayCard, RecentRecords (+PRCard), ExerciseInfoSheet
-  Features/<Screen>/       later slices: Program, Progress, Settings, Workout
+                           RestDayCard, RecentRecords (+PRCard)
+  Features/Program/        ProgramView (own @Query, `now` state, selection state, info sheet), ProgramContent (layout,
+                           +PhaseLine, RestCard), WeekChipRow, ProgramDayRow, SessionCard (+ProgramExerciseRow),
+                           ProgramTabPreselection (production value type the debug arguments fill in)
+  Features/<Screen>/       later slices: Progress, Settings, Workout
   Shared/                  Theme, FloatingTabBar, TabIcon, PlaceholderScreen, SegmentedPicker, PhaseBar, StepperButton,
-                           ProgramSummaryText, HomeText (dates, greeting, pill), VolumeText (kfmt); all formatting
+                           ProgramSummaryText, HomeText (dates, greeting, pill), VolumeText (kfmt), ProgramTabText
+                           (+StatusTone), ExerciseInfoSheet (moved here from Features/Home; its four presentation
+                           modifiers are the `exerciseInfoSheet(item:)` View extension both tabs call); all formatting
                            lives here, never in Engine
   Assets.xcassets/         theme color sets (bg, sf, sf2, bd, tx, mu, success, warning, phaseFoundation, phaseDeload)
 HomeGymLogTests/           Swift Testing target
   Support/                 TestCalendar (fixed calendar), TestContainer (makeTestStore, insertSampleGraph), TestInputs,
                            HomeFixtures (Home inputs built from the generator, never from a seed)
-  Engine/                  one suite per Engine file plus StaticTableTests and the HomeStats suites
-                           (HomeStats, HomeStatsEdge, HomeStatsInput, PersonalRecordsOrdering)
+  Engine/                  one suite per Engine file plus StaticTableTests, the HomeStats suites
+                           (HomeStats, HomeStatsEdge, HomeStatsInput, PersonalRecordsOrdering) and the Program tab
+                           suites (SessionState, SessionStateEdge, ProgramTabStats, ProgramTabStatsEdge)
   Persistence/             ModelRoundTrip, ProgramStore, ProgramStart, ProgramStartMidWeek, WorkoutLogStore,
                            WorkoutLogStoreSets, RoutingPredicate, ExerciseNoteStore, StatusInvariant, CascadeDelete,
-                           HomeSnapshotBuilder suites
+                           HomeSnapshotBuilder, ProgramTabSnapshot (seed rows → ProgramTabStats, no validating step) suites
   Onboarding/              OnboardingDraft suites (steps, clamps, preview)
-  Shared/                  HomeText and VolumeText suites (incl. kfmt boundaries)
-  Seed/                    DebugSeed, MidProgramSeed, RestDaySeed, FreshProgramSeed and SeedHomeStats
-                           (seed → Home numbers end to end) suites (Debug only)
+  Shared/                  HomeText, VolumeText (incl. kfmt boundaries), ProgramTabText and ProgramTabTextEdge suites
+  Seed/                    DebugSeed, MidProgramSeed, RestDaySeed, FreshProgramSeed, SeedHomeStats
+                           (seed → Home numbers end to end), DebugProgramSelection and DebugProgramSelectionEdge
+                           suites (Debug only)
   Static/                  ClockUsageTests: greps the app sources for Date() / Calendar.current outside App/AppClock.swift
 design/                    prototype export (read-only reference)
 docs/specs, docs/plans     specs from spec-creator, plans from implementation-planner (dated status when done)
@@ -99,6 +112,8 @@ Work happens in slices on branches `m<N>-<slice>` created by `/milestone`, merge
 `/pr-self-review`. UI slices are verified against the prototype with `/design-compare`, which renders the design
 with headless Chrome and launches the app in a `-seed` state per screen (DEBUG only, `App/DebugSeed/`: `onboarding`,
 `ob1`…`ob5`, `midProgram`, `missed`, `restDay`, `freshProgram`; frozen clock, in-memory store, throwaway preferences).
+Two more DEBUG launch arguments target a screen without taps (taps are refused on this machine): `-programWeek <n>
+-programDay <d>` preselects the Program tab's week and day, `-tab <name>` opens the shell on that tab.
 
 Skills (`.claude/skills/README.md`): `/milestone <n> [slice]` runs that flow up to plan approval. `/build-and-run`,
 `/run-tests`, `/device-install` drive Xcode. `/ship-check` before a commit, `/pr-self-review` before a PR,
@@ -134,7 +149,10 @@ xcrun xcresulttool get test-results summary --path build/tests.xcresult   # tota
    — onboarding slice done 2026-09-10 (branch `m2-onboarding`: six steps, root routing, lb/kg display, `-seed` states;
    162 tests on iOS 17.5 and 26.5; tap-through checks and device install pending the user).
    — Home slice done 2026-09-11 (branch `m2-home`: HomeStats engine, Home tab, exercise info sheet, `restDay` and
-   `freshProgram` seeds; 223 tests on iOS 17.5 and 26.5, Release build green). The Program tab slice remains.
+   `freshProgram` seeds; 223 tests on iOS 17.5 and 26.5, Release build green).
+   — Program tab slice done 2026-09-11 (branch `m2-program-tab`: ProgramTabStats engine, week chips, day row, session
+   and rest cards, `-programWeek`/`-programDay`/`-tab` arguments; 292 tests on iOS 17.5 and 26.5, Release build green).
+   M2 is complete except the user's manual tap-through checks; next milestone is M3.
 3. Workout flow: swipe logging, RPE, rest timer with local notification, adjust/swap/notes, summary, resume.
 4. Progress (Swift Charts, calendar), PRs, streak, missed-day handling, settings, daily reminder.
 5. Polish: Live Activity rest timer, light theme audit, haptics, export, icon, App Store prep.

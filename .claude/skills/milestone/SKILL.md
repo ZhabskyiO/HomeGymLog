@@ -38,7 +38,9 @@ multiple-choice question when the slicing is not obvious.
    keeps context) and re-run once. Surface anything blocking to the user.
 6. Launch `implementation-planner` → `docs/plans/<slug>.md`.
 7. Launch `plan-verifier` on the plan. Save its reply to `docs/reviews/<slug>-verifier-<round>.md`. If
-   not PASS, fix the plan (resume the planner with the finding ids) and re-verify scoped to those ids.
+   not PASS, fix the plan and re-verify scoped to the finding ids by resuming the same verifier: apply mechanical
+   should-fix items (one-line edits, typos, a missing command) directly in the main session; resume the planner
+   only for design changes.
    If the revision renamed or removed an artifact, grep the spec and `insights/INSIGHTS.md` for the old name
    and fix them before re-verifying. Maximum three rounds; after that, show the user the remaining findings and ask how to proceed.
 8. Commit the spec, plan and reviews on the branch (`git add docs insights && git commit`).
