@@ -39,11 +39,11 @@ Keep entries short. Date them. Newest at the top within each section.
   viewport of zero width and moved a row that was already correct. Only the `scrollTo` is wrapped in
   `Task { @MainActor in … }` (≈ deferring to the next tick after paint); the selection write stays synchronous, so
   the state and the scroll can never disagree. Details and the recognition cue in `gotchas.md` (SwiftUI).
-- 2026-09-11 (open) — **Whether `.onAppear` fires on every return to the Program tab in this shell is unverified**:
-  the tabs live in one `TabView`, so SwiftUI may keep the screen mounted and skip it. Both triggers ship
-  (`.onAppear` and `.onChange(of: selectedTab)`, calling the same idempotent `reset`), which is correct either way.
-  The user's manual AC-9a check decides; when it comes back, record here which trigger actually fires and drop the
-  other only if the check is conclusive on both 17.5 and 26.5.
+- 2026-09-11 (verified on device) — **Returning to the Program tab resets the selection to today** (AC-9a passed
+  on the user's iPhone 14 Pro Max; chip/day taps, the week-24 scroll-and-return and sheet dismissal also passed).
+  Both triggers ship (`.onAppear` and `.onChange(of: selectedTab)`, one idempotent `reset`); which of the two fires
+  first was not isolated and does not matter while both stay. Do not drop either without a simulator probe on 17.5
+  and 26.5.
 - 2026-09-11 (implemented) — **A window number is 0 before the anchor, never 1.** Swift's `/` on `Int` truncates
   toward zero (JS `Math.trunc`, not `Math.floor`), so the spec's `days / 7 + 1` mapped days −1…−6 into window 1.
   `initialWeek`'s `max(…, 1)` hid it, but `defaultDay`'s "today is in this window" test then selected today's
