@@ -6,6 +6,54 @@ Keep entries short. Date them. Newest at the top within each section.
 
 ## Architecture decisions
 
+### 2026-09-13 — M3 decisions (from the m3-logging slice spec, user-answered)
+
+- **M3 is three slices**, each merged before the next: `m3-logging` (workout screen, swipe/RPE/adjust, next exercise,
+  exit, summary, resume), `m3-rest-timer` (rest overlay + local notification, `wo-rest`), `m3-exercise-tools` (detail
+  sheet with notes, swap, progression pill; `wo-detail`, `wo-swap`).
+- **Workout route**: the root switches to the workout while a current-program session has an in-progress log (nested
+  `flatMap` predicate); not a cover. `selectedTab` lifts from `ShellView` into `RootView`. Workout sub-state (logging /
+  RPE pending / summary) is derived from set rows only, so a kill resumes exactly (researcher, m3-logging).
+- **Startable sessions**: today's pending session (Home Today card) and **any missed session** (pending, dated before
+  today) from the Program tab's session card, which gains "Start workout" for today's and missed sessions. Future and
+  skipped sessions have no start. (User chose over the prototype's today-only.)
+- **Done always lands on Home**, also when the workout was started from the Program card (user confirmed; identical
+  after a kill on the summary). Exit keeps the tab the user was on.
+- **Completing a missed session counts toward the streak** (user confirmed): the M2 streak rule is unchanged; a
+  completed session counts whichever day it was trained, and its `scheduledDate` is never rewritten (M4 owns shift).
+- **Exit** confirms ("Discard workout?") when at least one set is done or skipped; immediate otherwise. Deletes the log.
+- **Next exercise** marks the exercise's remaining pending sets skipped (keeps "summary iff nothing pending").
+- **RPE can be skipped, and the skip is stored** (user choice, **schema addition on `LoggedSet`**): a "Skip" button on the
+  RPE card is the only dismissal; an unanswered card reappears after a kill; "Next exercise" stays disabled while it shows.
+- **Adjust carries forward on "Save & log set"**: the sheet's weight and reps go to this set and the exercise's remaining
+  pending sets. "Skip set" stores the values on the skipped set only.
+- **Summary**: duration and `finishedAt` both end at the latest set `loggedAt`; date = day the workout started; no-records
+  text "No new records today."; records use Home's rule (current program, strict, first appearance counts with "—");
+  an all-skipped workout completes with 0 volume.
+- **Stray in-progress logs** (orphaned or archived program) are ignored by routing and left in the store.
+- **Later-slice controls** (Swap, Add note, ⓘ) are present but inert; progression pill hidden; no rest overlay yet.
+- **Workout writers (architecture review)**: every workout action is one `WorkoutLogStore` function ending in one save,
+  guarded to a no-op when the row is not in the expected state (log/skip set: pending; set/skip RPE: done, `rpe == nil`,
+  not skipped; next exercise: no done set awaiting RPE). One shared start function for Home and Program looks the row up by
+  session index and starts only a pending session; Exit is `WorkoutLogStore.discard` (delete + save). A failed save rolls
+  the context back, `assertionFailure`s, and the screen stays derived from rows (never blank in Release).
+- **Engine workout values carry row ids** (`UUID`); writes find rows by id through `Dictionary(_, uniquingKeysWith:)`,
+  never by array position; ties in `order` break on the id.
+- **Every stored timestamp comes from `clock.now()` at the moment of the action**, never from a screen's cached `@State now`.
+- **Invariants**: while the shell is visible, no in-progress log exists on the current program (M4's missed prompt,
+  shift and restart may rely on it); the PR baseline cannot change while a workout is open (breaks with CloudKit sync or
+  finished-set edits), so it is built lazily when the summary first shows.
+- **The root owns `selectedTab`**; `initialTab` is applied behind a one-time flag; Done writes the tab before `finish`.
+  **M4 note:** restart → onboarding would reopen the new shell on the old tab (e.g. Settings), so the restart path must
+  reset the tab to Home. The Program tab now writes, only through the shared start function.
+- **Workout presentation**: one `WorkoutSheet` enum (`.adjust` now; `.detail`, `.swap` in m3-exercise-tools) plus a
+  separate exit-dialog flag; the drag offset is `@State` inside the swipe row.
+- **Schema addition without versioning**: `LoggedSet.rpeSkipped: Bool = false` (default mandatory) migrates unversioned
+  stores automatically on 17.5 and 26.5; `AppSchema.makeContainer` stays unchanged. **Open for M5** (or the first change
+  that cannot migrate automatically, whichever comes first): introduce `AppSchemaV1` as a frozen nested copy of the
+  shipped models plus a lightweight `SchemaMigrationPlan`; verified to open both old and already-upgraded unversioned
+  stores (researcher addendum).
+
 ### 2026-09-11 — M2 Program tab decisions (from the program-tab slice spec, user-answered; implementation notes appended)
 
 - **Week chips are calendar windows**, Mon–Sun, anchored on the Monday of the earliest session's week; count =
@@ -481,6 +529,13 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
   `DebugSeed` reference outside `#if DEBUG` that only Release could catch.
 
 ## Patterns
+
+### 2026-09-13 — Real-touch probes without touching the repo
+When a question needs real drags or cold-launch frames (not just a unit test), copy the repo to the scratchpad,
+add a UI-test target to the copy's project, change the copy's bundle id, and drive `-probe` launch modes with XCUITest
+drags (`press(forDuration:thenDragTo:...)`). Report values through `XCTFail("DATA …")`; use `simctl io recordVideo`
+plus frame sampling for "no frame of X is shown" checks. Uninstall the probe bundles afterwards. The repo's
+`project.pbxproj` stays untouched. Used by the m3-logging researcher (`docs/reviews/m3-logging-researcher.md`).
 
 ### 2026-09-11 — DEBUG launch arguments reach a view through a nil-by-default `@Entry` value
 

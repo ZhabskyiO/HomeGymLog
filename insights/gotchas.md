@@ -69,7 +69,22 @@ are kept as history.
   traverse the whole log history in `body`.
 - 2026-09-11 — Writes through a second `ModelContext` are not reliably visible to objects already registered in another
   context (stale on 17.5 even after re-fetch). Keep every writer on `mainContext`.
-- (expected areas still open: migrations, previews)
+- 2026-09-13 — **Two-level predicates work as nested `flatMap`, not as `?.` chains.**
+  `log.session.flatMap { $0.program.flatMap { $0.archivedAt == nil } } == true` fetches correctly on 17.5 and 26.5
+  where `$0.session?.program?.archivedAt == nil` crashes. `[UUID?].contains($0.exercise?.id)` does not compile
+  ("Use the flatMap(_:) function explicitly"); `$0.exercise.flatMap { ids.contains($0.id) } == true` does.
+  `$0.workoutLog?.finishedAt == nil` also matches sessions with no log (nil chain == nil); add `$0.workoutLog != nil`.
+  Source: `docs/reviews/m3-logging-researcher.md` Q1/Q2.
+- 2026-09-13 — **The 17.5 retention rule, refined:** a view updates on a child-row change only while the rows it read
+  are held by something (`ForEach` data, a child view's property, a closure, `@State`, `@Query`). Mapping rows to plain
+  structs in `body` and iterating the structs leaves the view stale on 17.5 (fine on 26.5). Any save re-runs `body`
+  of every view that owns an `@Query` (DTS, forum 774561), so a query owner may map rows to values safely.
+- 2026-09-13 — **A new stored property needs a default value or the existing store will not open.**
+  `var rpeSkipped: Bool = false` migrates an unversioned on-disk store automatically on 17.5 and 26.5 (rows read
+  `false`). Without the default, `ModelContainer(for:configurations:)` throws `SwiftDataError.loadIssueModelContainer`
+  ("SwiftDataError error 1"; Debug `fatalError`, Release `StoreErrorView`) and leaves the store intact. Recognize it: the
+  store fails to open right after adding a model property. Source: `docs/reviews/m3-logging-researcher.md` addendum.
+- (expected areas still open: previews)
 
 ## Swift language
 
@@ -105,8 +120,13 @@ are kept as history.
   or the system tab bar reappears on push. Use `toolbar(_:for:)` (iOS 16), not `toolbarVisibility` (iOS 18).
 - 2026-09-09 — `tabBarMinimizeBehavior` / `tabViewBottomAccessory` are iOS 26-only: a compile error at iOS 17
   without `#available`, and irrelevant once the system bar is hidden.
-- (expected areas still open: custom swipe gesture vs List swipe actions, sheet + navigation interplay,
-  timers surviving background)
+- 2026-09-13 — **`DragGesture` at the default `minimumDistance` (10) inside a `ScrollView` blocks vertical scrolling
+  that starts on that row on iOS 26.5**, with `.gesture`, `.simultaneousGesture` and `.highPriorityGesture` alike; 17.5
+  scrolls. `minimumDistance` ≥ 15 fixes it; a direction check inside `onChanged` does not. Use 20 for swipe rows.
+- 2026-09-13 — `.fullScreenCover(item:)` bound to a query that is already non-nil at launch shows ~50 ms of the view
+  underneath (shell `onAppear` fires first); switch in the root view instead. XCUITest element frames ignore
+  `.offset`, so verify a drag offset by screenshot.
+- (expected areas still open: sheet + navigation interplay, timers surviving background)
 
 ## Xcode / build
 
