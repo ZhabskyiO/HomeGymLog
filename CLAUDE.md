@@ -12,7 +12,8 @@ from five onboarding answers, then tracks every set. One athlete, fixed home-gym
 - CloudKit sync is a later milestone, not v1.
 - Weights stored canonically in **pounds** (`Double`). kg is display-only conversion.
 - Exercise library is static Swift code keyed by stable string ids (e.g. `dbBench`), not database rows.
-- Free Apple developer tier until TestFlight is needed (7-day provisioning; re-run from Xcode).
+- Paid Apple Developer Program, Individual team `4GKZ96A6QR` (enrolled 2026-09-13; same team ID the free personal team
+  had, so no project change). Development profiles last one year; TestFlight and App Store are available.
 
 ## Source of truth
 

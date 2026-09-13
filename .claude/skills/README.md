@@ -18,7 +18,7 @@ Step-by-step instructions: exact commands, what success looks like, what to do o
 |---|---|---|
 | `/build-and-run` | Build for simulator, launch, report errors as file:line | yes |
 | `/run-tests [filter]` | Run Swift Testing suite, summarize failures | yes |
-| `/device-install` | Build and install on the connected iPhone (free tier aware) | yes |
+| `/device-install` | Build and install on the connected iPhone (paid team, checks profile expiry) | yes |
 | `/milestone <n> [slice]` | Branch, spec → architecture review → plan → verify, reports saved, stop for approval | no |
 | `/design-compare <snapshot>` | Prototype snapshot (Chrome) beside a simulator screenshot; lists differences | yes |
 | `/learning-notes <slice>` | Study note for the slice: new Swift concepts with React analogies and file:line | no |

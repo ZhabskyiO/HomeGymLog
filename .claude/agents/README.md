@@ -19,7 +19,7 @@ Keep agents narrow: one job, one clear output.
 
 For a milestone or feature, the intended order is:
 
-1. `researcher` — answer any platform question first (API availability on iOS 17, free-tier limits).
+1. `researcher` — answer any platform question first (API availability on iOS 17, capability and account limits).
 2. `spec-creator` — write `docs/specs/<name>.md` from the prototype and the recorded decisions.
 3. `architecture-reviewer` — check the spec's data model and state flow against `CLAUDE.md` and `insights/`.
 4. `implementation-planner` — write `docs/plans/<name>.md`: ordered, file-level steps with tests.

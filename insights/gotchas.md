@@ -3,12 +3,24 @@
 Things that cost time. Read the relevant section before working in that area. Append when something
 new bites: what happened, the fix, and how to recognize it next time. Date each entry.
 
-## Apple free developer tier
+## Apple developer account
 
-- 2026-09-09 — Provisioning for a personal team expires every 7 days. Symptom: app on the phone refuses to
-  launch with an "unable to verify" message. Fix: run from Xcode again. Nothing is wrong with the code.
-- 2026-09-09 — No TestFlight, no App Store, max 3 devices and 10 App IDs. Some entitlements are blocked;
-  Live Activities and local notifications do not need any, so they work on the free tier.
+Paid Individual team `4GKZ96A6QR` since 2026-09-13. Entries dated before that describe the free personal team and
+are kept as history.
+
+- 2026-09-13 — **Enrolling the same Apple ID keeps the team ID.** The free personal team `4GKZ96A6QR` became the paid
+  team; `project.pbxproj` needed no change, and Xcode's preferences flipped to `isFreeProvisioningTeam = 0`
+  (`defaults read com.apple.dt.Xcode IDEProvisioningTeamByIdentifier`). The phone did not ask to trust the developer
+  again. Recognize it: a grep for `DEVELOPMENT_TEAM` shows the old ID even though the switch worked.
+- 2026-09-13 — **`-allowProvisioningUpdates` reuses a cached free 7-day profile while it is still valid**, even after
+  enrollment. The first paid build embedded the Sep 10 profile expiring Sep 17. Fix: move the files out of
+  `~/Library/Developer/Xcode/UserData/Provisioning Profiles/` and build again; Xcode fetched a new profile expiring
+  2027-09-13. Check any build with `security cms -D -i <app>/embedded.mobileprovision` and read `ExpirationDate`.
+  Recognize it: an expiry 7 days after `CreationDate`.
+- 2026-09-09 (free tier, no longer applies) — Provisioning for a personal team expires every 7 days. Symptom: app on
+  the phone refuses to launch with an "unable to verify" message. Fix: run from Xcode again.
+- 2026-09-09 (free tier, no longer applies) — No TestFlight, no App Store, max 3 devices and 10 App IDs. Live
+  Activities and local notifications need no entitlement on either tier; push and CloudKit need the paid team.
 - 2026-09-10 — First device build fails with "Developer Mode disabled … enable Developer Mode in Settings → Privacy
   & Security" (xcodebuild reports it as "Timed out waiting for all destinations"). The phone needs Developer Mode on
   (iOS 16+): Settings → Privacy & Security → Developer Mode → on → restart → confirm. Only appears once.
