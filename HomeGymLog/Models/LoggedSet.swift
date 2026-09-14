@@ -13,8 +13,11 @@ final class LoggedSet {
     var reps: Int = 0
     /// Raw `SetStatus` value; use `status`.
     var statusRaw: String = SetStatus.pending.rawValue
-    /// 6–10; nil until chosen or if skipped.
+    /// 6–10; nil until chosen, when the rating was skipped (`rpeSkipped`), or when the set was skipped.
     var rpe: Int?
+    /// True when the RPE prompt was dismissed without choosing a value. Must keep its default: without one the
+    /// existing store fails to open (SwiftDataError.loadIssueModelContainer).
+    var rpeSkipped: Bool = false
     /// When marked done or skipped.
     var loggedAt: Date?
     var exercise: LoggedExercise?

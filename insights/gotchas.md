@@ -84,6 +84,33 @@ are kept as history.
   `false`). Without the default, `ModelContainer(for:configurations:)` throws `SwiftDataError.loadIssueModelContainer`
   ("SwiftDataError error 1"; Debug `fatalError`, Release `StoreErrorView`) and leaves the store intact. Recognize it: the
   store fails to open right after adding a model property. Source: `docs/reviews/m3-logging-researcher.md` addendum.
+- 2026-09-13 — **Releasing the `ModelContainer` while still using its models crashes the whole test process on iOS 26.5**
+  (17.5 survives). `let (_, context, …) = makeSeedStore()` drops the container at once; the next model read traps, and
+  one "Crash: … line N" is then reported against 151 unrelated tests. Fix: keep the container bound for the test's
+  lifetime (`defer { withExtendedLifetime(container) {} }`, or hold `TestStore`). Recognize it: a 26.5-only mass failure
+  with one repeated crash line while 17.5 is green.
+- 2026-09-13 — **`ModelContext.rollback()` does not revert in-memory property values** on 17.5 or 26.5. It clears
+  `hasChanges`, but the context's objects keep the edited values, even after a refetch; the store is untouched. So
+  "save, else rollback" still leaves the screen showing an unsaved change (e.g. a set as done). Found by
+  `WorkoutCommitRollbackTests` (failure forced by reopening an on-disk store with `allowsSave: false`, Cocoa error 513).
+  Fix: capture the fields a writer changes and restore them by hand before rethrowing. Recognize it: values
+  that survive a failed save in the same context while a fresh context reads the old ones.
+  **Never `rollback()` with a pending insert or delete** (implementer probe, `allowsSave: false` on disk): on 17.5 a pending
+  insert crashes the process (SwiftData stack overflow) and a pending delete traps even with no save attempted; on 26.5
+  the insert is undone but the unsaved log still matches the in-progress query and reading it traps, while a delete is
+  restored. Recognize it: a failed Start or Exit crashing inside SwiftData.
+- 2026-09-13 — **On 26.5 a failed insert cannot be undone in the same context.** After a failed save, every tried
+  undo (unlink + delete, with or without `rollback()`, `processPendingChanges()`, unlinking both sides, marking it
+  finished) leaves the unsaved log in that context's predicate fetches, and reading its relationships traps ("Illegal
+  attempt to resolve a fault against a store that is not known to this model context"); a fresh context never sees it.
+  17.5 undoes all variants cleanly. Hence m3-logging's `start` rehearses its insert in a scratch context first.
+  Also: `ModelContext.willSave` is not posted on 17.5 when the save fails, and pending deletes cut in-memory
+  relationships before the save succeeds (17.5 then reads 0 children, 26.5 a partial count).
+- 2026-09-13 — On 26.5, **loading a not-yet-loaded child after another context deleted its row traps** ("backing data
+  could no longer be found"). Load every row you will touch (read a stored field) before a delete is saved elsewhere.
+  Recognize it: a crash inside a delete helper right after a save in a different `ModelContext`.
+- 2026-09-13 — Swift Testing can lose issues recorded just before a process crash; a probe that may crash should write
+  flushed lines to a file instead of relying on `#expect` messages.
 - (expected areas still open: previews)
 
 ## Swift language
@@ -130,6 +157,12 @@ are kept as history.
 
 ## Xcode / build
 
+- 2026-09-13 — **`python3 -m http.server` needs more than `sleep 1` before headless Chrome renders from it**: Chrome got a
+  connection-refused page and every `sips` crop came out blank. Fix: poll until the page answers
+  (`until curl -sf -o /dev/null http://127.0.0.1:8765/; do sleep 0.2; done`). Recognize it: all prototype crops blank.
+- 2026-09-13 — After a 26.5 test run, the 17.5 simulator can be found shut down again even after a later 17.5 test run;
+  always `BOOT` (boot + bootstatus) right before any install, launch or screenshot, not once per session.
+
 - 2026-09-11 — **Launch arguments override any `UserDefaults` suite**, not just `.standard`: `-units kg` after
   `-seed midProgram` makes `@AppStorage("units")` read "kg" even though the seed swaps in a cleared
   `UserDefaults(suiteName: "seed")`. Use it to screenshot the kg path without tapping through onboarding.
@@ -146,7 +179,8 @@ are kept as history.
   Recognize it: a test run that ends immediately with no compile output and no test counts.
 - 2026-09-11 — `-only-testing` for a Swift Testing function needs the parentheses (`Suite/test()`); without them 0
   tests run and xcodebuild still prints TEST SUCCEEDED. Parallel test clones can shut down the booted simulator;
-  `-parallel-testing-enabled NO` avoids it.
+  `-parallel-testing-enabled NO` avoids it. 2026-09-13: on 17.5 the default parallel run also failed twice before any
+  test ran with "Failed to clone device 'iPhone 15' … stuck in creation state"; retry with parallel testing off.
 - 2026-09-10 — Running `xcodebuild test` against one runtime (iPhone 17 / iOS 26.5) shut down the other booted
   simulator (iPhone 15 / iOS 17.5); screenshots afterwards failed with "Unable to lookup in current state:
   Shutdown". Always `xcrun simctl boot <udid>; xcrun simctl bootstatus <udid> -b` before install/launch/screenshot.

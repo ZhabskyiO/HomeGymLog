@@ -15,6 +15,16 @@ enum DebugSeed: String, CaseIterable {
     case restDay
     /// A program from the onboarding defaults with no logs; today is Mon 2026-08-31.
     case freshProgram
+    /// midProgram with session 11 (Pull) started 12:34 ago, every set pending. Opens the workout at the root.
+    case woStart = "wo-start"
+    /// `wo-start` with the active row drawn 72 pt into a right swipe (screenshot-only drag preview).
+    case woSwipe = "wo-swipe"
+    /// `wo-start` with set 1 logged and its RPE card showing.
+    case woRPE = "wo-rpe"
+    /// `wo-start` with set 1 logged at RPE 7 and the adjust sheet open on set 2.
+    case woAdjust = "wo-adjust"
+    /// Session 11 started 42:00 ago with every set logged (set 1 at 120 lb): the summary screen.
+    case summary = "summary"
 
     /// nil when no `-seed` is present; throws for an unknown name or a trailing `-seed` with no value.
     static func parse(arguments: [String]) throws -> DebugSeed? {
@@ -28,7 +38,8 @@ enum DebugSeed: String, CaseIterable {
     func referenceDate(calendar: Calendar) -> Date {
         let day: DateComponents
         switch self {
-        case .midProgram, .missed: day = DateComponents(year: 2026, month: 9, day: 15, hour: 12)
+        case .midProgram, .missed, .woStart, .woSwipe, .woRPE, .woAdjust, .summary:
+            day = DateComponents(year: 2026, month: 9, day: 15, hour: 12)
         case .restDay: day = DateComponents(year: 2026, month: 9, day: 19, hour: 12)
         case .freshProgram: day = DateComponents(year: 2026, month: 8, day: 31, hour: 12)
         default: day = DateComponents(year: 2026, month: 8, day: 31, hour: 12)
@@ -40,7 +51,7 @@ enum DebugSeed: String, CaseIterable {
         .frozen(at: referenceDate(calendar: calendar), calendar: calendar)
     }
 
-    /// The onboarding draft to open with, or nil for seeds that show the shell.
+    /// The onboarding draft to open with, or nil for seeds that show the shell or a workout.
     func initialDraft(calendar: Calendar) -> OnboardingDraft? {
         switch self {
         case .onboarding:
@@ -49,12 +60,12 @@ enum DebugSeed: String, CaseIterable {
             let draft = OnboardingDraft(months: 6, frequency: 5)
             for _ in 0..<onboardingSteps { draft.advance(now: referenceDate(calendar: calendar), calendar: calendar) }
             return draft
-        case .midProgram, .missed, .restDay, .freshProgram:
+        case .midProgram, .missed, .restDay, .freshProgram, .woStart, .woSwipe, .woRPE, .woAdjust, .summary:
             return nil
         }
     }
 
-    /// In-memory container, populated for the mid-program seeds.
+    /// In-memory container, populated for the mid-program and workout seeds.
     func makeContainer(calendar: Calendar) throws -> ModelContainer {
         let container = try AppSchema.makeContainer(inMemory: true)
         switch self {
@@ -64,10 +75,36 @@ enum DebugSeed: String, CaseIterable {
             try MidProgramSeed.populate(in: container.mainContext, calendar: calendar, completedIndexes: Array(0...14).filter { $0 != 7 })
         case .freshProgram:
             try FreshProgramSeed.populate(in: container.mainContext, calendar: calendar)
+        case .woStart, .woSwipe, .woRPE, .woAdjust, .summary:
+            try MidProgramSeed.populate(in: container.mainContext, calendar: calendar)
+            if let workoutStage {
+                try WorkoutSeed.populate(workoutStage, now: referenceDate(calendar: calendar), in: container.mainContext)
+            }
         default:
             break
         }
         return container
+    }
+
+    /// Which `WorkoutSeed` recipe a workout seed runs; nil for every other seed.
+    private var workoutStage: WorkoutSeed.Stage? {
+        switch self {
+        case .woStart, .woSwipe: return .started
+        case .woRPE: return .awaitingRating
+        case .woAdjust: return .rated
+        case .summary: return .finishedSets
+        default: return nil
+        }
+    }
+
+    /// The fixed drag offset the active set row draws with (`workoutDragPreview`); nil except `wo-swipe`.
+    var workoutDragPreview: CGFloat? {
+        self == .woSwipe ? 72 : nil
+    }
+
+    /// True when the workout screen opens the adjust sheet on first appearance (`workoutAdjustPreview`); nil otherwise.
+    var workoutAdjustPreview: Bool? {
+        self == .woAdjust ? true : nil
     }
 
     /// How many steps into onboarding an `obN` seed opens.

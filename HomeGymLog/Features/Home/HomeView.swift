@@ -4,6 +4,7 @@ import SwiftData
 /// The Home tab. Owns a live query on this program's sessions (a view holding only the `Program` never
 /// re-renders on iOS 17; a `@Query` retains its rows and re-fetches on every save ≈ useQuery). Finished-log
 /// values are rebuilt only when the rows' fingerprint changes ≈ useMemo keyed on a fingerprint.
+/// Its one write is "Start workout", through the shared start; the root then shows the workout.
 struct HomeView: View {
     /// Immutable fields only: id, session length.
     let program: Program
@@ -15,6 +16,7 @@ struct HomeView: View {
     @State private var infoExercise: Exercise?
     @Environment(\.appClock) private var clock
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.modelContext) private var modelContext
     @AppStorage("units") private var unitsRaw = WeightUnit.lb.rawValue
 
     init(program: Program, selectedTab: Binding<AppTab>) {
@@ -40,7 +42,8 @@ struct HomeView: View {
     var body: some View {
         HomeContent(input: input, today: now ?? clock.now(), unit: unit, calendar: clock.calendar,
                     sessionLengthMinutes: program.sessionLengthMinutes,
-                    onProgress: { selectedTab = .progress }, onInfo: { infoExercise = $0 })
+                    onProgress: { selectedTab = .progress }, onInfo: { infoExercise = $0 },
+                    onStart: start(sessionIndex:))
             .background(Theme.bg.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
             .task(id: HomeSnapshotBuilder.fingerprint(of: sessions)) {
@@ -51,6 +54,16 @@ struct HomeView: View {
                 if phase == .active { now = clock.now() }
             }
             .exerciseInfoSheet(item: $infoExercise)
+    }
+
+    /// The shared start: nothing is written unless the row is still pending. `startedAt` is the clock read at the tap,
+    /// never the cached `now`.
+    private func start(sessionIndex: Int) {
+        do {
+            try WorkoutLogStore.start(sessionIndex: sessionIndex, rows: sessions, at: clock.now(), in: modelContext)
+        } catch {
+            assertionFailure("Start workout failed: \(error)")   // the store refused the write before this context changed; the shell stays
+        }
     }
 }
 

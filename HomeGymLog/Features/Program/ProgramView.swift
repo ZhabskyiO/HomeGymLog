@@ -2,7 +2,8 @@ import SwiftUI
 import SwiftData
 
 /// The Program tab: every week of the program as chips, the selected week's days, and the selected day's
-/// session (or a rest card). Read-only — it owns a live query but never writes to the store.
+/// session (or a rest card). It writes to the store only through the shared start, when "Start workout" is tapped
+/// on a today or missed card; the root then shows the workout.
 /// Like Home, it owns its `@Query` (a view holding only the `Program` never re-renders on iOS 17) and keeps
 /// one `now` written on appear and on scene-active. Analogy: `useQuery` for rows, a `visibilitychange` effect
 /// for "today".
@@ -19,6 +20,7 @@ struct ProgramView: View {
     @State private var infoExercise: Exercise?
     @Environment(\.appClock) private var clock
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.programTabPreselection) private var preselection
     @AppStorage("units") private var unitsRaw = WeightUnit.lb.rawValue
 
@@ -37,7 +39,8 @@ struct ProgramView: View {
                        scrollToken: scrollToken,
                        onSelectWeek: { selection = .week($0) },
                        onSelectDay: { week, day in selection = .day(week: week, day: day) },
-                       onInfo: { infoExercise = $0 })
+                       onInfo: { infoExercise = $0 },
+                       onStart: start(sessionIndex:))
             .background(Theme.bg.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
             .onAppear { reset(summaries) }
@@ -50,8 +53,8 @@ struct ProgramView: View {
             .exerciseInfoSheet(item: $infoExercise)
     }
 
-    /// The screen's one write path: refresh `now`, follow today (or the debug preselection, nil in Release),
-    /// and re-scroll the chip row. Idempotent, so both triggers above give the same state.
+    /// Refreshes `now`, follows today (or the debug preselection, nil in Release), and re-scrolls the chip row.
+    /// Idempotent, so both triggers above give the same state.
     private func reset(_ summaries: [SessionSummary]) {
         let today = clock.now()
         now = today
@@ -60,6 +63,16 @@ struct ProgramView: View {
             preselectedDay: preselection?.day,
             initialWeek: ProgramTabStats.initialWeek(sessions: summaries, today: today, calendar: clock.calendar))
         scrollToken += 1
+    }
+
+    /// The shared start: nothing is written unless the row is still pending (a card can be stale; visibility follows
+    /// the cached `now`, the write never does). `startedAt` is the clock read at the tap.
+    private func start(sessionIndex: Int) {
+        do {
+            try WorkoutLogStore.start(sessionIndex: sessionIndex, rows: sessions, at: clock.now(), in: modelContext)
+        } catch {
+            assertionFailure("Start workout failed: \(error)")   // the store refused the write before this context changed; the shell stays
+        }
     }
 }
 

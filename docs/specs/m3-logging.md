@@ -1,6 +1,6 @@
 # M3 slice 1 — Workout logging (start, swipe, RPE, adjust, next exercise, exit, summary, resume)
 
-**Status: agreed 2026-09-13, branch `m3-logging`; architecture review applied; plan `docs/plans/m3-logging.md` verified (round 2 PASS); awaiting implementation approval.** Depends on M2 (merged). Sources:
+**Status: implemented 2026-09-13 on branch `m3-logging` (plan `docs/plans/m3-logging.md`, Steps 1–14 plus ship-check fixes): 425 tests on iOS 17.5 and 26.5, Release build green, AC-1–AC-12 and AC-28–AC-41 checked. The 2.8 discarding flag is applied up front, and the 4.2 failure policy was revised at ship-check. Pending the user: AC-13–AC-23 on the simulator (including the AC-20 Exit-flash recording) and AC-24–AC-27 on the device.** Agreed 2026-09-13; architecture review applied; plan verified (round 2 PASS). Depends on M2 (merged). Sources:
 prototype markup `isWorkout` / `isSummary` and script `buildWo`, `snapshot()`, `startWorkout`, `logSet`, `advance`, `pickRpe`,
 `finishState`, `renderVals` workout/summary values; `CLAUDE.md`; INSIGHTS ("2026-09-13 — M3 decisions", Engine/Model boundary,
 status invariants, every set written immediately, explicit deletes, nil-by-default `@Entry`, M2 Home/Program decisions); gotchas
@@ -26,7 +26,7 @@ is derived from stored rows. Covers B2, B3, B4, B6, C1 and a button added to D1.
 | Workout route | The workout replaces the shell at the root while the current program has an in-progress log (4.5 facts 3–5). Not a cover or overlay; seeded workout screenshots need no `-tab`. **Invariant:** while the shell is visible, no in-progress log exists on the current program (M4's missed prompt, shift and restart may rely on it). |
 | Startable sessions | Pending and dated today (Home Today card, Program card), or pending and dated before today (Program card only), through one shared start function (2.1). Future, completed and skipped sessions cannot be started. |
 | State from rows | Workout sub-state (logging / RPE pending / summary) is a pure function of the log's set rows (5.1). Later slices add overlays, never a stored cursor. The rest timer (slice 2) sits between an RPE pick or skip (or Skip set) and the next active set. |
-| Writers | Each workout action is one `WorkoutLogStore` function that takes rows, is a guarded no-op when the row is not in the expected state, ends in one save, and rolls back on a failed save (4.2). `start`, `finish` and `discard`/`delete` stay the only creators, finishers and deleters of logs. Rows are found by id, never by array position (4.3). |
+| Writers | Each workout action is one `WorkoutLogStore` function that takes rows, is a guarded no-op when the row is not in the expected state, ends in one save, and never leaves an unsaved change on screen after a failed save (4.2 failure policy). `start`, `finish` and `discard`/`delete` stay the only creators, finishers and deleters of logs. Rows are found by id, never by array position (4.3). |
 | Timestamps | **Every stored timestamp comes from `clock.now()` read at the moment of the action, never from a screen's cached `now`:** start (`startedAt`), log set, Save & log set, Skip set, Next exercise (`loggedAt`). Done writes the end instant (5.6), which is built from those timestamps. |
 | Schema | One addition: `LoggedSet.rpeSkipped: Bool = false`, migrated automatically with no schema versioning (4.6). Versioning is deferred to M5. |
 | Tab ownership | The root owns the selected tab. Done → Home, always (decision 13). Exit → tab unchanged (4.4). |
@@ -227,9 +227,15 @@ program. **Empty log** (a session with no exercises, not producible by the gener
 ### 4.2 Written (model layer)
 
 Every function takes rows, performs its writes and ends in `try context.save()`; timestamps are the `at:` argument, always
-`clock.now()` read at the action (1.1). **Failure policy (item 6):** the store calls `context.rollback()` before rethrowing, so no
-unsaved change is ever shown as logged; the view calls `assertionFailure` (as `OnboardingView.startProgram` does); the screen stays
-derived from rows and is never blank in Release.
+`clock.now()` read at the action (1.1). **Failure policy (item 6, revised at ship-check 2026-09-13):** no unsaved change is ever shown as
+logged. Field writers (log, save & log, skip set, set/skip RPE, next exercise, finish) snapshot the fields they change, restore
+them on a failed save, then `rollback()` and rethrow (rollback alone keeps edited values). `discard` deletes and saves in the
+writing context and rethrows; on failure its deletes stay pending, the root already shows the shell, and the next successful save
+completes the discard. `start` first saves and removes the same graph in a scratch `ModelContext` on the same container, so a
+store that refuses the write throws before the writing context changes (on iOS 26.5 a failed insert cannot be undone in place;
+the one exception to "all writers on `mainContext`", INSIGHTS). `rollback()` is never called with an insert or delete pending. The
+view calls `assertionFailure` (as `OnboardingView.startProgram` does); the screen stays derived from rows and is never blank in
+Release.
 
 | Action | Rows and fields | Function and guard |
 |---|---|---|
@@ -472,7 +478,7 @@ card for WK 2 · W 9 reads "Legs" · "Completed" (`success`), with a `success` d
 | Every set skipped | Summary with "0", no muscle chips (the card shows only its title), the no-records card; Done completes the session (decision 10). |
 | Double commit (two swipes, a swipe and an accessibility action, two RPE taps, a rating after Skip, a second Skip) | Every writer is guarded (4.2): the second call finds the row no longer eligible and neither writes nor saves. |
 | Duplicate `order` values (not producible by `start`) | The Engine breaks ties on `id.uuidString`, so state and summary are identical across fetches; writes find rows by id, so a tie never redirects a swipe to another set; carry skips a tied sibling (its `order` is not greater); no map built from rows traps. |
-| Save fails | The store rolls back, the view asserts in Debug; in Release the screen shows the unchanged rows (the row springs back; the RPE card follows from rows); never blank (4.2). |
+| Save fails | Per the 4.2 failure policy (fields restored; a failed Exit leaves its deletes pending; a failed Start changes nothing), the view asserts in Debug; in Release the screen shows the unchanged rows (the row springs back; the RPE card follows from rows); never blank. |
 | Unknown exercise key (not producible by the generator) | The name shows the key; the "Exercise `n` of `N`" line omits " · `Muscle`"; the equipment line is empty; the weight steppers do nothing; the summary counts its volume but gives no muscle chip; a record row shows the key as its name. No trap, no assertion-only path. |
 | `log.session == nil` (routing excludes it; defensive) | Header name empty; summary meta week 1, phase from the `phaseRaw` fallback (Foundation); Done writes `finishedAt` with no session to complete. No trap. |
 | PR baseline | Cannot change while a workout is open (invariant, 4.1), so it is built lazily once when Summary first shows; neither records card renders before it exists. CloudKit sync or finished-set editing would break the invariant. |

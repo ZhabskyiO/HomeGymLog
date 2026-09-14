@@ -9,6 +9,8 @@ struct HomeContent: View {
     let sessionLengthMinutes: Int
     let onProgress: () -> Void
     let onInfo: (Exercise) -> Void
+    /// Receives today's session index; the screen that owns the rows starts it.
+    let onStart: (Int) -> Void
 
     var body: some View {
         let sessions = input.sessions
@@ -31,7 +33,8 @@ struct HomeContent: View {
                 WeekStrip(days: strip, letters: HomeText.weekStripLetters(calendar: calendar))
                     .padding(.top, 18)
                 if let todaySession {
-                    TodayCard(session: todaySession, sessionLengthMinutes: sessionLengthMinutes, unit: unit, onInfo: onInfo)
+                    TodayCard(session: todaySession, sessionLengthMinutes: sessionLengthMinutes, unit: unit, onInfo: onInfo,
+                              onStart: { onStart(todaySession.index) })
                         .padding(.top, 20)
                 } else if let next {
                     RestDayCard(next: next, calendar: calendar)

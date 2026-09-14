@@ -8,9 +8,9 @@ struct ShellView: View {
     /// The current program, for its immutable fields only (id, frequency, session length). Screens that
     /// need live rows own their own `@Query`; a view depending on this reference alone never re-renders (iOS 17).
     let program: Program
-    @State private var selected: AppTab = .home   // ≈ useState; passed down as a Binding for "Progress ›"
-    /// Nil outside a debug launch that asked for a starting tab; no `#if` in the view.
-    @Environment(\.initialTab) private var initialTab
+    /// Owned by `RootView`, which outlives this view while a workout replaces the shell. `@Binding` ≈ a
+    /// `value` + `onChange` prop pair from the parent.
+    @Binding var selected: AppTab
 
     var body: some View {
         TabView(selection: $selected) {
@@ -27,7 +27,6 @@ struct ShellView: View {
         }
         .ignoresSafeArea(edges: .bottom)
         .background(Theme.bg.ignoresSafeArea())
-        .onAppear { if let initialTab { selected = initialTab } }
     }
 
     @ViewBuilder
@@ -44,7 +43,7 @@ struct ShellView: View {
 #Preview {
     let calendar = AppClock.live().calendar
     let container = try! DebugSeed.midProgram.makeContainer(calendar: calendar)
-    return ShellView(program: try! ProgramStore.current(in: container.mainContext)!)
+    return ShellView(program: try! ProgramStore.current(in: container.mainContext)!, selected: .constant(.home))
         .modelContainer(container)
         .environment(\.appClock, DebugSeed.midProgram.clock(calendar: calendar))
 }

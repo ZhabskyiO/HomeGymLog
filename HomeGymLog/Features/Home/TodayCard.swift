@@ -1,11 +1,13 @@
 import SwiftUI
 
-/// Today's session: gradient header, exercise rows, and the Start workout button (inert until M3).
+/// Today's session: gradient header, exercise rows, and the Start workout button.
 struct TodayCard: View {
     let session: SessionSummary
     let sessionLengthMinutes: Int
     let unit: WeightUnit
     let onInfo: (Exercise) -> Void
+    /// Reports the tap; `HomeView` owns the rows and calls the shared start.
+    let onStart: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -31,17 +33,9 @@ struct TodayCard: View {
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 14)
-            Button {} label: {   // inert until M3 wires WorkoutLogStore.start
-                Text("Start workout")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(Color.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 50)
-                    .background(Theme.accent, in: RoundedRectangle(cornerRadius: 13))
-            }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 16)
-            .padding(.bottom, 16)
+            StartWorkoutButton(action: onStart)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 16)
         }
         .background(Theme.sf, in: RoundedRectangle(cornerRadius: 18))
         .clipShape(RoundedRectangle(cornerRadius: 18))

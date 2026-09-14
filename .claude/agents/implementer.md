@@ -43,6 +43,12 @@ developer new to Swift: add one-line React analogies in doc comments where a Swi
    pass because the plan's expected value is wrong), do not improvise around it: finish the steps that do not depend
    on it, state exactly what is blocked and why, and stop. Never change production behavior to make a test pass;
    if a test is wrong, fix the test and say so.
+10. If a fix you are asked for would contradict a decision recorded in `insights/INSIGHTS.md` (for example "all
+    writers stay on `mainContext`"), probe first, then stop and report the options with the probe evidence instead of
+    implementing the contradicting design; the main session takes it to the reviewer or the user.
+11. Every test that builds a `ModelContainer` keeps it bound for the whole test (hold the `TestStore`, or
+    `withExtendedLifetime(container) {}` at the end; never `let (_, context) = …`): on iOS 26.5 reading a model after its
+    container is released crashes the entire test process.
 
 ## Report
 

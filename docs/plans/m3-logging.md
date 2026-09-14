@@ -1,7 +1,15 @@
 # M3 slice 1 — Workout logging (start, swipe, RPE, adjust, next, exit, summary, resume): implementation plan
 
-**Status: drafted 2026-09-13 on branch `m3-logging`; verifier round 1 PASS WITH FIXES (applied in the main session), round 2 PASS; awaiting the user's approval to implement.** For `docs/specs/m3-logging.md` (architecture review applied). Spec §2–6 and §8 are the contract (ACs
+**Status: implemented 2026-09-13 on branch `m3-logging` (Steps 1–14 plus ship-check fixes): 425 tests green on iPhone 15 / iOS 17.5 and iPhone 17 / iOS 26.5, Release build green. Pending the user: AC-13–AC-23 on the simulator (AC-20 is the Exit-flash recording) and AC-24–AC-27 on the device.** Verified earlier: round 1 PASS WITH FIXES (applied), round 2 PASS. For `docs/specs/m3-logging.md` (architecture review applied). Spec §2–6 and §8 are the contract (ACs
 `AC-1`…`AC-41`); format follows `docs/plans/m2-program-tab.md`.
+
+Implementation notes (2026-09-13):
+- Tests ran with `-parallel-testing-enabled NO` (parallel clones got stuck on 17.5). Static greps are clean: the only `#if DEBUG` hits in Features are `#Preview` blocks, as before this slice.
+- Every seeded compare was read (wo-start, wo-swipe, wo-rpe, wo-adjust, summary, home, program; kg, light, missed and no-button shots), and the AC-9 frame check passed.
+- The §5 exit-flash fallback (`isDiscarding`) is applied up front, per the swift review; the AC-20 recording is still with the user.
+- Failed saves (spec 4.2, INSIGHTS "Failed-save policy"): the field writers and `finish` restore the fields they changed. `start` rehearses its insert in a scratch context first, because on 26.5 a failed insert cannot be undone in place. `discard` deletes and saves in the writing context; on failure its deletes stay pending until the next successful save. `rollback()` never runs with an insert or delete pending (it crashes on 17.5).
+- Deviations beyond the spec's: the adjust sheet uses the system dim (lighter than 50 % black) with a 251 pt detent; long names wrap in the summary's record rows (the prototype overlaps them).
+- Test-only fix: seeded suites keep their `ModelContainer` alive (`withExtendedLifetime`), because reading a model after its container is released crashed the 26.5 test process.
 
 ## 1. Goal and scope
 Land the workout-logging slice in the order of §3: Engine rules and suites, the `rpeSkipped` field and guarded store writers, predicates and mapping, Shared text, DEBUG seeds, the lifted

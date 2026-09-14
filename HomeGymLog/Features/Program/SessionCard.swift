@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// The selected day's session: its name, its status relative to today, and one row per planned exercise.
+/// The selected day's session: its name, its status relative to today, one row per planned exercise, and "Start
+/// workout" when the session can be started (today's or a missed pending session).
 /// Weights are the planned targets for every status, Completed included (logged weights are Progress, M4).
 struct SessionCard: View {
     let session: SessionSummary
@@ -8,6 +9,10 @@ struct SessionCard: View {
     let unit: WeightUnit
     let calendar: Calendar
     let onInfo: (Exercise) -> Void
+    /// True only for `.today` and `.missed` (`WorkoutFlow.isStartable`).
+    let showsStart: Bool
+    /// Reports the tap; `ProgramView` owns the rows and calls the shared start.
+    let onStart: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -26,6 +31,10 @@ struct SessionCard: View {
                 }
             }
             .padding(.top, 12)
+            if showsStart {
+                StartWorkoutButton(action: onStart)
+                    .padding(.top, 14)
+            }
         }
         .padding(.vertical, 14)
         .padding(.horizontal, 16)
