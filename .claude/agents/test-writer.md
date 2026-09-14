@@ -35,6 +35,12 @@ For any function that buckets or windows its input (weeks from an anchor, ranges
 with an input before the first bucket and one past the last; Swift's `/` truncates toward zero, so negatives are
 where such code breaks.
 
+For every model-layer writer (a function that mutates rows and saves), add a failed-save case: write the fixture to
+an on-disk store, reopen the same file with `ModelConfiguration(..., allowsSave: false)`, run the writer on that
+context, and check both the store (a fresh context on the writable container) and the writing context's own rows
+(INSIGHTS Patterns 2026-09-13). Keep every `ModelContainer` bound for the whole test; releasing it early crashes the
+iOS 26.5 test process.
+
 Also report existing assertions that cannot fail (an `||` with an always-true side, a value compared to itself, a
 test whose expected and actual come from the same function) with the file:line and a corrected form.
 

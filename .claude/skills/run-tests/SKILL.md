@@ -17,7 +17,8 @@ Run the test suite and report results honestly. Never edit production code from 
      -derivedDataPath build/DerivedData -resultBundlePath build/tests.xcresult \
      [ -only-testing:<filter> ] 2>&1 | tee build/last-test.log | grep -E "✔|✘|Test Suite|Executed|error:|TEST (SUCCEEDED|FAILED)"
    ```
-   Delete a stale `build/tests.xcresult` first; xcodebuild refuses to overwrite it.
+   Delete a stale `build/tests.xcresult` first; xcodebuild refuses to overwrite it. If the run fails before any test
+   with "Failed to clone device … stuck in creation state", re-run with `-parallel-testing-enabled NO`.
 4. If the build itself failed, report compiler errors as `path:line: message` and stop.
 5. For each failing test, pull the failure message from the log (`#expect` prints expected and actual).
    If the log is unclear, inspect the bundle:

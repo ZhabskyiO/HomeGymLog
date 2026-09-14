@@ -6,6 +6,68 @@ Keep entries short. Date them. Newest at the top within each section.
 
 ## Architecture decisions
 
+### 2026-09-13 — M3 decisions (from the m3-logging slice spec, user-answered)
+
+- **M3 is three slices**, each merged before the next: `m3-logging` (workout screen, swipe/RPE/adjust, next exercise,
+  exit, summary, resume), `m3-rest-timer` (rest overlay + local notification, `wo-rest`), `m3-exercise-tools` (detail
+  sheet with notes, swap, progression pill; `wo-detail`, `wo-swap`).
+- **Workout route**: the root switches to the workout while a current-program session has an in-progress log (nested
+  `flatMap` predicate); not a cover. `selectedTab` lifts from `ShellView` into `RootView`. Workout sub-state (logging /
+  RPE pending / summary) is derived from set rows only, so a kill resumes exactly (researcher, m3-logging).
+- **Startable sessions**: today's pending session (Home Today card) and **any missed session** (pending, dated before
+  today) from the Program tab's session card, which gains "Start workout" for today's and missed sessions. Future and
+  skipped sessions have no start. (User chose over the prototype's today-only.)
+- **Done always lands on Home**, also when the workout was started from the Program card (user confirmed; identical
+  after a kill on the summary). Exit keeps the tab the user was on.
+- **Completing a missed session counts toward the streak** (user confirmed): the M2 streak rule is unchanged; a
+  completed session counts whichever day it was trained, and its `scheduledDate` is never rewritten (M4 owns shift).
+- **Exit** confirms ("Discard workout?") when at least one set is done or skipped; immediate otherwise. Deletes the log.
+- **Next exercise** marks the exercise's remaining pending sets skipped (keeps "summary iff nothing pending").
+- **RPE can be skipped, and the skip is stored** (user choice, **schema addition on `LoggedSet`**): a "Skip" button on the
+  RPE card is the only dismissal; an unanswered card reappears after a kill; "Next exercise" stays disabled while it shows.
+- **Adjust carries forward on "Save & log set"**: the sheet's weight and reps go to this set and the exercise's remaining
+  pending sets. "Skip set" stores the values on the skipped set only.
+- **Summary**: duration and `finishedAt` both end at the latest set `loggedAt`; date = day the workout started; no-records
+  text "No new records today."; records use Home's rule (current program, strict, first appearance counts with "—");
+  an all-skipped workout completes with 0 volume.
+- **Stray in-progress logs** (orphaned or archived program) are ignored by routing and left in the store.
+- **Later-slice controls** (Swap, Add note, ⓘ) are present but inert; progression pill hidden; no rest overlay yet.
+- **Workout writers (architecture review)**: every workout action is one `WorkoutLogStore` function ending in one save,
+  guarded to a no-op when the row is not in the expected state (log/skip set: pending; set/skip RPE: done, `rpe == nil`,
+  not skipped; next exercise: no done set awaiting RPE). One shared start function for Home and Program looks the row up by
+  session index and starts only a pending session; Exit is `WorkoutLogStore.discard` (delete + save). On a failed save
+  the view `assertionFailure`s and the screen stays derived from rows (never blank in Release); the store-side policy
+  is the entry below.
+- **Failed-save policy (ship-check, user-approved 2026-09-13)**, because `rollback()` keeps edited values and must never
+  run with a pending insert or delete (gotchas SwiftData): **field writers** (log, save & log, skip set, RPE, skip RPE,
+  next exercise, finish) snapshot the fields they change and restore them, then `rollback()`, then rethrow. **`discard`**
+  deletes and saves in the writing context and rethrows; on failure the deletes stay pending (the root already shows the
+  shell) and the next successful save completes them. **`start` is the one exception to "all writers stay on
+  `mainContext`"**: on 26.5 a failed insert cannot be undone in the same context (the unsaved log stays in that context's
+  routing fetch and reading it traps), so `start` first saves and deletes the same graph in a scratch `ModelContext` on
+  the same container; a refusing store throws there before the writing context changes. Cost: two extra saves per
+  start. Accepted edge: rehearsal insert saved but its delete refused leaves the tapped workout started. The single-context
+  alternatives were probed on 17.5 and 26.5 and all trap on 26.5 (implementer report, m3-logging swift review round 2).
+- **Engine workout values carry row ids** (`UUID`); writes find rows by id through `Dictionary(_, uniquingKeysWith:)`,
+  never by array position; ties in `order` break on the id.
+- **Every stored timestamp comes from `clock.now()` at the moment of the action**, never from a screen's cached `@State now`.
+- **Invariants**: while the shell is visible, no in-progress log exists on the current program (M4's missed prompt,
+  shift and restart may rely on it); the PR baseline cannot change while a workout is open (breaks with CloudKit sync or
+  finished-set edits), so it is built lazily when the summary first shows.
+- **The root owns `selectedTab`**; `initialTab` is applied behind a one-time flag; Done writes the tab before `finish`.
+  **M4 note:** restart → onboarding would reopen the new shell on the old tab (e.g. Settings), so the restart path must
+  reset the tab to Home. The Program tab now writes, only through the shared start function.
+- **Workout presentation**: one `WorkoutSheet` enum (`.adjust` now; `.detail`, `.swap` in m3-exercise-tools) plus a
+  separate exit-dialog flag; the drag offset is `@State` inside the swipe row. (implemented 2026-09-13) The screen also
+  holds `isDiscarding`, raised before `discard` and lowered if it throws. While it is set, the screen renders only the
+  background, so the emptied queries never show a summary frame or start the PR baseline while Exit is leaving. The
+  spec made the flag conditional on AC-20; the swift review had it applied up front.
+- **Schema addition without versioning**: `LoggedSet.rpeSkipped: Bool = false` (default mandatory) migrates unversioned
+  stores automatically on 17.5 and 26.5; `AppSchema.makeContainer` stays unchanged. **Open for M5** (or the first change
+  that cannot migrate automatically, whichever comes first): introduce `AppSchemaV1` as a frozen nested copy of the
+  shipped models plus a lightweight `SchemaMigrationPlan`; verified to open both old and already-upgraded unversioned
+  stores (researcher addendum).
+
 ### 2026-09-11 — M2 Program tab decisions (from the program-tab slice spec, user-answered; implementation notes appended)
 
 - **Week chips are calendar windows**, Mon–Sun, anchored on the Monday of the earliest session's week; count =
@@ -58,7 +120,8 @@ Keep entries short. Date them. Newest at the top within each section.
   its rows and re-fetches on every save. Session-derived stats are computed from the retained rows in `body`;
   `[FinishedLogValue]` (PRs, week volume) is built once per data change in `.task(id: fingerprint)` because a full
   log traversal costs ~0.4 s at program end on 17.5 and is never cached. Analogy: `useQuery` for rows, `useMemo`
-  keyed on a fingerprint for the expensive mapping. All writers stay on `mainContext`.
+  keyed on a fingerprint for the expensive mapping. All writers stay on `mainContext` (one exception since 2026-09-13:
+  `WorkoutLogStore.start` rehearses its insert in a scratch context; see M3 "Failed-save policy").
 - **Screens that depend on "today" hold one `@State now`**, written in `.onAppear` and in `.onChange(of: scenePhase)`
   when `.active` (verified: a bare `clock.now()` in `body` never refreshes on foreground); `now ?? clock.now()` covers
   only the pre-appear frame. Analogy: a `visibilitychange` effect.
@@ -355,6 +418,37 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
 
 ## Agent tuning
 
+- 2026-09-13 (m3-logging) — **researcher** was decisive: a scratch copy of the repo with a generated UI-test target gave
+  real drags, cold-launch video frames and kill tests on both runtimes, and its migration addendum (a field without a
+  default fails to open the store) went straight into the spec. Running it before spec-creator, because its answers
+  decided the data flow, cost no revision. Nothing to change.
+- 2026-09-13 (m3-logging) — **architecture-reviewer** found the three real design gaps (RPE double-tap guard, row ids,
+  a shared start with a stale `now`) but also prescribed "the store calls `context.rollback()` on a failed save" without
+  evidence; the spec adopted it and the test-writer later proved `rollback()` keeps edited values and crashes 17.5 with
+  inserts or deletes pending. Prompt edit: any policy that relies on the runtime semantics of a SwiftData or SwiftUI API
+  must be marked unverified unless a report or gotcha proves it, naming the probe that would verify it.
+- 2026-09-13 (m3-logging) — **test-writer** found the slice's only real bug by forcing a failed save (on-disk store
+  reopened with `allowsSave: false`) and left the test red on purpose, with `file:line` of the cause. Prompt edit: make
+  the failed-save check standard for every store writer, and bind every `ModelContainer` for the test's lifetime.
+- 2026-09-13 (m3-logging) — **implementer** ran all 14 steps in one pass with every compare read, but (a) its seeded
+  tests released their `ModelContainer` early, which crashed the whole 26.5 test process (151 failures, one cause), and
+  (b) its fix for the rollback bug introduced scratch-context writes that contradicted "all writers stay on
+  `mainContext`" and reported the conflict only afterwards; that cost a reviewer round and a second probe round before
+  the user chose. Prompt edits: keep containers bound; stop and report options when a fix would contradict a recorded
+  decision. What worked: resuming it with SendMessage for three fix rounds kept the whole slice in context.
+- 2026-09-13 (m3-logging) — **swift-reviewer** round 1 was accurate (ship, six useful non-blocking items); round 2
+  correctly rejected the scratch design but proposed an alternative that the implementer's own probe table had already
+  shown to trap on 26.5. Prompt edit: check any proposed alternative against probe results already in the reports and
+  mark untested alternatives unverified; do not build when the brief says the main session is running the gate.
+- 2026-09-13 (m3-logging) — **plan-verifier** recomputed every number (0 false claims), found the AC-21 test the plan
+  pushed to the user and an empty frame-sampling window; the scoped round 2 took 45 s. **spec-creator** turned twelve
+  open questions plus follow-ups into a 593-line spec with no numeric error. **doc-writer** caught a false status claim in
+  the plan. Nothing to change.
+- 2026-09-13 — **process**: twelve open questions went out as three parallel `AskUserQuestion` calls of four, and the
+  answers that opened new detail (RPE dismissal, carry trigger, missed-start entry point) as one follow-up batch; no
+  re-asking. Shared DerivedData means only one `xcodebuild` at a time: the main gate ran first, the reviewer read without
+  building, and the test-writer started after the gate.
+
 - 2026-09-11 (m2-program-tab) — **implementer** (new, model opus) ran all eight plan steps in one 25-minute pass: per-step
   builds, 438 green runs, every seeded screenshot read and compared, the plan's own fallback applied when `scrollTo`
   ran before layout, and its own doc comments fixed when the raw flag-string scan caught them. It missed one bug the
@@ -457,6 +551,13 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
   spec-creator in parallel at the start of `/milestone` saved a full round.
 
 ### Skill tuning
+- 2026-09-13 — **ship-check**: step 4 now says a fix that introduces a new design (another `ModelContext`, a new API
+  semantic, or a conflict with an INSIGHTS decision) gets a scoped reviewer re-run even without a blocking finding, and
+  that only one `xcodebuild` may run at a time on the shared DerivedData (gate first; reviewer reads; test-writer after).
+- 2026-09-13 — **design-compare**: step 1 polls the local `http.server` with `curl` before Chrome renders; a fixed
+  `sleep 1` rendered a connection-refused page and every crop came out blank.
+- 2026-09-13 — **run-tests**: retry with `-parallel-testing-enabled NO` when a run fails before any test with "Failed to
+  clone device … stuck in creation state".
 - 2026-09-11 — **ship-check**: step 4 now launches swift-reviewer and test-writer in parallel and routes reviewer fixes
   to the `implementer` (resumed with SendMessage) after the test-writer returns; step 6 says not to ask doc-writer for
   study notes (`/learning-notes` owns `docs/learning/`).
@@ -481,6 +582,42 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
   `DebugSeed` reference outside `#if DEBUG` that only Release could catch.
 
 ## Patterns
+
+### 2026-09-13 — Force a failed SwiftData save in a test: reopen an on-disk store with `allowsSave: false`
+In-memory stores never fail to save. Write the fixture through a normal on-disk container, then open the same file with
+a second container configured read-only and run the writer on that context: `save()` throws NSCocoaErrorDomain 513.
+Check both halves: a fresh context on the writable container (the store) and the writing context's own rows (what a
+screen's `@Query` shows). Bind both containers for the whole test.
+
+```swift
+let writer = try ModelContainer(for: AppSchema.schema, configurations: [ModelConfiguration(schema: AppSchema.schema, url: url)])
+// … insert the fixture through ModelContext(writer) and save …
+let readOnly = try ModelContainer(for: AppSchema.schema,
+                                  configurations: [ModelConfiguration(schema: AppSchema.schema, url: url, allowsSave: false)])
+let context = ModelContext(readOnly)
+#expect(throws: (any Error).self) { try WorkoutLogStore.logSet(set, at: now, in: context) }
+withExtendedLifetime((writer, readOnly)) {}   // ≈ keeping the DB connection open until the assertions finish
+```
+Used by `HomeGymLogTests/Persistence/WorkoutCommitRollbackTests.swift`; it found that `rollback()` keeps edited values.
+
+### 2026-09-13 — A store writer restores its own snapshot on a failed save
+`rollback()` alone leaves edited values on the rows (gotchas SwiftData), so each field writer captures what it will
+change and hands `commit` a closure that puts it back (≈ a reducer keeping the previous state to revert an optimistic
+update).
+
+```swift
+let snapshot = SetSnapshot(set)            // weightLb, reps, statusRaw, rpe, rpeSkipped, loggedAt
+set.status = .done; set.loggedAt = at
+try commit(context) { snapshot.restore() } // save; on throw: restore, rollback(), rethrow
+```
+Never call `rollback()` with an insert or delete pending; `start` and `discard` follow INSIGHTS "Failed-save policy".
+
+### 2026-09-13 — Real-touch probes without touching the repo
+When a question needs real drags or cold-launch frames (not just a unit test), copy the repo to the scratchpad,
+add a UI-test target to the copy's project, change the copy's bundle id, and drive `-probe` launch modes with XCUITest
+drags (`press(forDuration:thenDragTo:...)`). Report values through `XCTFail("DATA …")`; use `simctl io recordVideo`
+plus frame sampling for "no frame of X is shown" checks. Uninstall the probe bundles afterwards. The repo's
+`project.pbxproj` stays untouched. Used by the m3-logging researcher (`docs/reviews/m3-logging-researcher.md`).
 
 ### 2026-09-11 — DEBUG launch arguments reach a view through a nil-by-default `@Entry` value
 

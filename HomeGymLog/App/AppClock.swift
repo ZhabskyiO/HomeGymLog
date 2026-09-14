@@ -24,4 +24,10 @@ extension EnvironmentValues {
     @Entry var programTabPreselection: ProgramTabPreselection? = nil
     /// The tab the shell opens on; nil means Home. Set the same way, for seeded screenshots.
     @Entry var initialTab: AppTab? = nil
+    /// A fixed drag offset (pt) the workout's active set row draws with, so a mid-swipe frame can be screenshot
+    /// without touches (`-seed wo-swipe` sets 72). Nil in Release and in every other launch; set the same way.
+    @Entry var workoutDragPreview: CGFloat? = nil
+    /// True when the workout screen should open the adjust sheet on its active set as it first appears
+    /// (`-seed wo-adjust`). Nil in Release and in every other launch; set the same way.
+    @Entry var workoutAdjustPreview: Bool? = nil
 }

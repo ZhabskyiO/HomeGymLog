@@ -20,8 +20,11 @@ Verify the working tree is ready to commit. Report failures; do not hide them.
    parallel (they are independent). Save the reviewer's reply to `docs/reviews/<slug>-swift-review.md`. Wait for
    the test-writer before applying anything, then send the reviewer's findings to the `implementer` (resume it
    with SendMessage so it keeps the slice in context) with the exact fixes and the instruction to re-run the full
-   suite on both runtimes and the Release build. Re-run the reviewer once only for blocking findings. Report
-   non-blocking findings to the user.
+   suite on both runtimes and the Release build. Re-run the reviewer once only for blocking findings, or scoped to
+   the change when a fix introduces a new design (another `ModelContext`, a new API semantic, a conflict with an
+   INSIGHTS decision). Report non-blocking findings to the user. Only one `xcodebuild` may run at a time (shared
+   DerivedData and simulators): run steps 2–3 before the test-writer starts, and tell the reviewer not to build while
+   they run.
 5. Scan the diff for leftovers: `print(`, `TODO`, `FIXME`, `fatalError(` outside tests, force unwraps
    `!` on optionals in new code, hardcoded "Benchmark" strings, and `#if DEBUG` blocks that should not
    ship. List any found.

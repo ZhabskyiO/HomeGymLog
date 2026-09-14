@@ -3,12 +3,24 @@
 Things that cost time. Read the relevant section before working in that area. Append when something
 new bites: what happened, the fix, and how to recognize it next time. Date each entry.
 
-## Apple free developer tier
+## Apple developer account
 
-- 2026-09-09 — Provisioning for a personal team expires every 7 days. Symptom: app on the phone refuses to
-  launch with an "unable to verify" message. Fix: run from Xcode again. Nothing is wrong with the code.
-- 2026-09-09 — No TestFlight, no App Store, max 3 devices and 10 App IDs. Some entitlements are blocked;
-  Live Activities and local notifications do not need any, so they work on the free tier.
+Paid Individual team `4GKZ96A6QR` since 2026-09-13. Entries dated before that describe the free personal team and
+are kept as history.
+
+- 2026-09-13 — **Enrolling the same Apple ID keeps the team ID.** The free personal team `4GKZ96A6QR` became the paid
+  team; `project.pbxproj` needed no change, and Xcode's preferences flipped to `isFreeProvisioningTeam = 0`
+  (`defaults read com.apple.dt.Xcode IDEProvisioningTeamByIdentifier`). The phone did not ask to trust the developer
+  again. Recognize it: a grep for `DEVELOPMENT_TEAM` shows the old ID even though the switch worked.
+- 2026-09-13 — **`-allowProvisioningUpdates` reuses a cached free 7-day profile while it is still valid**, even after
+  enrollment. The first paid build embedded the Sep 10 profile expiring Sep 17. Fix: move the files out of
+  `~/Library/Developer/Xcode/UserData/Provisioning Profiles/` and build again; Xcode fetched a new profile expiring
+  2027-09-13. Check any build with `security cms -D -i <app>/embedded.mobileprovision` and read `ExpirationDate`.
+  Recognize it: an expiry 7 days after `CreationDate`.
+- 2026-09-09 (free tier, no longer applies) — Provisioning for a personal team expires every 7 days. Symptom: app on
+  the phone refuses to launch with an "unable to verify" message. Fix: run from Xcode again.
+- 2026-09-09 (free tier, no longer applies) — No TestFlight, no App Store, max 3 devices and 10 App IDs. Live
+  Activities and local notifications need no entitlement on either tier; push and CloudKit need the paid team.
 - 2026-09-10 — First device build fails with "Developer Mode disabled … enable Developer Mode in Settings → Privacy
   & Security" (xcodebuild reports it as "Timed out waiting for all destinations"). The phone needs Developer Mode on
   (iOS 16+): Settings → Privacy & Security → Developer Mode → on → restart → confirm. Only appears once.
@@ -57,7 +69,49 @@ new bites: what happened, the fix, and how to recognize it next time. Date each 
   traverse the whole log history in `body`.
 - 2026-09-11 — Writes through a second `ModelContext` are not reliably visible to objects already registered in another
   context (stale on 17.5 even after re-fetch). Keep every writer on `mainContext`.
-- (expected areas still open: migrations, previews)
+- 2026-09-13 — **Two-level predicates work as nested `flatMap`, not as `?.` chains.**
+  `log.session.flatMap { $0.program.flatMap { $0.archivedAt == nil } } == true` fetches correctly on 17.5 and 26.5
+  where `$0.session?.program?.archivedAt == nil` crashes. `[UUID?].contains($0.exercise?.id)` does not compile
+  ("Use the flatMap(_:) function explicitly"); `$0.exercise.flatMap { ids.contains($0.id) } == true` does.
+  `$0.workoutLog?.finishedAt == nil` also matches sessions with no log (nil chain == nil); add `$0.workoutLog != nil`.
+  Source: `docs/reviews/m3-logging-researcher.md` Q1/Q2.
+- 2026-09-13 — **The 17.5 retention rule, refined:** a view updates on a child-row change only while the rows it read
+  are held by something (`ForEach` data, a child view's property, a closure, `@State`, `@Query`). Mapping rows to plain
+  structs in `body` and iterating the structs leaves the view stale on 17.5 (fine on 26.5). Any save re-runs `body`
+  of every view that owns an `@Query` (DTS, forum 774561), so a query owner may map rows to values safely.
+- 2026-09-13 — **A new stored property needs a default value or the existing store will not open.**
+  `var rpeSkipped: Bool = false` migrates an unversioned on-disk store automatically on 17.5 and 26.5 (rows read
+  `false`). Without the default, `ModelContainer(for:configurations:)` throws `SwiftDataError.loadIssueModelContainer`
+  ("SwiftDataError error 1"; Debug `fatalError`, Release `StoreErrorView`) and leaves the store intact. Recognize it: the
+  store fails to open right after adding a model property. Source: `docs/reviews/m3-logging-researcher.md` addendum.
+- 2026-09-13 — **Releasing the `ModelContainer` while still using its models crashes the whole test process on iOS 26.5**
+  (17.5 survives). `let (_, context, …) = makeSeedStore()` drops the container at once; the next model read traps, and
+  one "Crash: … line N" is then reported against 151 unrelated tests. Fix: keep the container bound for the test's
+  lifetime (`defer { withExtendedLifetime(container) {} }`, or hold `TestStore`). Recognize it: a 26.5-only mass failure
+  with one repeated crash line while 17.5 is green.
+- 2026-09-13 — **`ModelContext.rollback()` does not revert in-memory property values** on 17.5 or 26.5. It clears
+  `hasChanges`, but the context's objects keep the edited values, even after a refetch; the store is untouched. So
+  "save, else rollback" still leaves the screen showing an unsaved change (e.g. a set as done). Found by
+  `WorkoutCommitRollbackTests` (failure forced by reopening an on-disk store with `allowsSave: false`, Cocoa error 513).
+  Fix: capture the fields a writer changes and restore them by hand before rethrowing. Recognize it: values
+  that survive a failed save in the same context while a fresh context reads the old ones.
+  **Never `rollback()` with a pending insert or delete** (implementer probe, `allowsSave: false` on disk): on 17.5 a pending
+  insert crashes the process (SwiftData stack overflow) and a pending delete traps even with no save attempted; on 26.5
+  the insert is undone but the unsaved log still matches the in-progress query and reading it traps, while a delete is
+  restored. Recognize it: a failed Start or Exit crashing inside SwiftData.
+- 2026-09-13 — **On 26.5 a failed insert cannot be undone in the same context.** After a failed save, every tried
+  undo (unlink + delete, with or without `rollback()`, `processPendingChanges()`, unlinking both sides, marking it
+  finished) leaves the unsaved log in that context's predicate fetches, and reading its relationships traps ("Illegal
+  attempt to resolve a fault against a store that is not known to this model context"); a fresh context never sees it.
+  17.5 undoes all variants cleanly. Hence m3-logging's `start` rehearses its insert in a scratch context first.
+  Also: `ModelContext.willSave` is not posted on 17.5 when the save fails, and pending deletes cut in-memory
+  relationships before the save succeeds (17.5 then reads 0 children, 26.5 a partial count).
+- 2026-09-13 — On 26.5, **loading a not-yet-loaded child after another context deleted its row traps** ("backing data
+  could no longer be found"). Load every row you will touch (read a stored field) before a delete is saved elsewhere.
+  Recognize it: a crash inside a delete helper right after a save in a different `ModelContext`.
+- 2026-09-13 — Swift Testing can lose issues recorded just before a process crash; a probe that may crash should write
+  flushed lines to a file instead of relying on `#expect` messages.
+- (expected areas still open: previews)
 
 ## Swift language
 
@@ -93,10 +147,21 @@ new bites: what happened, the fix, and how to recognize it next time. Date each 
   or the system tab bar reappears on push. Use `toolbar(_:for:)` (iOS 16), not `toolbarVisibility` (iOS 18).
 - 2026-09-09 — `tabBarMinimizeBehavior` / `tabViewBottomAccessory` are iOS 26-only: a compile error at iOS 17
   without `#available`, and irrelevant once the system bar is hidden.
-- (expected areas still open: custom swipe gesture vs List swipe actions, sheet + navigation interplay,
-  timers surviving background)
+- 2026-09-13 — **`DragGesture` at the default `minimumDistance` (10) inside a `ScrollView` blocks vertical scrolling
+  that starts on that row on iOS 26.5**, with `.gesture`, `.simultaneousGesture` and `.highPriorityGesture` alike; 17.5
+  scrolls. `minimumDistance` ≥ 15 fixes it; a direction check inside `onChanged` does not. Use 20 for swipe rows.
+- 2026-09-13 — `.fullScreenCover(item:)` bound to a query that is already non-nil at launch shows ~50 ms of the view
+  underneath (shell `onAppear` fires first); switch in the root view instead. XCUITest element frames ignore
+  `.offset`, so verify a drag offset by screenshot.
+- (expected areas still open: sheet + navigation interplay, timers surviving background)
 
 ## Xcode / build
+
+- 2026-09-13 — **`python3 -m http.server` needs more than `sleep 1` before headless Chrome renders from it**: Chrome got a
+  connection-refused page and every `sips` crop came out blank. Fix: poll until the page answers
+  (`until curl -sf -o /dev/null http://127.0.0.1:8765/; do sleep 0.2; done`). Recognize it: all prototype crops blank.
+- 2026-09-13 — After a 26.5 test run, the 17.5 simulator can be found shut down again even after a later 17.5 test run;
+  always `BOOT` (boot + bootstatus) right before any install, launch or screenshot, not once per session.
 
 - 2026-09-11 — **Launch arguments override any `UserDefaults` suite**, not just `.standard`: `-units kg` after
   `-seed midProgram` makes `@AppStorage("units")` read "kg" even though the seed swaps in a cleared
@@ -114,7 +179,8 @@ new bites: what happened, the fix, and how to recognize it next time. Date each 
   Recognize it: a test run that ends immediately with no compile output and no test counts.
 - 2026-09-11 — `-only-testing` for a Swift Testing function needs the parentheses (`Suite/test()`); without them 0
   tests run and xcodebuild still prints TEST SUCCEEDED. Parallel test clones can shut down the booted simulator;
-  `-parallel-testing-enabled NO` avoids it.
+  `-parallel-testing-enabled NO` avoids it. 2026-09-13: on 17.5 the default parallel run also failed twice before any
+  test ran with "Failed to clone device 'iPhone 15' … stuck in creation state"; retry with parallel testing off.
 - 2026-09-10 — Running `xcodebuild test` against one runtime (iPhone 17 / iOS 26.5) shut down the other booted
   simulator (iPhone 15 / iOS 17.5); screenshots afterwards failed with "Unable to lookup in current state:
   Shutdown". Always `xcrun simctl boot <udid>; xcrun simctl bootstatus <udid> -b` before install/launch/screenshot.

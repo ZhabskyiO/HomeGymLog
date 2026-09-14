@@ -10,9 +10,11 @@ struct HomeGymLogApp: App {
     private let clock: AppClock
     private let defaults: UserDefaults
     private let seedDraft: OnboardingDraft?
-    /// Both nil unless a Debug launch argument set them (see `App/DebugSeed/`); always nil in Release.
+    /// All nil unless a Debug launch argument set them (see `App/DebugSeed/`); always nil in Release.
     private let preselection: ProgramTabPreselection?
     private let initialTab: AppTab?
+    private let dragPreview: CGFloat?
+    private let adjustPreview: Bool?
 
     init() {
         let live = AppClock.live()   // the only place the real clock is read
@@ -23,6 +25,8 @@ struct HomeGymLogApp: App {
         var seedDraft: OnboardingDraft? = nil
         var preselection: ProgramTabPreselection? = nil
         var initialTab: AppTab? = nil
+        var dragPreview: CGFloat? = nil
+        var adjustPreview: Bool? = nil
         #if DEBUG
         do {
             if let seed = try DebugSeed.parse(arguments: ProcessInfo.processInfo.arguments) {
@@ -32,6 +36,8 @@ struct HomeGymLogApp: App {
                 clock = seed.clock(calendar: live.calendar)
                 seedDraft = seed.initialDraft(calendar: live.calendar)
                 makeContainer = { try seed.makeContainer(calendar: live.calendar) }
+                dragPreview = seed.workoutDragPreview
+                adjustPreview = seed.workoutAdjustPreview
             }
             // Outside the seed branch: the selection arguments work on their own too.
             preselection = DebugProgramSelection.parse(arguments: ProcessInfo.processInfo.arguments)
@@ -46,6 +52,8 @@ struct HomeGymLogApp: App {
         self.seedDraft = seedDraft
         self.preselection = preselection
         self.initialTab = initialTab
+        self.dragPreview = dragPreview
+        self.adjustPreview = adjustPreview
         #if DEBUG
         if case .failure(let error) = containerResult {
             fatalError("SwiftData store failed to open: \(error)")
@@ -63,6 +71,8 @@ struct HomeGymLogApp: App {
                     .defaultAppStorage(defaults)
                     .environment(\.programTabPreselection, preselection)
                     .environment(\.initialTab, initialTab)
+                    .environment(\.workoutDragPreview, dragPreview)
+                    .environment(\.workoutAdjustPreview, adjustPreview)
             case .failure(let error):
                 StoreErrorView(error: error)
             }

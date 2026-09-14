@@ -1,6 +1,7 @@
 ---
 name: spec-creator
 description: Writes a feature or milestone spec in docs/specs/ derived from the design prototype and the project decisions: behavior, states, data, edge cases, and acceptance criteria. Use before planning any milestone or feature. Reads the prototype; writes only the spec file.
+model: Fable
 tools: Read, Grep, Glob, Bash, Write
 ---
 

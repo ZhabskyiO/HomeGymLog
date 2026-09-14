@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// Lays out the Program tab from already-mapped values. Every derived value is computed once per render.
-/// The screen writes nothing; taps only report a new selection upward.
+/// Taps report a new selection, or a session index to start, upward; the only store write is the shared start that
+/// `ProgramView` runs for a today or missed card.
 struct ProgramContent: View {
     let summaries: [SessionSummary]
     let selection: ProgramSelection
@@ -14,6 +15,8 @@ struct ProgramContent: View {
     let onSelectWeek: (Int) -> Void
     let onSelectDay: (Int, Int) -> Void
     let onInfo: (Exercise) -> Void
+    /// Receives the selected card's session index.
+    let onStart: (Int) -> Void
 
     var body: some View {
         let chips = ProgramTabStats.weekChips(sessions: summaries, calendar: calendar)
@@ -52,8 +55,9 @@ struct ProgramContent: View {
                       onSelect: { onSelectDay(focus.week, $0) })
             .padding(.top, 12)
         if let session = selected?.session {
-            SessionCard(session: session, state: HomeStats.sessionState(session, today: today, calendar: calendar),
-                        unit: unit, calendar: calendar, onInfo: onInfo)
+            let state = HomeStats.sessionState(session, today: today, calendar: calendar)
+            SessionCard(session: session, state: state, unit: unit, calendar: calendar, onInfo: onInfo,
+                        showsStart: WorkoutFlow.isStartable(state), onStart: { onStart(session.index) })
                 .padding(.top, 16)
         } else {
             RestCard().padding(.top, 16)
