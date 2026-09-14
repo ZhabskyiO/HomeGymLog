@@ -35,7 +35,9 @@ multiple-choice question when the slicing is not obvious.
    `insights/INSIGHTS.md`.
 5. Launch `architecture-reviewer` on the spec. Save its reply to `docs/reviews/<slug>-architecture.md`.
    If the verdict is rework, fix the spec (resume the same `spec-creator` agent with SendMessage so it
-   keeps context) and re-run once. Surface anything blocking to the user.
+   keeps context) and re-run once. Surface anything blocking to the user. If the review marks platform claims as
+   unverified, resume the same `researcher` with a scoped probe list in parallel with the spec revision, append its
+   addendum to `docs/reviews/<slug>-researcher.md`, and fold the results into the spec before planning.
 6. Launch `implementation-planner` → `docs/plans/<slug>.md`.
 7. Launch `plan-verifier` on the plan. Save its reply to `docs/reviews/<slug>-verifier-<round>.md`. If
    not PASS, fix the plan and re-verify scoped to the finding ids by resuming the same verifier: apply mechanical

@@ -11,9 +11,10 @@ enum WorkoutSeedError: Error, Equatable {
 /// Written through the workout store functions only, exactly as the screen writes, with timestamps derived from the
 /// seed's frozen `now`.
 enum WorkoutSeed {
-    /// `started`: wo-start and wo-swipe. `awaitingRating`: wo-rpe. `rated`: wo-adjust. `finishedSets`: summary.
+    /// `started`: wo-start and wo-swipe. `awaitingRating`: wo-rpe. `rated`: wo-adjust. `resting`: wo-rest.
+    /// `finishedSets`: summary.
     enum Stage {
-        case started, awaitingRating, rated, finishedSets
+        case started, awaitingRating, rated, resting, finishedSets
     }
 
     /// Seconds between consecutive set timestamps: set k is logged at `startedAt + 168·k`.
@@ -39,21 +40,28 @@ enum WorkoutSeed {
             try WorkoutLogStore.logSet(firstSet, at: firstLoggedAt, in: context)
         case .rated:
             try WorkoutLogStore.logSet(firstSet, at: firstLoggedAt, in: context)
-            try WorkoutLogStore.setRPE(7, on: firstSet, in: context)
+            // Rated at the logging instant: its rest ended long before `now` (stale, not drawn).
+            try WorkoutLogStore.setRPE(7, on: firstSet, at: firstLoggedAt, in: context)
+        case .resting:
+            try WorkoutLogStore.logSet(firstSet, at: firstLoggedAt, in: context)
+            // Rated 13 s before the frozen now: the 75 s rest reads "1:02" with 62/75 of the ring left.
+            try WorkoutLogStore.setRPE(7, on: firstSet, at: now.addingTimeInterval(-13), in: context)
         case .finishedSets:
             // Every set but the first first, then the first at one Marcy step above target: with its siblings already
-            // done, "Save & log set" carries 120 lb to nothing.
+            // done, "Save & log set" carries 120 lb to nothing. Each rating is stamped at its set's own instant; the
+            // last one leaves no set pending, so it clears the rest.
             var k = 0
             for exerciseSets in sets {
                 for set in exerciseSets {
                     k += 1
                     guard set !== firstSet else { continue }
-                    try WorkoutLogStore.logSet(set, at: startedAt.addingTimeInterval(setInterval * Double(k)), in: context)
-                    try WorkoutLogStore.setRPE(7, on: set, in: context)
+                    let loggedAt = startedAt.addingTimeInterval(setInterval * Double(k))
+                    try WorkoutLogStore.logSet(set, at: loggedAt, in: context)
+                    try WorkoutLogStore.setRPE(7, on: set, at: loggedAt, in: context)
                 }
             }
             try WorkoutLogStore.saveAndLogSet(firstSet, weightLb: 120, reps: 12, at: firstLoggedAt, in: context)
-            try WorkoutLogStore.setRPE(7, on: firstSet, in: context)
+            try WorkoutLogStore.setRPE(7, on: firstSet, at: firstLoggedAt, in: context)
         }
         return log
     }

@@ -153,7 +153,49 @@ are kept as history.
 - 2026-09-13 — `.fullScreenCover(item:)` bound to a query that is already non-nil at launch shows ~50 ms of the view
   underneath (shell `onAppear` fires first); switch in the root view instead. XCUITest element frames ignore
   `.offset`, so verify a drag offset by screenshot.
-- (expected areas still open: sheet + navigation interplay, timers surviving background)
+- 2026-09-14 — **`TimelineView(.explicit([date]))` never updates at its last (only) date** on iOS 17.5 or 26.5: a rest
+  overlay stayed at "0:00" and the row never re-activated. `.periodic(from: start, by: 1)` re-evaluated 11–17 ms after
+  the deadline. Recognize it: a view that should change at a deadline changes only after some other re-render.
+- 2026-09-14 — **`Text(timerInterval:pauseTime:countsDown: true)` shows elapsed time when paused** ("0:13", not "1:02"),
+  rounds half seconds differently on 17.5 and 26.5, and ignores the injected clock; a custom `ProgressViewStyle` on
+  `ProgressView(timerInterval:)` gets `fractionCompleted == nil`. For seedable countdowns use `TimelineView` +
+  `AppClock` + `Circle().trim`. Source: `docs/reviews/m3-rest-timer-researcher.md` Q2.
+- 2026-09-14 — **`.onChange(of:)` on a value computed inside a `TimelineView` closure must be attached inside that
+  closure.** There it fired once, 17–37 ms after the deadline (17.5 and 26.5); attached outside (value computed in the
+  parent's `body`) it never fired when time alone flipped the value, only when a save re-ran `body`. A `@State` write in
+  `body` logs "Modifying state during view update"; the same write in the handler logs nothing.
+- 2026-09-14 — A `.safeAreaInset` whose content changes height moves scrolled-to-bottom content by the difference in one
+  frame (46 pt when the rest card swaps back to the bar); `.animation(.easeInOut(duration: 0.3), value:)` turns it into
+  a slide. Content shorter than the screen does not move.
+- 2026-09-14 — **XCUITest still reports a SwiftUI `Text` marked `.accessibilityHidden(true)`** (iOS 17.5, rest card): the
+  hidden "Rest" title showed up as `StaticText, label: 'Rest'` beside the countdown (`label: 'Rest', value: 19 seconds`),
+  so `app.staticTexts["Rest"].value` failed four tests with "Multiple matching elements found" (`.exists` does not
+  fail on several matches; `.value`, `.label` and `.frame` do, and the test stops there). Whether VoiceOver also stops
+  on it is unverified (no VoiceOver on the simulator). Fix in tests: query by a unique attribute
+  (`label == 'Rest' AND value CONTAINS 'second'`) or `.firstMatch`. Recognize it: "Find single matching element" with
+  a sparse tree listing an element you hid. The same holds after grouping: with `.accessibilityElement(children:
+  .ignore)` plus label and value on a `VStack`, XCUITest lists the group as an `Other` element (`value: 1 minute 2
+  seconds`, no longer a `StaticText`) and still lists the inner "Rest" `Text` as a `StaticText` with an empty value, so
+  "exactly one element labelled X" cannot be asserted from XCUITest; VoiceOver checks stay manual.
+- (expected areas still open: sheet + navigation interplay)
+
+## User notifications
+
+- 2026-09-14 — **`UNUserNotificationCenter.add` before authorization is silently dropped**: no error, nothing pending,
+  never delivered (17.5 and 26.5). Await `requestAuthorization` first and compute the trigger interval *after* that
+  await; the permission prompt delayed one probe's notification by 2.5 s.
+- 2026-09-14 — **With no `UNUserNotificationCenterDelegate`, a foreground notification shows no banner and is not kept
+  in Notification Center** (17.5 and 26.5). This matches the SDK header, not the doc sentence about "original
+  options". A delegate returning `[.banner, .sound]` shows it; the property is `weak`, so retain the delegate.
+- 2026-09-14 — **A `.task(id:)` superseded while awaiting a completion-handler API resumes with `Task.isCancelled ==
+  true` and still runs to the end**: a slow first `schedule` overwrote the newer pending request (banner ~26 s early).
+  Fix: `guard !Task.isCancelled else { return }` after every await and before `center.add`. Also,
+  `removePendingNotificationRequests` is asynchronous: on 26.5 the pending count still read 1 about 0.2 s after
+  cancelling, 0 by 1.5 s; never assert 0 pending on the live center right after a cancel.
+- 2026-09-14 — **`UNTimeIntervalNotificationTrigger(timeInterval: 0, …)` terminates the app** (both runtimes). Guard
+  `interval > 0` and cancel instead.
+- 2026-09-14 — `xcrun simctl privacy` has no notifications service: reset the permission by uninstalling the app. In
+  XCUITest drive the prompt and banners through `XCUIApplication(bundleIdentifier: "com.apple.springboard")`.
 
 ## Xcode / build
 
@@ -228,6 +270,12 @@ are kept as history.
   in Product → Scheme → Manage Schemes (creates `HomeGymLog.xcodeproj/xcshareddata/xcschemes/`).
 
 ## Agent workflow
+
+- 2026-09-14 — **A subagent that ends its turn while its own `run_in_background` command is still running is not woken
+  when that command finishes.** The m3-rest-timer implementer reported "starts when the background run finishes and
+  notifies me" and then sat idle; it continued only after a SendMessage. Fix: agents run long builds in the foreground
+  (Bash timeout up to 600000 ms) or poll them to completion before ending the turn. Recognize it: an agent report that
+  ends with "waiting for" a run it started.
 
 - 2026-09-11 — A **new `.claude/agents/<name>.md` is not selectable as a `subagent_type` right away**; the Agent tool
   reports "Agent type '<name>' not found" until the agent list refreshes (it did a few turns later without a restart).

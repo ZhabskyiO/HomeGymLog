@@ -8,6 +8,11 @@ final class WorkoutLog {
     var startedAt: Date = Date.distantPast
     /// nil while in progress. The only in-progress indicator.
     var finishedAt: Date?
+    /// When the current rest began; nil when none is stored. Optional, so an existing store migrates with no default.
+    var restStartedAt: Date?
+    /// When the current rest ends; the card shows while now < restEndsAt. Nil on every finished log (the writers clear
+    /// it before the summary), so nothing outside the workout screen may read it as "a rest happened".
+    var restEndsAt: Date?
     var session: PlannedSession?
     /// Unordered in the store; read through `sortedExercises`.
     @Relationship(deleteRule: .cascade, inverse: \LoggedExercise.workout)

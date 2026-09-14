@@ -4,9 +4,11 @@ import SwiftData
 /// The full-screen workout. Owns the log's two live queries (≈ useQuery, re-fetched after every save, which is what
 /// keeps this view current on iOS 17), maps the rows to Engine values on every render, derives the state from them,
 /// and runs every write through `WorkoutLogStore` with `clock.now()` read at the action. Nothing on screen is stored
-/// state except presentation and the lazily built PR baseline, so a relaunch resumes exactly.
+/// state except presentation and the lazily built PR baseline, so a relaunch resumes exactly; the rest card derives from
+/// the log's two stored instants and the clock, and its effects (end announcement, notification) run only in handlers.
 struct WorkoutView: View {
-    /// The row passed to `discard`. Immutable fields are read once in `init`, never in `body`.
+    /// The row passed to the writers. Immutable fields are read once in `init`; the rest instants are read in `body`
+    /// (every save re-runs it) and never after Exit starts discarding.
     let log: WorkoutLog
     /// The root's Done handler, given the end instant; it switches to Home before finishing the log.
     let onDone: (Date) -> Void
@@ -25,8 +27,14 @@ struct WorkoutView: View {
     @State private var isDiscarding = false
     /// Exercise key → best weight before this workout; nil until the summary first shows (≈ a memo filled by an effect).
     @State private var bestsBefore: [String: Double]?
+    /// The rest end instant last seen while resting, for the "Rest over" rule (≈ a `useRef`: written only in effects).
+    @State private var lastSeenRestEnd: Date?
     @Environment(\.appClock) private var clock
     @Environment(\.modelContext) private var modelContext
+    /// Live in the app, silent in seeds and previews.
+    @Environment(\.restNotifier) private var notifier
+    /// Active, inactive or background (≈ `document.visibilityState`).
+    @Environment(\.scenePhase) private var scenePhase
     /// Nil except a DEBUG `-seed wo-adjust` launch, which opens the sheet on the active set as the screen appears.
     @Environment(\.workoutAdjustPreview) private var adjustPreview
     @AppStorage("units") private var unitsRaw = WeightUnit.lb.rawValue
@@ -55,9 +63,19 @@ struct WorkoutView: View {
                 WorkoutSummaryView(info: info, startedAt: startedAt, summary: summary, recordsReady: bestsBefore != nil, unit: unit,
                                    calendar: clock.calendar, onDone: { onDone(summary.endedAt) })
             } else {
-                WorkoutLoggingContent(info: info, startedAt: startedAt, exercises: exercises, state: state, sheetOpen: sheet != nil, unit: unit,
-                                      onExit: { exitTapped(exercises) }, onNext: nextExercise,
-                                      onLog: logSet, onAdjust: { openAdjust($0, in: exercises) }, onRate: rate, onSkipRating: skipRating)
+                // ≈ a setInterval the framework owns, anchored on the rest start so ticks land on whole rest seconds (spec 4.4)
+                TimelineView(.periodic(from: log.restStartedAt ?? startedAt, by: 1)) { _ in
+                    let rest = RestTimer.display(restStartedAt: log.restStartedAt, restEndsAt: log.restEndsAt, now: clock.now(),
+                                                 exercises: exercises, state: state)
+                    WorkoutLoggingContent(info: info, startedAt: startedAt, exercises: exercises, state: state, sheetOpen: sheet != nil,
+                                          unit: unit, rest: rest,
+                                          onExit: { exitTapped(exercises) }, onNext: nextExercise,
+                                          onLog: logSet, onAdjust: { openAdjust($0, in: exercises) }, onRate: rate, onSkipRating: skipRating,
+                                          onAddRest: addRest, onSkipRest: skipRest)
+                        // Once each and only here: outside this closure a time-based end never fires; twice, a save runs it twice.
+                        .onChange(of: rest != nil, initial: true) { _, resting in observeRestEnd(resting: resting) }   // ≈ useEffect(…, [resting])
+                        .onChange(of: log.restEndsAt) { observeRestEnd(resting: rest != nil) }
+                }
             }
         }
         .sheet(item: $sheet) { item in
@@ -91,6 +109,34 @@ struct WorkoutView: View {
             } catch {
                 assertionFailure("PR baseline failed: \(error)")
             }
+        }
+        // ≈ an effect whose AbortController fires when the id changes: schedules or cancels the rest notification.
+        .task(id: isDiscarding ? nil : log.restEndsAt) {
+            await notifier.reconcile(restEndsAt: isDiscarding ? nil : log.restEndsAt, clock: clock)
+        }
+        .onChange(of: scenePhase) { _, phase in   // ≈ a visibilitychange listener
+            if phase == .active {
+                notifier.removeDelivered()
+                guard !isDiscarding else { return }   // the log row is being deleted: never read its rest instants
+                observeRestEnd(resting: RestTimer.display(restStartedAt: log.restStartedAt, restEndsAt: log.restEndsAt, now: clock.now(),
+                                                          exercises: exercises, state: state) != nil)
+            } else {
+                lastSeenRestEnd = nil
+            }
+        }
+        .onDisappear { notifier.cancel() }
+    }
+
+    // MARK: Rest effects
+
+    /// Spec 5.5, run from change handlers only: stores the next last-seen end and posts "Rest over" when a rest the screen
+    /// saw ends by time in the foreground (≈ an `aria-live` message; nothing happens without VoiceOver).
+    private func observeRestEnd(resting: Bool) {
+        guard !isDiscarding else { return }
+        let result = RestTimer.observeEnd(lastSeenEndsAt: lastSeenRestEnd, restEndsAt: log.restEndsAt, resting: resting, now: clock.now())
+        lastSeenRestEnd = result.lastSeenEndsAt
+        if result.announce {
+            AccessibilityNotification.Announcement(RestText.restOver).post()
         }
     }
 
@@ -145,7 +191,7 @@ struct WorkoutView: View {
     private func rate(_ setID: UUID, _ rpe: Int) {
         guard let row = setRow(setID) else { return }
         do {
-            try WorkoutLogStore.setRPE(rpe, on: row, in: modelContext)
+            try WorkoutLogStore.setRPE(rpe, on: row, at: clock.now(), in: modelContext)
         } catch {
             assertionFailure("Set RPE failed: \(error)")
         }
@@ -154,9 +200,27 @@ struct WorkoutView: View {
     private func skipRating(_ setID: UUID) {
         guard let row = setRow(setID) else { return }
         do {
-            try WorkoutLogStore.skipRPE(on: row, in: modelContext)
+            try WorkoutLogStore.skipRPE(on: row, at: clock.now(), in: modelContext)
         } catch {
             assertionFailure("Skip RPE failed: \(error)")
+        }
+    }
+
+    /// Rest card "+30s": extends a live rest; a tap at or after its end writes nothing.
+    private func addRest() {
+        do {
+            try WorkoutLogStore.addRestTime(30, to: log, at: clock.now(), in: modelContext)
+        } catch {
+            assertionFailure("Add rest time failed: \(error)")
+        }
+    }
+
+    /// Rest card "Skip": clears the rest; the bar comes back and the rows are unchanged.
+    private func skipRest() {
+        do {
+            try WorkoutLogStore.skipRest(log, in: modelContext)
+        } catch {
+            assertionFailure("Skip rest failed: \(error)")
         }
     }
 
@@ -180,7 +244,8 @@ struct WorkoutView: View {
 
     /// Deletes the log; the root's query then routes back to the shell on the tab that was selected. The flag goes up
     /// first so no summary frame renders in between, and comes down again if the save failed (the rows stay in the
-    /// store, their deletes pending until the next successful save).
+    /// store, their deletes pending until the next successful save). The pending rest notification is cancelled when
+    /// the screen disappears.
     private func discard() {
         isDiscarding = true
         do {
@@ -200,5 +265,6 @@ struct WorkoutView: View {
     return WorkoutView(log: log, onDone: { _ in })
         .modelContainer(container)
         .environment(\.appClock, DebugSeed.woStart.clock(calendar: calendar))
+        .environment(\.restNotifier, .silent())
 }
 #endif

@@ -20,6 +20,7 @@ import Testing
         (DebugSeed.midProgram, 3, 10, 120, 7560.0, ["dbBench", "inclineDb", "shoulderPress", "pecDeck"], 3),
         // In-progress logs are never mapped, so the workout seeds read midProgram's numbers.
         (DebugSeed.woStart, 3, 10, 120, 7560.0, ["dbBench", "inclineDb", "shoulderPress", "pecDeck"], 3),
+        (DebugSeed.woRest, 3, 10, 120, 7560.0, ["dbBench", "inclineDb", "shoulderPress", "pecDeck"], 3),
         (DebugSeed.summary, 3, 10, 120, 7560.0, ["dbBench", "inclineDb", "shoulderPress", "pecDeck"], 3),
         (DebugSeed.restDay, 7, 14, 120, 49320.0, ["chestPress", "skull", "latPull", "lowRow"], 4),
         (DebugSeed.freshProgram, 0, 0, 16, 0.0, [], 1),

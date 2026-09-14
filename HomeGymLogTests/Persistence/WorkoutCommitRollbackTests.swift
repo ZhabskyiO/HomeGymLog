@@ -29,6 +29,9 @@ import Testing
         let sets: [[SetValues]]
         let finishedAt: Date?
         let sessionStatus: SessionStatus?
+        /// m3-rest-timer: the rating writers start a rest before the refused save, so these must be restored too.
+        let restStartedAt: Date?
+        let restEndsAt: Date?
 
         /// One line per field that differs from `other`, e.g. "E1S2 status pending → done", so a failure reads short.
         func changes(from other: LogValues) -> [String] {
@@ -49,6 +52,8 @@ import Testing
             note("set count", other.sets.flatMap { $0 }.count, sets.flatMap { $0 }.count)
             note("finishedAt", String(describing: other.finishedAt), String(describing: finishedAt))
             note("session status", String(describing: other.sessionStatus), String(describing: sessionStatus))
+            note("restStartedAt", String(describing: other.restStartedAt), String(describing: restStartedAt))
+            note("restEndsAt", String(describing: other.restEndsAt), String(describing: restEndsAt))
             return lines
         }
     }
@@ -64,7 +69,8 @@ import Testing
     private func values(_ log: WorkoutLog) -> LogValues {
         LogValues(sets: WorkoutStoreFixtures.sets(of: log).map { exercise in
             exercise.map { SetValues(status: $0.status, weightLb: $0.weightLb, reps: $0.reps, rpe: $0.rpe, rpeSkipped: $0.rpeSkipped, loggedAt: $0.loggedAt) }
-        }, finishedAt: log.finishedAt, sessionStatus: log.session?.status)
+        }, finishedAt: log.finishedAt, sessionStatus: log.session?.status,
+           restStartedAt: log.restStartedAt, restEndsAt: log.restEndsAt)
     }
 
     private func perform(_ action: Action, on log: WorkoutLog, in context: ModelContext) throws {
@@ -74,8 +80,8 @@ import Testing
         case .logSet: try WorkoutLogStore.logSet(sets[0][1], at: at, in: context)
         case .saveAndLogSet: try WorkoutLogStore.saveAndLogSet(sets[0][1], weightLb: 120, reps: 11, at: at, in: context)
         case .skipSet: try WorkoutLogStore.skipSet(sets[0][1], weightLb: 120, reps: 11, at: at, in: context)
-        case .setRPE: try WorkoutLogStore.setRPE(7, on: sets[0][0], in: context)
-        case .skipRPE: try WorkoutLogStore.skipRPE(on: sets[0][0], in: context)
+        case .setRPE: try WorkoutLogStore.setRPE(7, on: sets[0][0], at: at, in: context)
+        case .skipRPE: try WorkoutLogStore.skipRPE(on: sets[0][0], at: at, in: context)
         case .nextExercise: try WorkoutLogStore.nextExercise(log.sortedExercises[1], at: at, in: context)
         case .finish: try WorkoutLogStore.finish(log, at: at, in: context)
         }

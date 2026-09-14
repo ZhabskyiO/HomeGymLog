@@ -18,7 +18,8 @@ Run the test suite and report results honestly. Never edit production code from 
      [ -only-testing:<filter> ] 2>&1 | tee build/last-test.log | grep -E "✔|✘|Test Suite|Executed|error:|TEST (SUCCEEDED|FAILED)"
    ```
    Delete a stale `build/tests.xcresult` first; xcodebuild refuses to overwrite it. If the run fails before any test
-   with "Failed to clone device … stuck in creation state", re-run with `-parallel-testing-enabled NO`.
+   with "Failed to clone device … stuck in creation state", re-run with `-parallel-testing-enabled NO`. CoreData/SQLite `error:` lines and "save failed … Code=513" come from the
+   suites that force a failed save on purpose; judge the run by `TEST SUCCEEDED` and the result-bundle counts.
 4. If the build itself failed, report compiler errors as `path:line: message` and stop.
 5. For each failing test, pull the failure message from the log (`#expect` prints expected and actual).
    If the log is unclear, inspect the bundle:

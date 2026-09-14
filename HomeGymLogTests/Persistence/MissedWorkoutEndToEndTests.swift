@@ -27,7 +27,7 @@ import Testing
             for set in exercise {
                 k += 1
                 try WorkoutLogStore.logSet(set, at: now.addingTimeInterval(Double(60 * k)), in: context)
-                try WorkoutLogStore.setRPE(7, on: set, in: context)
+                try WorkoutLogStore.setRPE(7, on: set, at: now.addingTimeInterval(Double(60 * k)), in: context)
             }
         }
         #expect(k == 15)

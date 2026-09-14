@@ -49,6 +49,9 @@ developer new to Swift: add one-line React analogies in doc comments where a Swi
 11. Every test that builds a `ModelContainer` keeps it bound for the whole test (hold the `TestStore`, or
     `withExtendedLifetime(container) {}` at the end; never `let (_, context) = …`): on iOS 26.5 reading a model after its
     container is released crashes the entire test process.
+12. Never end your turn while a command you started in the background is still running: you are not woken when it
+    finishes. Run long builds and tests in the foreground (Bash timeout up to 600000 ms), or poll a background run to
+    completion, then continue.
 
 ## Report
 

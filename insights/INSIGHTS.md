@@ -6,6 +6,51 @@ Keep entries short. Date them. Newest at the top within each section.
 
 ## Architecture decisions
 
+### 2026-09-14 — M3 rest-timer decisions (from the m3-rest-timer slice spec, user-answered)
+
+- **Rest is two stored instants on `WorkoutLog`** (`restStartedAt`, `restEndsAt`, optional Dates, unversioned migration
+  verified): started by Set RPE, Skip RPE and Skip set when a pending set remains (including the next exercise's first
+  set), extended by +30s, cleared by Skip, Log set, Save & log and Next exercise. Resting is derived
+  (`now < restEndsAt` in `.logging`); nothing is written at zero (researcher m3-rest-timer).
+- **The next set stays swipeable during rest** (user chose over the prototype's blocked row): the focus row keeps its
+  accent border and "← →" under the overlay (a `wo-rest` deviation); a swipe, the "Log set" / "Adjust set" actions and
+  the adjust sheet all work mid-rest, and logging clears the rest in the same save.
+- **"Next exercise ›" is blocked during rest**: the overlay covers the bar, as in the prototype.
+- **At zero in the foreground** the overlay disappears and VoiceOver announces "Rest over" once (user chose over the
+  prototype's silent end; wording is the fixed "Rest over", not the next set); no announcement for Skip, a log, or a
+  relaunch past the end. Haptics stay M5.
+- **Architecture review (2026-09-14)**: the rest card **replaces the bottom bar inside the existing
+  `.safeAreaInset(edge: .bottom)`** (self-sizing, content kept clear, bar out of the tree), animated with
+  `.easeInOut(duration: 0.3)` on `rest != nil` (verified P1: card top y 704 / 726, 148 pt, rows scroll 16 pt clear). The
+  "Rest over" rule runs in `.onChange(of: resting)` / `.onChange(of: restEndsAt)` attached **inside** the timeline
+  closure (verified P2: outside, a time-based flip never fires), never as a `@State` write in `body`. Time-dependent
+  behaviour checks run on a live clock; `-seed` launches are screenshot-only. The live notifier checks
+  `Task.isCancelled` after every await and before `add` (verified P3: without it a superseded run overwrote the newer
+  request); `onDisappear` cancel runs on Exit → Discard (verified P4). (implemented 2026-09-14) The mount row uses
+  `.onChange(of: rest != nil, initial: true)` (`initial: true` ≈ a `useEffect` that also runs on mount) inside the
+  closure, a shape P2 had not probed: a `log stream` on `-seed wo-rest` showed no "Modifying state", so the plan's
+  `.onAppear` fallback was not needed. `observeRestEnd` and the scene-phase handler both return while `isDiscarding` is
+  set, the handler before it reads the log's rest instants (swift review item 1: reading a row that is being deleted can
+  trap on 26.5, gotchas SwiftData).
+- **Card accessibility** (implemented 2026-09-14): "Rest" and the countdown are one element
+  (`.accessibilityElement(children: .ignore)` ≈ one node with an `aria-label` whose children are hidden; label "Rest",
+  value the spoken time, `.updatesFrequently`), replacing an `.accessibilityHidden(true)` title that XCUITest still
+  listed (swift review item 2). "Next: …", "+30s" and "Skip" stay separate stops. XCUITest cannot confirm the single
+  element (gotchas SwiftUI), so the VoiceOver order stays a manual AC-11 check.
+- **Notifier seam**: `struct RestNotifier` of closures in `App/RestNotifier.swift` (the `AppClock` precedent, not a
+  protocol), `.live()` / `.silent()`, built over a `RestNotificationCenter` of four injected system calls so a test
+  recorder can hold the authorization await (`.live()` = `.using(.system())`, reading the system center lazily inside
+  each call), `@Entry` default `.live()` overridden to `.silent()` in the DEBUG seed branch;
+  `RestNotificationPlan.decide` (Engine) owns schedule-vs-cancel. Seeds, previews and tests never touch the system center.
+- **Invariant**: rest fields are nil on every finished log by construction; only the workout screen reads them, always
+  gated on `now < restEndsAt`. M4 history and Progress must not read `restEndsAt` as "a rest happened".
+- **M4 delegate rule**: if M4 installs a `UNUserNotificationCenterDelegate` for the reminder, it returns `[]` for the
+  `rest-timer` identifier, uses a different identifier for the reminder, and is installed in `App.init` and retained
+  (the delegate property is weak).
+- **Notifications**: permission is requested at the first rest (one prompt per install, reused by M4's reminder); denied
+  is silent this slice (M4 Settings shows status); text is generic "Rest over" / "Time for your next set."; no
+  notification delegate (a foreground app shows no banner). +30s is unlimited. Rest also runs between exercises.
+
 ### 2026-09-13 — M3 decisions (from the m3-logging slice spec, user-answered)
 
 - **M3 is three slices**, each merged before the next: `m3-logging` (workout screen, swipe/RPE/adjust, next exercise,
@@ -418,6 +463,25 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
 
 ## Agent tuning
 
+- 2026-09-14 (m3-rest-timer) — **implementer** stopped its turn while a scratch-copy `xcodebuild` it had started in the
+  background was still compiling ("starts when the background run finishes and notifies me"); a stopped subagent is not
+  woken by its own background command, so it needed a second prompt. Prompt edit (implementer, test-writer): never end
+  a turn with a background command running; run long builds in the foreground (timeout up to 600000 ms) or poll them to
+  completion. Otherwise it ran all 12 steps, the optional scratch-copy UI tests (7/7), and one fix round cleanly.
+- 2026-09-14 (m3-rest-timer) — **architecture-reviewer**'s new "unverified platform semantics" rule paid off: of its four
+  flagged items, the researcher's probe found `.onChange` on a timeline-derived value never fires when attached outside
+  the closure, which the reviewer's own proposed shape would have shipped. It also caught behaviour ACs written against
+  frozen-clock seeds. Its one miss: a grep-derived count (25 call sites) that included two test function names. No edit.
+- 2026-09-14 (m3-rest-timer) — **implementation-planner** added an optional scratch-copy XCUITest step for the live-clock
+  ACs, which verified AC-5–AC-10 without touching the repo while the user defers manual checks. Its static source tests
+  anchored on literal lines (`if let seed = try DebugSeed.parse`, an exact `var … Date?` line) and were flagged as brittle
+  by the test-writer. Prompt edits: plan that scratch-copy step whenever a slice has tap- or time-dependent ACs; static
+  source tests anchor on stable tokens and accept equivalent spellings.
+- 2026-09-14 (m3-rest-timer) — **researcher** (with addendum), **spec-creator**, **plan-verifier** (walked every row of the
+  announcement table under the plan's added triggers; scoped round 2 in 43 s), **swift-reviewer** (ship, accessibility
+  analysis) and **test-writer** (+42, no production bug) needed no re-prompt. **doc-writer** hit a session rate limit
+  before editing and was relaunched from scratch safely.
+
 - 2026-09-13 (m3-logging) — **researcher** was decisive: a scratch copy of the repo with a generated UI-test target gave
   real drags, cold-launch video frames and kill tests on both runtimes, and its migration addendum (a field without a
   default fails to open the store) went straight into the spec. Running it before spec-creator, because its answers
@@ -551,6 +615,11 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
   spec-creator in parallel at the start of `/milestone` saved a full round.
 
 ### Skill tuning
+- 2026-09-14 — **milestone**: step 5 now says that when the architecture review marks platform claims unverified, the
+  researcher is resumed for a scoped probe addendum in parallel with the spec revision (m3-rest-timer P1–P4 caught a
+  handler placement that would never have fired).
+- 2026-09-14 — **run-tests**: CoreData/SQLite `error:` lines and "save failed … Code=513" from the forced-failure suites
+  are expected noise; judge a run by `TEST SUCCEEDED` and the result-bundle counts, not by grepping `error:`.
 - 2026-09-13 — **ship-check**: step 4 now says a fix that introduces a new design (another `ModelContext`, a new API
   semantic, or a conflict with an INSIGHTS decision) gets a scoped reviewer re-run even without a blocking finding, and
   that only one `xcodebuild` may run at a time on the shared DerivedData (gate first; reviewer reads; test-writer after).
@@ -582,6 +651,29 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
   `DebugSeed` reference outside `#if DEBUG` that only Release could catch.
 
 ## Patterns
+
+### 2026-09-14 — Deadline-driven UI: store instants, derive in a periodic timeline, run effects inside the closure
+A countdown that must survive background and kill stores absolute instants, never a ticking value; the screen derives
+"is it live" every second, and side effects fire from `.onChange` attached inside the `TimelineView` closure (outside
+it a time-based flip never fires). ≈ a stored deadline plus a selector re-run by a framework-owned `setInterval`, with
+`useEffect` keyed on the derived boolean.
+
+```swift
+TimelineView(.periodic(from: log.restStartedAt ?? startedAt, by: 1)) { _ in
+    let rest = RestTimer.display(restStartedAt: log.restStartedAt, restEndsAt: log.restEndsAt, now: clock.now(), …)
+    WorkoutLoggingContent(/* … */ rest: rest)
+        .onChange(of: rest != nil, initial: true) { _, resting in observeRestEnd(resting: resting) }
+}
+```
+Nothing is written when the deadline passes; a relaunch after it shows the right screen from the instants alone.
+Used by m3-rest-timer (`WorkoutView`, `Engine/RestTimer`); M4's reminder and M5's Live Activity can reuse the shape.
+
+### 2026-09-14 — Probe local notifications through SpringBoard
+Extends the real-touch probe (below): tap Allow / Don't Allow on
+`XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts.firstMatch`, detect banners by label in the
+SpringBoard process (`label CONTAINS 'Rest over'`), and report app-side facts (pending and delivered counts, the
+scheduled interval) through a `-probeLog <path>` launch argument appended with flushed lines. Uninstall the app between
+permission scenarios (`simctl privacy` cannot reset notifications). Used by `docs/reviews/m3-rest-timer-researcher.md`.
 
 ### 2026-09-13 — Force a failed SwiftData save in a test: reopen an on-disk store with `allowsSave: false`
 In-memory stores never fail to save. Write the fixture through a normal on-disk container, then open the same file with
