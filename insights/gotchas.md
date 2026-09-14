@@ -111,6 +111,21 @@ are kept as history.
   Recognize it: a crash inside a delete helper right after a save in a different `ModelContext`.
 - 2026-09-13 — Swift Testing can lose issues recorded just before a process crash; a probe that may crash should write
   flushed lines to a file instead of relying on `#expect` messages.
+- 2026-09-14 — **On 26.5, after a failed save, restore-then-`rollback()` lets a refetch bring back an unsaved Codable array.**
+  The swap probe (`allowsSave: false`) restored `PlannedSession.exercises`, then rolled back: the object read the original,
+  but a `FetchDescriptor` refetch in the same context returned the edited array (scalars stayed restored; 17.5 correct).
+  Fix: reassign the array snapshot after `rollback()` (or roll back first, then restore); both refetch correctly on both
+  runtimes and leave `hasChanges == true`. Recognize it: a failed-save test that passes on object reads but fails once it
+  refetches. Source: `docs/reviews/m3-exercise-tools-researcher.md` Q4.
+- 2026-09-14 — **A failed insert does not undo in place even for a relationship-free row** (`ExerciseNote`, store reopened
+  with `allowsSave: false`). Nothing in the catch: the unsaved row stays in fetches and `@Query` (bar label "Notes ·", editor
+  reopens with the text); on 26.5 a fetch of all notes returns it **twice** while `fetchCount` says 2. `context.delete(note)`
+  without `rollback()`: `@Query` clean on both, but on 26.5 an immediate same-turn fetch still returns it. Fix: rehearse the
+  insert in a scratch `ModelContext` (clean on both). Recognize it: a fetch count that disagrees with the fetched array's
+  count after a failed save. Source: m3-exercise-tools researcher addendum P1.
+- 2026-09-14 — **`@ModelActor` created from the main actor runs its methods on the main thread** (17.5 and 26.5); created
+  inside `Task.detached` it runs off main. A four-hop nested-`flatMap` predicate fails to compile ("unable to type-check
+  this expression in reasonable time"); three hops compile and fetch. Source: m3-exercise-tools researcher Q5.
 - (expected areas still open: previews)
 
 ## Swift language
@@ -177,6 +192,19 @@ are kept as history.
   .ignore)` plus label and value on a `VStack`, XCUITest lists the group as an `Other` element (`value: 1 minute 2
   seconds`, no longer a `StaticText`) and still lists the inner "Rest" `Text` as a `StaticText` with an empty value, so
   "exactly one element labelled X" cannot be asserted from XCUITest; VoiceOver checks stay manual.
+- 2026-09-14 — **`.task(id: text)` as a debounced save runs on appear** with the initial text and inserted an empty
+  `ExerciseNote` before any typing (17.5 and 26.5). Recognize it: a row appears when a sheet merely opens. Save in
+  `.onChange(of: text)` instead (it does not fire on appear).
+- 2026-09-14 — **A keyboard inside a `.fraction(0.78)` sheet grows the sheet to nearly full height** (17.5 top 233.7 → 69;
+  26.5 → 62) and returns to the detent when the keyboard goes; the presenting screen's `.safeAreaInset` bar moves up behind
+  the sheet and is never visible above it. `TextField(axis: .vertical)` does not focus on a tap in its padding below the
+  text line (both runtimes); `TextEditor` focuses anywhere in its frame.
+- 2026-09-14 — **XCUITest: `.accessibilityIdentifier` on a plain container (a `VStack`) overwrites every descendant's
+  identifier** (swap rows all reported the container's id). Put identifiers on leaf controls. `element.tap()` on a vertical
+  `TextField` in a sheet does not focus it on 17.5 (a coordinate tap does); on 26.5 partial-detent sheets are inset and
+  scaled, so never assert sheet widths.
+- 2026-09-14 — **`onGeometryChange(for:of:action:)` is iOS 16.0**, not 18 (SDK interface, typechecked at 17.0, run on 17.5);
+  only its old/new two-value overload and `presentationSizing` are iOS 18.
 - (expected areas still open: sheet + navigation interplay)
 
 ## User notifications

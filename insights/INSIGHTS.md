@@ -6,6 +6,50 @@ Keep entries short. Date them. Newest at the top within each section.
 
 ## Architecture decisions
 
+### 2026-09-14 — M3 exercise-tools decisions (from the m3-exercise-tools slice spec, user-answered)
+
+- **Swap is enabled only while every set of the displayed exercise is pending** (the button dims otherwise, so always
+  during the RPE card; the store guard refuses too): a done weight is never credited to another key's records or pill.
+- **A swap writes the log and this session's plan** (`LoggedExercise` key, `swappedFromKey`, target, pending sets' weight,
+  and the `PlannedSession.exercises` element with the same `order`) in one save; future sessions are untouched. Exit →
+  Discard keeps the plan swapped (a restart shows the new exercise with no swap history). Swapping back to the planned key
+  clears `swappedFromKey`. Candidates: same muscle, not currently in the log, library order, weight from
+  `WeightFormula.targetWeightLb` at the session's stored week and phase.
+- **Empty candidate list** shows "Every <Muscle> exercise is already in this workout." (`wo-swap` on Lat Pulldown has 0
+  candidates in Pull; a `wo-swap-rdl` seed shows the five-row list).
+- **Progression pill** = focus set's stored weight − the top of the **most recent** finished appearance of the key in the
+  current program, text "↑ +X from your last <name>", hidden when no previous top or not greater. Baseline is the per-key
+  fetch (Patterns "Per-key history reads"), never the full `bestsBefore` traversal at mount.
+- **Notes**: one `ExerciseNote` per key, saved on every keystroke through `ExerciseNoteStore` (researcher: kill-safe, focus
+  and caret survive); cleared text is stored as ""; no auto-focus; label "Notes ·" verbatim when the text is non-empty,
+  else "Add note"; Home/Program info sheets unchanged. Editor is a `TextEditor` with an overlay placeholder.
+- **DEBUG**: `workoutAdjustPreview: Bool?` generalizes into `workoutSheetPreview: WorkoutSheetPreview?`
+  (`adjust`/`detail`/`swap`); new seeds `wo-detail`, `wo-swap`, `wo-swap-rdl`, `wo-notes`.
+- No schema change.
+- **Architecture review (2026-09-14)**: **insert writers rehearse, field writers restore** (B1): a writer that inserts
+  first saves and deletes the same row in a scratch `ModelContext` on the same container, so a refusing store throws before
+  the writing context changes; a writer that edits fields restores its snapshot, then `rollback()`. Callers of the rehearsal:
+  `WorkoutLogStore.start` and the insert branch of `ExerciseNoteStore.save` (never its update branch). Cost: three saves on
+  the first keystroke per key (measured ~3 ms on 17.5, ~20 ms on the 26.5 simulator), once per key. Accepted edge: a rehearsal insert
+  saved but its delete refused leaves the text stored, absorbed by the next keystroke's update. Reason: on 26.5 a failed
+  insert undone in place stays in same-context fetches and would drive the bar label from an unsaved row. `commit` and the
+  rehearsal move to a shared `Models/StoreCommit.swift` (NB3). Researcher addendum P1 (17.5 and 26.5): even a
+  relationship-free row does not undo cleanly in place (nothing in the catch shows "Notes ·" from an unsaved row; an in-place
+  delete still leaves it in a same-turn fetch on 26.5), so the rehearsal is required; P3: it never flashes a row into the query.
+- **Engine functions over stored rows are total** (B2): `SwapCandidates`, `ProgressionPill` and `WorkoutFlow.canSwap` never
+  throw (a stored `week < 1` computes as week 1); validation belongs at the generator boundary only.
+- **`WorkoutView` stays small** (B3): the `.sheet(item:)` content is `WorkoutSheetContent` in `WorkoutSheet.swift` with the
+  per-case presentation modifiers; one `openPreview` handler; `WorkoutFlow.displayedExercise(exercises:state:)` shared with
+  the logging content. Sheet ids are strings (`adjust-<setID>`, `detail-<key>`, `swap-<exerciseID>`); a sheet's draft lives in
+  its own `@State`, seeded from the query rows, never in the enum case.
+- **Pill baseline ownership**: screen `@State` `(key, tops)` filled by `.task(id: isDiscarding ? nil : displayedKey)` on
+  `mainContext`, drawn only when the held key equals the displayed key; finished logs cannot change during a workout, so
+  it is never re-fetched for the same key.
+- **A swap can never leave Home or Program stale** (NB9): the shell is unmounted during a workout and both cards read
+  `PlannedSession.exercises` from query rows in `body`; Home's `.task` fingerprint stays log-only.
+- **Bar button accessibility** (B4): label "Notes" (hint "Edit your note") / "Add note", matching the visible text; no
+  third string. Swap pick closes the sheet before writing (NB4).
+
 ### 2026-09-14 — M3 rest-timer decisions (from the m3-rest-timer slice spec, user-answered)
 
 - **Rest is two stored instants on `WorkoutLog`** (`restStartedAt`, `restEndsAt`, optional Dates, unversioned migration
@@ -87,7 +131,7 @@ Keep entries short. Date them. Newest at the top within each section.
   run with a pending insert or delete (gotchas SwiftData): **field writers** (log, save & log, skip set, RPE, skip RPE,
   next exercise, finish) snapshot the fields they change and restore them, then `rollback()`, then rethrow. **`discard`**
   deletes and saves in the writing context and rethrows; on failure the deletes stay pending (the root already shows the
-  shell) and the next successful save completes them. **`start` is the one exception to "all writers stay on
+  shell) and the next successful save completes them. (generalized 2026-09-14 into "insert writers rehearse", M3 exercise-tools decisions) **`start` is the first exception to "all writers stay on
   `mainContext`"**: on 26.5 a failed insert cannot be undone in the same context (the unsaved log stays in that context's
   routing fetch and reading it traps), so `start` first saves and deletes the same graph in a scratch `ModelContext` on
   the same container; a refusing store throws there before the writing context changes. Cost: two extra saves per
@@ -651,6 +695,14 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
   `DebugSeed` reference outside `#if DEBUG` that only Release could catch.
 
 ## Patterns
+
+### 2026-09-14 — Per-key history reads: fetch the key's rows, filter the program in Swift
+Never traverse the log history for one exercise. `FetchDescriptor<LoggedExercise>` with
+`exerciseKey == key && workout.flatMap { $0.finishedAt != nil } == true`, then keep rows whose
+`workout?.session?.program?.id == programID` in Swift. ~55 ms at program end on 17.5 versus ~0.44 s for the full
+`bestsBefore` traversal, identical results over 17 keys. Run it in `.task(id: key)` on `mainContext` (≈ `useEffect` keyed on
+the id); a `@ModelActor` made from the view still runs on the main thread. Source:
+`docs/reviews/m3-exercise-tools-researcher.md` Q5.
 
 ### 2026-09-14 — Deadline-driven UI: store instants, derive in a periodic timeline, run effects inside the closure
 A countdown that must survive background and kill stores absolute instants, never a ticking value; the screen derives
