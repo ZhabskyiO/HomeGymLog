@@ -26,7 +26,17 @@ Keep entries short. Date them. Newest at the top within each section.
   closure (verified P2: outside, a time-based flip never fires), never as a `@State` write in `body`. Time-dependent
   behaviour checks run on a live clock; `-seed` launches are screenshot-only. The live notifier checks
   `Task.isCancelled` after every await and before `add` (verified P3: without it a superseded run overwrote the newer
-  request); `onDisappear` cancel runs on Exit → Discard (verified P4).
+  request); `onDisappear` cancel runs on Exit → Discard (verified P4). (implemented 2026-09-14) The mount row uses
+  `.onChange(of: rest != nil, initial: true)` (`initial: true` ≈ a `useEffect` that also runs on mount) inside the
+  closure, a shape P2 had not probed: a `log stream` on `-seed wo-rest` showed no "Modifying state", so the plan's
+  `.onAppear` fallback was not needed. `observeRestEnd` and the scene-phase handler both return while `isDiscarding` is
+  set, the handler before it reads the log's rest instants (swift review item 1: reading a row that is being deleted can
+  trap on 26.5, gotchas SwiftData).
+- **Card accessibility** (implemented 2026-09-14): "Rest" and the countdown are one element
+  (`.accessibilityElement(children: .ignore)` ≈ one node with an `aria-label` whose children are hidden; label "Rest",
+  value the spoken time, `.updatesFrequently`), replacing an `.accessibilityHidden(true)` title that XCUITest still
+  listed (swift review item 2). "Next: …", "+30s" and "Skip" stay separate stops. XCUITest cannot confirm the single
+  element (gotchas SwiftUI), so the VoiceOver order stays a manual AC-11 check.
 - **Notifier seam**: `struct RestNotifier` of closures in `App/RestNotifier.swift` (the `AppClock` precedent, not a
   protocol), `.live()` / `.silent()`, built over a `RestNotificationCenter` of four injected system calls so a test
   recorder can hold the authorization await (`.live()` = `.using(.system())`, reading the system center lazily inside
@@ -453,6 +463,25 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
 
 ## Agent tuning
 
+- 2026-09-14 (m3-rest-timer) — **implementer** stopped its turn while a scratch-copy `xcodebuild` it had started in the
+  background was still compiling ("starts when the background run finishes and notifies me"); a stopped subagent is not
+  woken by its own background command, so it needed a second prompt. Prompt edit (implementer, test-writer): never end
+  a turn with a background command running; run long builds in the foreground (timeout up to 600000 ms) or poll them to
+  completion. Otherwise it ran all 12 steps, the optional scratch-copy UI tests (7/7), and one fix round cleanly.
+- 2026-09-14 (m3-rest-timer) — **architecture-reviewer**'s new "unverified platform semantics" rule paid off: of its four
+  flagged items, the researcher's probe found `.onChange` on a timeline-derived value never fires when attached outside
+  the closure, which the reviewer's own proposed shape would have shipped. It also caught behaviour ACs written against
+  frozen-clock seeds. Its one miss: a grep-derived count (25 call sites) that included two test function names. No edit.
+- 2026-09-14 (m3-rest-timer) — **implementation-planner** added an optional scratch-copy XCUITest step for the live-clock
+  ACs, which verified AC-5–AC-10 without touching the repo while the user defers manual checks. Its static source tests
+  anchored on literal lines (`if let seed = try DebugSeed.parse`, an exact `var … Date?` line) and were flagged as brittle
+  by the test-writer. Prompt edits: plan that scratch-copy step whenever a slice has tap- or time-dependent ACs; static
+  source tests anchor on stable tokens and accept equivalent spellings.
+- 2026-09-14 (m3-rest-timer) — **researcher** (with addendum), **spec-creator**, **plan-verifier** (walked every row of the
+  announcement table under the plan's added triggers; scoped round 2 in 43 s), **swift-reviewer** (ship, accessibility
+  analysis) and **test-writer** (+42, no production bug) needed no re-prompt. **doc-writer** hit a session rate limit
+  before editing and was relaunched from scratch safely.
+
 - 2026-09-13 (m3-logging) — **researcher** was decisive: a scratch copy of the repo with a generated UI-test target gave
   real drags, cold-launch video frames and kill tests on both runtimes, and its migration addendum (a field without a
   default fails to open the store) went straight into the spec. Running it before spec-creator, because its answers
@@ -586,6 +615,11 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
   spec-creator in parallel at the start of `/milestone` saved a full round.
 
 ### Skill tuning
+- 2026-09-14 — **milestone**: step 5 now says that when the architecture review marks platform claims unverified, the
+  researcher is resumed for a scoped probe addendum in parallel with the spec revision (m3-rest-timer P1–P4 caught a
+  handler placement that would never have fired).
+- 2026-09-14 — **run-tests**: CoreData/SQLite `error:` lines and "save failed … Code=513" from the forced-failure suites
+  are expected noise; judge a run by `TEST SUCCEEDED` and the result-bundle counts, not by grepping `error:`.
 - 2026-09-13 — **ship-check**: step 4 now says a fix that introduces a new design (another `ModelContext`, a new API
   semantic, or a conflict with an INSIGHTS decision) gets a scoped reviewer re-run even without a blocking finding, and
   that only one `xcodebuild` may run at a time on the shared DerivedData (gate first; reviewer reads; test-writer after).
@@ -617,6 +651,22 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
   `DebugSeed` reference outside `#if DEBUG` that only Release could catch.
 
 ## Patterns
+
+### 2026-09-14 — Deadline-driven UI: store instants, derive in a periodic timeline, run effects inside the closure
+A countdown that must survive background and kill stores absolute instants, never a ticking value; the screen derives
+"is it live" every second, and side effects fire from `.onChange` attached inside the `TimelineView` closure (outside
+it a time-based flip never fires). ≈ a stored deadline plus a selector re-run by a framework-owned `setInterval`, with
+`useEffect` keyed on the derived boolean.
+
+```swift
+TimelineView(.periodic(from: log.restStartedAt ?? startedAt, by: 1)) { _ in
+    let rest = RestTimer.display(restStartedAt: log.restStartedAt, restEndsAt: log.restEndsAt, now: clock.now(), …)
+    WorkoutLoggingContent(/* … */ rest: rest)
+        .onChange(of: rest != nil, initial: true) { _, resting in observeRestEnd(resting: resting) }
+}
+```
+Nothing is written when the deadline passes; a relaunch after it shows the right screen from the instants alone.
+Used by m3-rest-timer (`WorkoutView`, `Engine/RestTimer`); M4's reminder and M5's Live Activity can reuse the shape.
 
 ### 2026-09-14 — Probe local notifications through SpringBoard
 Extends the real-touch probe (below): tap Allow / Don't Allow on

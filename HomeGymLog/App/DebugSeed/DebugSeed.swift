@@ -8,7 +8,7 @@ enum DebugSeedError: Error, Equatable {
 
 /// Launch-argument seeds mirroring the prototype's Tweaks, so `/design-compare` can reach every screen.
 /// `xcrun simctl launch <udid> <bundle> -seed ob3`. Compiled out of Release (this whole file is `#if DEBUG`).
-/// A seeded run uses an in-memory store, a throwaway preferences suite, and a frozen clock.
+/// A seeded run uses an in-memory store, a throwaway preferences suite, a frozen clock and a silent rest notifier.
 enum DebugSeed: String, CaseIterable {
     case onboarding, ob1, ob2, ob3, ob4, ob5, midProgram, missed
     /// midProgram data with sessions 11–14 also completed; today is Sat 2026-09-19, a rest day.
@@ -23,6 +23,8 @@ enum DebugSeed: String, CaseIterable {
     case woRPE = "wo-rpe"
     /// `wo-start` with set 1 logged at RPE 7 and the adjust sheet open on set 2.
     case woAdjust = "wo-adjust"
+    /// `wo-start` with set 1 rated RPE 7 thirteen seconds ago: the rest card reads "1:02" of 75 s, "Next: set 2 of 3".
+    case woRest = "wo-rest"
     /// Session 11 started 42:00 ago with every set logged (set 1 at 120 lb): the summary screen.
     case summary = "summary"
 
@@ -38,7 +40,7 @@ enum DebugSeed: String, CaseIterable {
     func referenceDate(calendar: Calendar) -> Date {
         let day: DateComponents
         switch self {
-        case .midProgram, .missed, .woStart, .woSwipe, .woRPE, .woAdjust, .summary:
+        case .midProgram, .missed, .woStart, .woSwipe, .woRPE, .woAdjust, .woRest, .summary:
             day = DateComponents(year: 2026, month: 9, day: 15, hour: 12)
         case .restDay: day = DateComponents(year: 2026, month: 9, day: 19, hour: 12)
         case .freshProgram: day = DateComponents(year: 2026, month: 8, day: 31, hour: 12)
@@ -60,7 +62,7 @@ enum DebugSeed: String, CaseIterable {
             let draft = OnboardingDraft(months: 6, frequency: 5)
             for _ in 0..<onboardingSteps { draft.advance(now: referenceDate(calendar: calendar), calendar: calendar) }
             return draft
-        case .midProgram, .missed, .restDay, .freshProgram, .woStart, .woSwipe, .woRPE, .woAdjust, .summary:
+        case .midProgram, .missed, .restDay, .freshProgram, .woStart, .woSwipe, .woRPE, .woAdjust, .woRest, .summary:
             return nil
         }
     }
@@ -75,7 +77,7 @@ enum DebugSeed: String, CaseIterable {
             try MidProgramSeed.populate(in: container.mainContext, calendar: calendar, completedIndexes: Array(0...14).filter { $0 != 7 })
         case .freshProgram:
             try FreshProgramSeed.populate(in: container.mainContext, calendar: calendar)
-        case .woStart, .woSwipe, .woRPE, .woAdjust, .summary:
+        case .woStart, .woSwipe, .woRPE, .woAdjust, .woRest, .summary:
             try MidProgramSeed.populate(in: container.mainContext, calendar: calendar)
             if let workoutStage {
                 try WorkoutSeed.populate(workoutStage, now: referenceDate(calendar: calendar), in: container.mainContext)
@@ -92,6 +94,7 @@ enum DebugSeed: String, CaseIterable {
         case .woStart, .woSwipe: return .started
         case .woRPE: return .awaitingRating
         case .woAdjust: return .rated
+        case .woRest: return .resting
         case .summary: return .finishedSets
         default: return nil
         }

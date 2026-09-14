@@ -3,7 +3,7 @@ import SwiftData
 
 /// App entry point. Builds the SwiftData container once into a `Result` so a failure to open the store can be
 /// shown instead of trapping (debug builds still crash, loudly). A DEBUG `-seed` launch swaps in an in-memory
-/// container, a throwaway preferences suite, and a frozen clock; everything below the root is identical.
+/// container, a throwaway preferences suite, a frozen clock and a silent rest notifier; everything below the root is identical.
 @main
 struct HomeGymLogApp: App {
     private let containerResult: Result<ModelContainer, Error>
@@ -15,6 +15,9 @@ struct HomeGymLogApp: App {
     private let initialTab: AppTab?
     private let dragPreview: CGFloat?
     private let adjustPreview: Bool?
+    /// Nil except a DEBUG `-seed` launch, which silences rest notifications; every other launch keeps the environment's
+    /// live default.
+    private let restNotifier: RestNotifier?
 
     init() {
         let live = AppClock.live()   // the only place the real clock is read
@@ -27,6 +30,7 @@ struct HomeGymLogApp: App {
         var initialTab: AppTab? = nil
         var dragPreview: CGFloat? = nil
         var adjustPreview: Bool? = nil
+        var restNotifier: RestNotifier? = nil
         #if DEBUG
         do {
             if let seed = try DebugSeed.parse(arguments: ProcessInfo.processInfo.arguments) {
@@ -38,6 +42,7 @@ struct HomeGymLogApp: App {
                 makeContainer = { try seed.makeContainer(calendar: live.calendar) }
                 dragPreview = seed.workoutDragPreview
                 adjustPreview = seed.workoutAdjustPreview
+                restNotifier = .silent()   // seeds freeze the clock: screenshot-only, never a real notification
             }
             // Outside the seed branch: the selection arguments work on their own too.
             preselection = DebugProgramSelection.parse(arguments: ProcessInfo.processInfo.arguments)
@@ -54,6 +59,7 @@ struct HomeGymLogApp: App {
         self.initialTab = initialTab
         self.dragPreview = dragPreview
         self.adjustPreview = adjustPreview
+        self.restNotifier = restNotifier
         #if DEBUG
         if case .failure(let error) = containerResult {
             fatalError("SwiftData store failed to open: \(error)")
@@ -73,6 +79,10 @@ struct HomeGymLogApp: App {
                     .environment(\.initialTab, initialTab)
                     .environment(\.workoutDragPreview, dragPreview)
                     .environment(\.workoutAdjustPreview, adjustPreview)
+                    // ≈ a provider that overrides a context value only when a prop is set; otherwise the live default stays.
+                    .transformEnvironment(\.restNotifier) { value in
+                        if let override = restNotifier { value = override }
+                    }
             case .failure(let error):
                 StoreErrorView(error: error)
             }

@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// Lays out the logging screen from Engine values: header, the displayed exercise with its set rows, the hint and the
-/// RPE card in a scroll view, and the pinned bottom bar. Every derived value comes from `WorkoutFlow`; taps and swipes
-/// report row ids upward, never positions.
+/// RPE card in a scroll view, and the pinned bottom bar, or the rest card in its place while resting. Every derived value
+/// comes from `WorkoutFlow` and `RestTimer`; taps and swipes report row ids upward, never positions.
 struct WorkoutLoggingContent: View {
     let info: WorkoutSessionInfo
     let startedAt: Date
@@ -11,6 +11,8 @@ struct WorkoutLoggingContent: View {
     let state: WorkoutState
     let sheetOpen: Bool
     let unit: WeightUnit
+    /// The rest card's values while resting; nil shows the bottom bar.
+    let rest: RestDisplay?
     let onExit: () -> Void
     /// Receives the displayed exercise's id.
     let onNext: (UUID) -> Void
@@ -19,6 +21,9 @@ struct WorkoutLoggingContent: View {
     let onAdjust: (UUID) -> Void
     let onRate: (UUID, Int) -> Void
     let onSkipRating: (UUID) -> Void
+    /// Rest card "+30s" and "Skip".
+    let onAddRest: () -> Void
+    let onSkipRest: () -> Void
 
     var body: some View {
         let displayed = WorkoutFlow.displayedExercise(state) ?? 0
@@ -61,16 +66,23 @@ struct WorkoutLoggingContent: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        // `.safeAreaInset(edge: .bottom)` ≈ a sticky footer the scroll content ends above.
+        // `.safeAreaInset(edge: .bottom)` ≈ a sticky footer the scroll content ends above. Its child switches between the
+        // bar and the rest card, so the content always clears whichever is shown and the bar leaves the tree while resting.
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            WorkoutBottomBar(nextEnabled: WorkoutFlow.nextExerciseEnabled(state), onNext: {
-                if let exercise { onNext(exercise.id) }
-            })
-            .padding(.horizontal, 18)
-            .padding(.top, 14)
-            .padding(.bottom, 8)
-            .background(Theme.bg)
+            if let rest {
+                RestOverlay(rest: rest, onAdd: onAddRest, onSkip: onSkipRest)
+            } else {
+                WorkoutBottomBar(nextEnabled: WorkoutFlow.nextExerciseEnabled(state), onNext: {
+                    if let exercise { onNext(exercise.id) }
+                })
+                .padding(.horizontal, 18)
+                .padding(.top, 14)
+                .padding(.bottom, 8)
+                .background(Theme.bg)
+            }
         }
+        // The card is 46 pt taller than the bar: animating the swap slides scrolled-to-bottom content instead of jumping it.
+        .animation(.easeInOut(duration: 0.3), value: rest != nil)
         .background(Theme.bg.ignoresSafeArea())
     }
 

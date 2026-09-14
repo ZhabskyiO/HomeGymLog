@@ -4,6 +4,8 @@ import SwiftData
 enum WorkoutLogStoreError: Error, Equatable {
     /// An RPE outside 6…10; nothing was written.
     case invalidRPE(Int)
+    /// A rest extension of zero or fewer seconds; nothing was written.
+    case invalidRestExtension(Int)
 }
 
 /// Model-layer actions on workout logs. Deletion is explicit because the iOS 17 runtime does not
@@ -40,6 +42,25 @@ enum WorkoutLogStore {
             set.rpe = rpe
             set.rpeSkipped = rpeSkipped
             set.loggedAt = loggedAt
+        }
+    }
+
+    /// The log's two rest instants, read before a writer changes them so a failed save can put them back. A nil log
+    /// (a set with no exercise or workout) restores nothing.
+    private struct RestSnapshot {
+        let log: WorkoutLog?
+        let startedAt: Date?
+        let endsAt: Date?
+
+        init(_ log: WorkoutLog?) {
+            self.log = log
+            startedAt = log?.restStartedAt
+            endsAt = log?.restEndsAt
+        }
+
+        func restore() {
+            log?.restStartedAt = startedAt
+            log?.restEndsAt = endsAt
         }
     }
 
@@ -120,7 +141,8 @@ enum WorkoutLogStore {
     }
 
     /// The single writer of completion: sets `finishedAt` and marks the session completed in one save,
-    /// upholding "completed iff the log is finished".
+    /// upholding "completed iff the log is finished". The rest instants are untouched: every path into the summary has
+    /// already cleared them.
     static func finish(_ log: WorkoutLog, at: Date, in context: ModelContext) throws {
         let previousFinishedAt = log.finishedAt
         let previousStatusRaw = log.session?.statusRaw
@@ -132,31 +154,84 @@ enum WorkoutLogStore {
         }
     }
 
+    // MARK: Rest (spec 4.2)
+
+    /// Starts a rest of the session's `restSeconds` at `at` when any set of the log is still pending (the next exercise's
+    /// first set included); otherwise, and when the log has no session or a rest that is not positive, clears it. This is
+    /// the single writer of "a rest exists ⇒ a pending set exists", so seeds, tests and the screen cannot disagree.
+    /// Does not save.
+    private static func startRestIfSetFollows(_ log: WorkoutLog?, at: Date) {
+        guard let log else { return }
+        let pendingRemains = log.exercises.contains { exercise in exercise.sets.contains { $0.status == .pending } }
+        let seconds = log.session?.restSeconds ?? 0
+        if pendingRemains && seconds > 0 {
+            log.restStartedAt = at
+            log.restEndsAt = at.addingTimeInterval(TimeInterval(seconds))
+        } else {
+            clearRest(log)
+        }
+    }
+
+    /// Clears both rest instants. Does not save.
+    private static func clearRest(_ log: WorkoutLog?) {
+        log?.restStartedAt = nil
+        log?.restEndsAt = nil
+    }
+
+    /// Rest card "+30s": moves the end `seconds` later, so the total grows by the same amount; the start stays. Throws
+    /// `invalidRestExtension` for `seconds ≤ 0` before looking at the log. Returns false and saves nothing unless a rest
+    /// is stored and still live at `at` (a tap as the rest ends is a no-op). Unlimited.
+    @discardableResult
+    static func addRestTime(_ seconds: Int, to log: WorkoutLog, at: Date, in context: ModelContext) throws -> Bool {
+        guard seconds > 0 else { throw WorkoutLogStoreError.invalidRestExtension(seconds) }
+        guard let endsAt = log.restEndsAt, at < endsAt else { return false }
+        let rest = RestSnapshot(log)
+        log.restEndsAt = endsAt.addingTimeInterval(TimeInterval(seconds))
+        try commit(context) { rest.restore() }
+        return true
+    }
+
+    /// Rest card "Skip": clears both instants. Returns false and saves nothing when no rest is stored; a stale rest that
+    /// already ended is cleared too, harmlessly.
+    @discardableResult
+    static func skipRest(_ log: WorkoutLog, in context: ModelContext) throws -> Bool {
+        guard log.restEndsAt != nil else { return false }
+        let rest = RestSnapshot(log)
+        clearRest(log)
+        try commit(context) { rest.restore() }
+        return true
+    }
+
     // MARK: Set writers
     // Each is guarded: when the row is no longer in the expected state (a double swipe, a second RPE tap before the
     // redraw, a rating after Skip) it returns false before mutating anything and saves nothing. Otherwise it snapshots
-    // the sets it will change, writes, and commits, and returns true. `at` is always `clock.now()` read at the action.
+    // the sets and the rest instants it will change, writes, and commits, and returns true. `at` is always `clock.now()`
+    // read at the action.
 
     /// Swipe right / "Log set": a pending set becomes done at its stored weight and reps. RPE fields stay as they are.
+    /// Clears any rest in the same save (the set can be logged mid-rest).
     @discardableResult
     static func logSet(_ set: LoggedSet, at: Date, in context: ModelContext) throws -> Bool {
         guard set.status == .pending else { return false }
         let snapshot = SetSnapshot(set)
+        let rest = RestSnapshot(set.exercise?.workout)
         set.status = .done
         set.loggedAt = at
-        try commit(context) { snapshot.restore() }
+        clearRest(set.exercise?.workout)
+        try commit(context) { snapshot.restore(); rest.restore() }
         return true
     }
 
     /// Adjust sheet "Save & log set": this pending set takes the draft's weight (lb) and reps and becomes done; the
     /// same exercise's pending sets with a greater `order` take the weight and reps too and stay pending (carry).
-    /// Done or skipped sets, tied `order` values and other exercises are never touched.
+    /// Done or skipped sets, tied `order` values and other exercises are never touched. Clears any rest.
     @discardableResult
     static func saveAndLogSet(_ set: LoggedSet, weightLb: Double, reps: Int, at: Date, in context: ModelContext) throws -> Bool {
         guard set.status == .pending else { return false }
         let order = set.order
         let carried = (set.exercise?.sets ?? []).filter { $0.order > order && $0.status == .pending }
         let snapshots = ([set] + carried).map(SetSnapshot.init)
+        let rest = RestSnapshot(set.exercise?.workout)
         set.weightLb = weightLb
         set.reps = reps
         set.status = .done
@@ -165,20 +240,24 @@ enum WorkoutLogStore {
             sibling.weightLb = weightLb
             sibling.reps = reps
         }
-        try commit(context) { snapshots.forEach { $0.restore() } }
+        clearRest(set.exercise?.workout)
+        try commit(context) { snapshots.forEach { $0.restore() }; rest.restore() }
         return true
     }
 
-    /// Adjust sheet "Skip set": this pending set only takes the draft's weight (lb) and reps and becomes skipped.
+    /// Adjust sheet "Skip set": this pending set only takes the draft's weight (lb) and reps and becomes skipped. Starts a
+    /// new rest from `at` when a set remains (replacing any live one), else clears it.
     @discardableResult
     static func skipSet(_ set: LoggedSet, weightLb: Double, reps: Int, at: Date, in context: ModelContext) throws -> Bool {
         guard set.status == .pending else { return false }
         let snapshot = SetSnapshot(set)
+        let rest = RestSnapshot(set.exercise?.workout)
         set.weightLb = weightLb
         set.reps = reps
         set.status = .skipped
         set.loggedAt = at
-        try commit(context) { snapshot.restore() }
+        startRestIfSetFollows(set.exercise?.workout, at: at)
+        try commit(context) { snapshot.restore(); rest.restore() }
         return true
     }
 
@@ -188,29 +267,34 @@ enum WorkoutLogStore {
     }
 
     /// RPE card pick. Throws `invalidRPE` for anything outside 6…10 before looking at the set; otherwise writes
-    /// `rpe` only when the set awaits a rating.
+    /// `rpe` only when the set awaits a rating, and starts a rest from `at` when a set remains (else clears it).
     @discardableResult
-    static func setRPE(_ rpe: Int, on set: LoggedSet, in context: ModelContext) throws -> Bool {
+    static func setRPE(_ rpe: Int, on set: LoggedSet, at: Date, in context: ModelContext) throws -> Bool {
         guard (6...10).contains(rpe) else { throw WorkoutLogStoreError.invalidRPE(rpe) }
         guard awaitsRating(set) else { return false }
         let snapshot = SetSnapshot(set)
+        let rest = RestSnapshot(set.exercise?.workout)
         set.rpe = rpe
-        try commit(context) { snapshot.restore() }
+        startRestIfSetFollows(set.exercise?.workout, at: at)
+        try commit(context) { snapshot.restore(); rest.restore() }
         return true
     }
 
-    /// RPE card "Skip": stores that the prompt was dismissed, under the same guard as `setRPE`.
+    /// RPE card "Skip": stores that the prompt was dismissed, under the same guard as `setRPE`, and rests the same way.
     @discardableResult
-    static func skipRPE(on set: LoggedSet, in context: ModelContext) throws -> Bool {
+    static func skipRPE(on set: LoggedSet, at: Date, in context: ModelContext) throws -> Bool {
         guard awaitsRating(set) else { return false }
         let snapshot = SetSnapshot(set)
+        let rest = RestSnapshot(set.exercise?.workout)
         set.rpeSkipped = true
-        try commit(context) { snapshot.restore() }
+        startRestIfSetFollows(set.exercise?.workout, at: at)
+        try commit(context) { snapshot.restore(); rest.restore() }
         return true
     }
 
     /// "Next exercise ›": every pending set of the exercise becomes skipped. Does nothing while one of its done
     /// sets awaits a rating (keeps "only the last non-pending set may await RPE"), or when no set is pending.
+    /// Clears any stored rest (the button is not on screen while resting; this is the guard).
     @discardableResult
     static func nextExercise(_ exercise: LoggedExercise, at: Date, in context: ModelContext) throws -> Bool {
         let sets = exercise.sets
@@ -218,11 +302,13 @@ enum WorkoutLogStore {
         let pending = sets.filter { $0.status == .pending }
         guard !pending.isEmpty else { return false }
         let snapshots = pending.map(SetSnapshot.init)
+        let rest = RestSnapshot(exercise.workout)
         for set in pending {
             set.status = .skipped
             set.loggedAt = at
         }
-        try commit(context) { snapshots.forEach { $0.restore() } }
+        clearRest(exercise.workout)
+        try commit(context) { snapshots.forEach { $0.restore() }; rest.restore() }
         return true
     }
 

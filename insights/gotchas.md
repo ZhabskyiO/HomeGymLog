@@ -167,6 +167,16 @@ are kept as history.
 - 2026-09-14 — A `.safeAreaInset` whose content changes height moves scrolled-to-bottom content by the difference in one
   frame (46 pt when the rest card swaps back to the bar); `.animation(.easeInOut(duration: 0.3), value:)` turns it into
   a slide. Content shorter than the screen does not move.
+- 2026-09-14 — **XCUITest still reports a SwiftUI `Text` marked `.accessibilityHidden(true)`** (iOS 17.5, rest card): the
+  hidden "Rest" title showed up as `StaticText, label: 'Rest'` beside the countdown (`label: 'Rest', value: 19 seconds`),
+  so `app.staticTexts["Rest"].value` failed four tests with "Multiple matching elements found" (`.exists` does not
+  fail on several matches; `.value`, `.label` and `.frame` do, and the test stops there). Whether VoiceOver also stops
+  on it is unverified (no VoiceOver on the simulator). Fix in tests: query by a unique attribute
+  (`label == 'Rest' AND value CONTAINS 'second'`) or `.firstMatch`. Recognize it: "Find single matching element" with
+  a sparse tree listing an element you hid. The same holds after grouping: with `.accessibilityElement(children:
+  .ignore)` plus label and value on a `VStack`, XCUITest lists the group as an `Other` element (`value: 1 minute 2
+  seconds`, no longer a `StaticText`) and still lists the inner "Rest" `Text` as a `StaticText` with an empty value, so
+  "exactly one element labelled X" cannot be asserted from XCUITest; VoiceOver checks stay manual.
 - (expected areas still open: sheet + navigation interplay)
 
 ## User notifications
@@ -260,6 +270,12 @@ are kept as history.
   in Product → Scheme → Manage Schemes (creates `HomeGymLog.xcodeproj/xcshareddata/xcschemes/`).
 
 ## Agent workflow
+
+- 2026-09-14 — **A subagent that ends its turn while its own `run_in_background` command is still running is not woken
+  when that command finishes.** The m3-rest-timer implementer reported "starts when the background run finishes and
+  notifies me" and then sat idle; it continued only after a SendMessage. Fix: agents run long builds in the foreground
+  (Bash timeout up to 600000 ms) or poll them to completion before ending the turn. Recognize it: an agent report that
+  ends with "waiting for" a run it started.
 
 - 2026-09-11 — A **new `.claude/agents/<name>.md` is not selectable as a `subagent_type` right away**; the Agent tool
   reports "Agent type '<name>' not found" until the agent list refreshes (it did a few turns later without a restart).

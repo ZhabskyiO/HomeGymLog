@@ -4,7 +4,8 @@ import SwiftData
 import Testing
 @testable import HomeGymLog
 
-/// AC-38: the five workout seeds hold exactly the rows of the spec's seed table and derive the expected state.
+/// AC-38: the six workout seeds hold exactly the rows of the spec's seed table and derive the expected state.
+/// m3-rest-timer AC-28: each seed's rest instants, and the `wo-rest` card values at the frozen now.
 @MainActor
 @Suite struct WorkoutSeedTests {
     private let cal = TestCalendar.calendar
@@ -25,7 +26,7 @@ import Testing
         switch seed {
         case .woRPE:
             rows[0] = Row(status: .done, rpe: nil, weightLb: 110, loggedOffset: 168)
-        case .woAdjust:
+        case .woAdjust, .woRest:
             rows[0] = Row(status: .done, rpe: 7, weightLb: 110, loggedOffset: 168)
         case .summary:
             let weights: [Double] = [120, 110, 110, 100, 100, 100, 47.5, 47.5, 47.5, 52.5, 52.5, 52.5, 27.5, 27.5, 27.5]
@@ -41,6 +42,7 @@ import Testing
         (DebugSeed.woSwipe, 754.0, WorkoutState.logging(exercise: 0, set: 0)),
         (DebugSeed.woRPE, 754.0, WorkoutState.rpePending(exercise: 0, set: 0)),
         (DebugSeed.woAdjust, 754.0, WorkoutState.logging(exercise: 0, set: 1)),
+        (DebugSeed.woRest, 754.0, WorkoutState.logging(exercise: 0, set: 1)),
         (DebugSeed.summary, 2520.0, WorkoutState.summary),
     ])
     func seed(seed: DebugSeed, secondsBeforeNoon: Double, state: WorkoutState) throws {
@@ -70,6 +72,41 @@ import Testing
 
         let completed = try fresh.fetch(FetchDescriptor<PlannedSession>()).filter { $0.status == .completed }.map(\.index).sorted()
         #expect(completed == [0, 1, 2, 3, 4, 5, 6, 8, 9, 10])
+    }
+
+    /// Rest instants as seconds from noon (nil when not stored), per seed table.
+    @Test("rest instants per seed; wo-adjust is stale and not resting; wo-rest reads 1:02, 62/75, set 2 of 3", arguments: [
+        (DebugSeed.woStart, nil, nil),
+        (DebugSeed.woSwipe, nil, nil),
+        (DebugSeed.woRPE, nil, nil),
+        (DebugSeed.woAdjust, -586.0, -511.0),
+        (DebugSeed.woRest, -13.0, 62.0),
+        (DebugSeed.summary, nil, nil),
+    ] as [(DebugSeed, Double?, Double?)])
+    func restInstants(seed: DebugSeed, startOffset: Double?, endOffset: Double?) throws {
+        let container = try seed.makeContainer(calendar: cal)
+        defer { withExtendedLifetime(container) {} }   // keep the store alive while rows are read (26.5)
+        let fresh = ModelContext(container)
+        let log = try #require(try fresh.fetch(FetchDescriptor(predicate: WorkoutSnapshotBuilder.inProgressPredicate)).first)
+        #expect(log.restStartedAt == startOffset.map { Self.noon.addingTimeInterval($0) })
+        #expect(log.restEndsAt == endOffset.map { Self.noon.addingTimeInterval($0) })
+
+        let exerciseRows = try fresh.fetch(FetchDescriptor(predicate: WorkoutSnapshotBuilder.exercisePredicate(logID: log.id)))
+        let setRows = try fresh.fetch(FetchDescriptor(predicate: WorkoutSnapshotBuilder.setPredicate(exerciseIDs: exerciseRows.map(\.id))))
+        let values = WorkoutSnapshotBuilder.values(exercises: exerciseRows, sets: setRows)
+        let now = seed.referenceDate(calendar: cal)
+        #expect(now == Self.noon)
+        let display = RestTimer.display(restStartedAt: log.restStartedAt, restEndsAt: log.restEndsAt, now: now, exercises: values,
+                                        state: WorkoutFlow.state(exercises: values))
+        switch seed {
+        case .woRest:
+            let rest = try #require(display)
+            #expect(rest.next == .set(number: 2, of: 3))
+            #expect(RestTimer.remainingSeconds(endsAt: rest.endsAt, now: now) == 62)
+            #expect(abs(RestTimer.remainingFraction(startedAt: rest.startedAt, endsAt: rest.endsAt, now: now) - 62.0 / 75.0) < 1e-12)
+        default:
+            #expect(display == nil)
+        }
     }
 }
 #endif

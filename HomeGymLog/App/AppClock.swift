@@ -19,6 +19,10 @@ struct AppClock {
 
 extension EnvironmentValues {
     @Entry var appClock = AppClock.live()
+    /// Schedules and cancels the rest-end notification. Live by default, so production never sets it; only the root's
+    /// DEBUG seed branch and the workout `#Preview` override it with the silent notifier (seeds and previews must never
+    /// touch the system center).
+    @Entry var restNotifier: RestNotifier = .live()
     /// Nil in every Release build and in any launch without the debug arguments; only the root's `#if DEBUG`
     /// block ever sets it. Analogy: a context value a test harness may provide, undefined in production.
     @Entry var programTabPreselection: ProgramTabPreselection? = nil

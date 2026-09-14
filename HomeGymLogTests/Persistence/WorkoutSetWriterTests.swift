@@ -125,23 +125,23 @@ import Testing
     func setRPE() throws {
         let (store, log) = try started(11)
         let set = WorkoutStoreFixtures.sets(of: log)[0][0]
-        let onPending = try WorkoutLogStore.setRPE(7, on: set, in: store.context)
+        let onPending = try WorkoutLogStore.setRPE(7, on: set, at: t0, in: store.context)
         #expect(!onPending && !store.context.hasChanges)
 
         let at = t0.addingTimeInterval(168)
         try WorkoutLogStore.logSet(set, at: at, in: store.context)
-        #expect(throws: WorkoutLogStoreError.invalidRPE(5)) { try WorkoutLogStore.setRPE(5, on: set, in: store.context) }
-        #expect(throws: WorkoutLogStoreError.invalidRPE(11)) { try WorkoutLogStore.setRPE(11, on: set, in: store.context) }
+        #expect(throws: WorkoutLogStoreError.invalidRPE(5)) { try WorkoutLogStore.setRPE(5, on: set, at: at, in: store.context) }
+        #expect(throws: WorkoutLogStoreError.invalidRPE(11)) { try WorkoutLogStore.setRPE(11, on: set, at: at, in: store.context) }
         #expect(!store.context.hasChanges)
         let unrated = try freshSets(store)
         #expect(unrated[0][0].rpe == nil)
 
-        let wrote = try WorkoutLogStore.setRPE(7, on: set, in: store.context)
+        let wrote = try WorkoutLogStore.setRPE(7, on: set, at: at, in: store.context)
         #expect(wrote)
         let rated = try freshSets(store)[0][0]
         #expect(rated.rpe == 7 && !rated.rpeSkipped && rated.status == .done && rated.loggedAt == at && rated.weightLb == 110 && rated.reps == 12)
 
-        let second = try WorkoutLogStore.setRPE(8, on: set, in: store.context)
+        let second = try WorkoutLogStore.setRPE(8, on: set, at: at, in: store.context)
         #expect(!second && !store.context.hasChanges)
         let after = try freshSets(store)
         #expect(after[0][0].rpe == 7)
@@ -152,9 +152,9 @@ import Testing
         let (store, log) = try started(11)
         let set = WorkoutStoreFixtures.sets(of: log)[0][0]
         try WorkoutLogStore.logSet(set, at: t0, in: store.context)
-        let skipped = try WorkoutLogStore.skipRPE(on: set, in: store.context)
+        let skipped = try WorkoutLogStore.skipRPE(on: set, at: t0, in: store.context)
         #expect(skipped)
-        let rated = try WorkoutLogStore.setRPE(7, on: set, in: store.context)
+        let rated = try WorkoutLogStore.setRPE(7, on: set, at: t0, in: store.context)
         #expect(!rated && !store.context.hasChanges)
         let row = try freshSets(store)[0][0]
         #expect(row.rpe == nil && row.rpeSkipped)
@@ -165,21 +165,21 @@ import Testing
         let (store, log) = try started(11)
         let sets = WorkoutStoreFixtures.sets(of: log)
         try WorkoutLogStore.logSet(sets[0][0], at: t0, in: store.context)
-        let wrote = try WorkoutLogStore.skipRPE(on: sets[0][0], in: store.context)
+        let wrote = try WorkoutLogStore.skipRPE(on: sets[0][0], at: t0, in: store.context)
         #expect(wrote)
         let marked = try freshSets(store)
         #expect(marked[0][0].rpeSkipped && marked[0][0].rpe == nil)
 
-        let second = try WorkoutLogStore.skipRPE(on: sets[0][0], in: store.context)
+        let second = try WorkoutLogStore.skipRPE(on: sets[0][0], at: t0, in: store.context)
         #expect(!second && !store.context.hasChanges)
-        let pending = try WorkoutLogStore.skipRPE(on: sets[1][0], in: store.context)
+        let pending = try WorkoutLogStore.skipRPE(on: sets[1][0], at: t0, in: store.context)
         #expect(!pending && !store.context.hasChanges)
         try WorkoutLogStore.skipSet(sets[2][0], weightLb: 47.5, reps: 12, at: t0, in: store.context)
-        let skippedSet = try WorkoutLogStore.skipRPE(on: sets[2][0], in: store.context)
+        let skippedSet = try WorkoutLogStore.skipRPE(on: sets[2][0], at: t0, in: store.context)
         #expect(!skippedSet && !store.context.hasChanges)
         try WorkoutLogStore.logSet(sets[3][0], at: t0, in: store.context)
-        try WorkoutLogStore.setRPE(7, on: sets[3][0], in: store.context)
-        let rated = try WorkoutLogStore.skipRPE(on: sets[3][0], in: store.context)
+        try WorkoutLogStore.setRPE(7, on: sets[3][0], at: t0, in: store.context)
+        let rated = try WorkoutLogStore.skipRPE(on: sets[3][0], at: t0, in: store.context)
         #expect(!rated && !store.context.hasChanges)
         let fresh = try freshSets(store)
         #expect(!fresh[1][0].rpeSkipped && !fresh[2][0].rpeSkipped && !fresh[3][0].rpeSkipped && fresh[3][0].rpe == 7)
@@ -196,7 +196,7 @@ import Testing
         let untouched = try freshSets(store)
         #expect(untouched[0][1].status == .pending && untouched[0][2].status == .pending)
 
-        try WorkoutLogStore.setRPE(7, on: sets[0][0], in: store.context)
+        try WorkoutLogStore.setRPE(7, on: sets[0][0], at: t0, in: store.context)
         let at = t0.addingTimeInterval(300)
         let wrote = try WorkoutLogStore.nextExercise(first, at: at, in: store.context)
         #expect(wrote)

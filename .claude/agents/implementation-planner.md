@@ -40,7 +40,11 @@ able to fail when the rule is wrong: assert against an independently built value
 the refactor made both sides depend on. Every helper, fixture,
 file, or artifact a step uses must be declared in that step or an earlier one, and every verify command
 may read only files an earlier command writes. Pure Engine code, views
-separate. Prefer the smallest plan that fully meets the spec. Do not write Swift code beyond signatures
+separate. When the spec has tap- or time-dependent acceptance criteria (scripted taps are refused in the repo's
+simulator session), add an optional step that verifies them with XCUITest in a throwaway scratch copy of the repo
+(INSIGHTS Patterns "Real-touch probes"), never touching the repo's `project.pbxproj`, with a clean skip path. Static
+source tests anchor on stable tokens (a type or function name such as `DebugSeed.parse(`) and accept equivalent
+spellings (`Date?` with or without `= nil`), never on a whole literal line. Prefer the smallest plan that fully meets the spec. Do not write Swift code beyond signatures
 and short illustrative snippets. Do not edit any file other than the plan.
 
 Return the plan path and a five-line summary of the steps.

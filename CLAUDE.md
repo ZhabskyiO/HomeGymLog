@@ -40,7 +40,7 @@ from five onboarding answers, then tracks every set. One athlete, fixed home-gym
 - Update `insights/gotchas.md` whenever a build error, simulator quirk, or API surprise costs more than a few minutes.
 - Update `insights/INSIGHTS.md` when an architecture decision is made or changed.
 
-## Layout (as of M3 logging slice, 2026-09-13)
+## Layout (as of M3 rest-timer slice, 2026-09-14)
 
 ```
 HomeGymLog/                app target (synchronized folder: every .swift under it is compiled)
@@ -48,16 +48,18 @@ HomeGymLog/                app target (synchronized folder: every .swift under i
                            nothing navigates: the workout while the current program has an in-progress log, else the
                            shell, else onboarding; owns selectedTab, applies initialTab once), ShellView (tab shell,
                            selection bound from RootView), AppTab, AppClock (the only Date()/Calendar.current in the app;
-                           an environment value, and the file holding the nil-by-default debug @Entry values:
-                           programTabPreselection, initialTab, workoutDragPreview, workoutAdjustPreview), StoreErrorView
+                           an environment value, and the file holding the restNotifier @Entry (default .live()) and the
+                           nil-by-default debug @Entry values: programTabPreselection, initialTab, workoutDragPreview,
+                           workoutAdjustPreview), RestNotifier (rest-end local notification: a struct of closures over
+                           RestNotificationCenter, .live() / .silent(), reconcile), StoreErrorView
   App/DebugSeed/           DebugSeed (-seed launch names → frozen clock, in-memory store, prepared draft, workout
                            previews), MidProgramSeed (completed indexes are a parameter), FreshProgramSeed, WorkoutSeed
                            (session 11 of midProgram written through the workout store, one Stage per workout seed),
                            DebugProgramSelection (-programWeek, -programDay, -tab parsers); all five files under #if DEBUG
   Models/                  AppSchema, six @Model classes (Program, PlannedSession, WorkoutLog, LoggedExercise,
                            LoggedSet, ExerciseNote), write helpers ProgramStore (current, start, apply, skip, delete),
-                           WorkoutLogStore (start, finish, guarded set writers, discard, delete; failed-save policy in
-                           INSIGHTS), ExerciseNoteStore, HomeSnapshotBuilder (the session predicate + row → Engine value
+                           WorkoutLogStore (start, finish, guarded set writers that also start or clear the rest,
+                           addRestTime, skipRest, discard, delete; failed-save policy in INSIGHTS), ExerciseNoteStore, HomeSnapshotBuilder (the session predicate + row → Engine value
                            mapping shared by Home and Program; maps, never validates), WorkoutSnapshotBuilder (routing,
                            exercise and set predicates, rows → workout values, lazy PR baseline)
   Engine/                  pure logic, no SwiftData/SwiftUI: EngineTypes, Equipment, ExerciseLibrary, SplitPlans,
@@ -66,7 +68,8 @@ HomeGymLog/                app target (synchronized folder: every .swift under i
                            (SessionSummary, FinishedLogValue, validating HomeStatsInput), HomeStats (Home tab numbers,
                            plus sessionState shared with the Program card), ProgramTabStats (week windows, chips, day
                            cells, selection → focus), WorkoutFlow (workout state from set rows, row states, isStartable),
-                           WorkoutSummary (volume, end instant, duration, muscles, records); CalendarRules owns
+                           WorkoutSummary (volume, end instant, duration, muscles, records), RestTimer (remaining seconds
+                           and fraction, resting display, "Rest over" end rule, RestNotificationPlan); CalendarRules owns
                            days(from:to:), the one day-difference helper
   Features/Onboarding/     OnboardingView (flow root), OnboardingDraft (@Observable answers + step), OnboardingChrome
                            (header, footer), StepTitle, one file per step: WelcomeStep, LengthStep, FrequencyStep,
@@ -79,40 +82,52 @@ HomeGymLog/                app target (synchronized folder: every .swift under i
                            (+ProgramExerciseRow, start button for today's or a missed session), ProgramTabPreselection
                            (production value type the debug arguments fill in)
   Features/Workout/        WorkoutView (owns the log's exercise and set @Querys, sheet/exit/isDiscarding state, the lazy
-                           PR baseline task, every write handler), WorkoutLoggingContent (layout, +ExerciseBlock),
-                           WorkoutHeader (+WorkoutElapsedClock, ProgressSegments), SetRow, SetSwipeRow (drag + VoiceOver
-                           actions), RPECard, WorkoutSheet (+AdjustDraft), AdjustSheet, WorkoutBottomBar,
-                           WorkoutSummaryView, SummaryCards (tiles, muscles, records, no-records)
+                           PR baseline task, every write handler, the 1 Hz rest TimelineView and the rest effects:
+                           end announcement, notification .task(id:), scene phase), WorkoutLoggingContent (layout,
+                           +ExerciseBlock; the bottom inset shows the bar or the rest card), WorkoutHeader
+                           (+WorkoutElapsedClock, ProgressSegments), SetRow, SetSwipeRow (drag + VoiceOver actions),
+                           RPECard, WorkoutSheet (+AdjustDraft), AdjustSheet, WorkoutBottomBar, RestOverlay (rest card:
+                           ring, countdown, "Next: …", +30s, Skip), WorkoutSummaryView, SummaryCards (tiles, muscles,
+                           records, no-records)
   Features/<Screen>/       later slices: Progress, Settings
   Shared/                  Theme, FloatingTabBar, TabIcon, PlaceholderScreen, SegmentedPicker, PhaseBar, StepperButton,
                            ProgramSummaryText, HomeText (dates, greeting, pill), VolumeText (kfmt), ProgramTabText
                            (+StatusTone), ExerciseInfoSheet (moved here from Features/Home; its four presentation
                            modifiers are the `exerciseInfoSheet(item:)` View extension both tabs call), StartWorkoutButton
                            (Home and Program), WorkoutText (clock, grouping, set and record text), FlowLayout (wrapping
-                           chips); all formatting lives here, never in Engine
+                           chips), RestText (m:ss, spoken countdown, "Next:" and notification text); all formatting
+                           lives here, never in Engine
   Assets.xcassets/         theme color sets (bg, sf, sf2, bd, tx, mu, success, warning, phaseFoundation, phaseDeload)
 HomeGymLogTests/           Swift Testing target
   Support/                 TestCalendar (fixed calendar), TestContainer (makeTestStore, insertSampleGraph), TestInputs,
                            HomeFixtures (Home inputs built from the generator, never from a seed), WorkoutFixtures
-                           (plain workout values typed from the spec), WorkoutStoreFixtures (a generated program's rows)
+                           (plain workout values typed from the spec), WorkoutStoreFixtures (a generated program's rows),
+                           RestNotifierRecorder (fake notification center that can hold the authorization await)
+  App/                     RestNotifier(+Edge) suites: the notifier's rules over the recorder, never the system center
   Engine/                  one suite per Engine file plus StaticTableTests, the HomeStats suites
                            (HomeStats, HomeStatsEdge, HomeStatsInput, PersonalRecordsOrdering), the Program tab
-                           suites (SessionState, SessionStateEdge, ProgramTabStats, ProgramTabStatsEdge) and the workout
-                           suites (WorkoutFlow, WorkoutFlowEdge, AdjustStepper, WorkoutSummary, WorkoutSummaryEdge)
+                           suites (SessionState, SessionStateEdge, ProgramTabStats, ProgramTabStatsEdge), the workout
+                           suites (WorkoutFlow, WorkoutFlowEdge, AdjustStepper, WorkoutSummary, WorkoutSummaryEdge) and
+                           the rest suites (RestTimer, RestTimerEdge, RestEndRule)
   Persistence/             ModelRoundTrip, ProgramStore, ProgramStart, ProgramStartMidWeek, WorkoutLogStore,
                            WorkoutLogStoreSets, RoutingPredicate, ExerciseNoteStore, StatusInvariant, CascadeDelete,
                            HomeSnapshotBuilder, ProgramTabSnapshot (seed rows → ProgramTabStats, no validating step),
                            RpeSkipped, WorkoutStart(+Edge), WorkoutSetWriter(+Edge), WorkoutRoutingPredicate,
-                           WorkoutQueries, WorkoutSnapshotBuilder(+Edge), MissedWorkoutEndToEnd, WorkoutCommitRollback
-                           (failed saves forced through an on-disk store reopened with allowsSave: false) suites
+                           WorkoutQueries, WorkoutSnapshotBuilder(+Edge), MissedWorkoutEndToEnd, RestFields,
+                           WorkoutRestWriter, RestExtendSkip, RestWriterEdge, and the failed-save suites
+                           WorkoutCommitRollback, RestCommitRollback, RestWriterRollback (an on-disk store reopened with
+                           allowsSave: false)
   Onboarding/              OnboardingDraft suites (steps, clamps, preview)
-  Shared/                  HomeText, VolumeText (incl. kfmt boundaries), ProgramTabText(+Edge), WorkoutText(+Edge) suites
+  Shared/                  HomeText, VolumeText (incl. kfmt boundaries), ProgramTabText(+Edge), WorkoutText(+Edge),
+                           RestText(+Edge) suites
   Seed/                    DebugSeed, MidProgramSeed, RestDaySeed, FreshProgramSeed, SeedHomeStats
                            (seed → Home numbers end to end), DebugProgramSelection(+Edge), WorkoutSeed(+Edge),
-                           SummaryDoneHomeStats (Done on `summary` → Home numbers) suites (Debug only)
+                           SummaryDoneHomeStats (Done on `summary` → Home numbers), RestSeedFlow (rest card actions on
+                           the `wo-rest` rows) suites (Debug only)
   Static/                  source scans: ClockUsageTests (Date() / Calendar.current only in App/AppClock.swift),
-                           SchemaSourceTests (rpeSkipped keeps its default), SeedNameScanTests (workout seed names only
-                           in App/DebugSeed/)
+                           SchemaSourceTests (rpeSkipped keeps its default, rest instants stay optional),
+                           SeedNameScanTests (workout seed names only in App/DebugSeed/), RestNotifierSourceTests
+                           (.silent() only in the root's seed branch, .live() only as the @Entry default)
 design/                    prototype export (read-only reference)
 docs/specs, docs/plans     specs from spec-creator, plans from implementation-planner (dated status when done)
 docs/reviews               saved agent reports per slice (researcher, architecture, verifier rounds, swift review)
@@ -132,7 +147,7 @@ Work happens in slices on branches `m<N>-<slice>` created by `/milestone`, merge
 `/pr-self-review`. UI slices are verified against the prototype with `/design-compare`, which renders the design
 with headless Chrome and launches the app in a `-seed` state per screen (DEBUG only, `App/DebugSeed/`: `onboarding`,
 `ob1`…`ob5`, `midProgram`, `missed`, `restDay`, `freshProgram`, and the workout seeds `wo-start`, `wo-swipe`, `wo-rpe`,
-`wo-adjust`, `summary`, which open at the root with no `-tab`; frozen clock, in-memory store, throwaway preferences).
+`wo-adjust`, `wo-rest`, `summary`, which open at the root with no `-tab`; frozen clock, in-memory store, throwaway preferences).
 Two more DEBUG launch arguments target a screen without taps (taps are refused on this machine): `-programWeek <n>
 -programDay <d>` preselects the Program tab's week and day, `-tab <name>` opens the shell on that tab.
 
@@ -179,8 +194,11 @@ xcrun xcresulttool get test-results summary --path build/tests.xcresult   # tota
    card with a stored Skip (`LoggedSet.rpeSkipped`, unversioned), adjust sheet with carry-forward, next exercise, Exit
    with discard, summary, resume from rows, Start workout on Home's and Program's cards, five workout seeds; 425 tests
    on iOS 17.5 and 26.5, Release build green; simulator and device checks pending the user).
-   Remaining slices: `m3-rest-timer` (rest overlay, local notification), `m3-exercise-tools` (detail sheet with notes,
-   swap, progression pill).
+   — rest-timer slice done 2026-09-14 (branch `m3-rest-timer`: rest stored as two optional instants on `WorkoutLog`
+   (unversioned), rest card replacing the bottom bar with +30s and Skip, one "Rest over" VoiceOver announcement, local
+   notification through `RestNotifier` with permission asked at the first rest, `wo-rest` seed; 515 tests on iOS 17.5
+   and 26.5, Release green; simulator and device checks pending the user's MVP pass).
+   Next slice: `m3-exercise-tools` (detail sheet with notes, swap, progression pill).
 4. Progress (Swift Charts, calendar), PRs, streak, missed-day handling, settings, daily reminder.
 5. Polish: Live Activity rest timer, light theme audit, haptics, export, icon, App Store prep.
 

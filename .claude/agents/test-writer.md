@@ -41,6 +41,9 @@ context, and check both the store (a fresh context on the writable container) an
 (INSIGHTS Patterns 2026-09-13). Keep every `ModelContainer` bound for the whole test; releasing it early crashes the
 iOS 26.5 test process.
 
+Run test commands in the foreground (Bash timeout up to 600000 ms) or poll a background run to completion before
+ending your turn; a subagent is not woken when its own background command finishes.
+
 Also report existing assertions that cannot fail (an `||` with an always-true side, a value compared to itself, a
 test whose expected and actual come from the same function) with the file:line and a corrected form.
 

@@ -51,8 +51,9 @@ import Testing
         let (store, log) = try started(11)
         let sets = WorkoutStoreFixtures.sets(of: log)
         for s in 0..<2 {
-            try WorkoutLogStore.logSet(sets[0][s], at: t0.addingTimeInterval(Double(60 * (s + 1))), in: store.context)
-            try WorkoutLogStore.setRPE(7, on: sets[0][s], in: store.context)
+            let at = t0.addingTimeInterval(Double(60 * (s + 1)))
+            try WorkoutLogStore.logSet(sets[0][s], at: at, in: store.context)
+            try WorkoutLogStore.setRPE(7, on: sets[0][s], at: at, in: store.context)
         }
         let wrote = try WorkoutLogStore.saveAndLogSet(sets[0][2], weightLb: 120, reps: 11, at: t0.addingTimeInterval(180), in: store.context)
         #expect(wrote)
@@ -92,7 +93,7 @@ import Testing
             switch finished {
             case .doneAndRated:
                 try WorkoutLogStore.logSet(sets[0][s], at: at, in: store.context)
-                try WorkoutLogStore.setRPE(8, on: sets[0][s], in: store.context)
+                try WorkoutLogStore.setRPE(8, on: sets[0][s], at: at, in: store.context)
             case .skipped:
                 try WorkoutLogStore.skipSet(sets[0][s], weightLb: 110, reps: 12, at: at, in: store.context)
             }
@@ -111,7 +112,7 @@ import Testing
         let (store, log) = try started(11)
         let sets = WorkoutStoreFixtures.sets(of: log)
         try WorkoutLogStore.logSet(sets[0][0], at: t0.addingTimeInterval(60), in: store.context)
-        try WorkoutLogStore.skipRPE(on: sets[0][0], in: store.context)
+        try WorkoutLogStore.skipRPE(on: sets[0][0], at: t0.addingTimeInterval(60), in: store.context)
         let at = t0.addingTimeInterval(120)
         let wrote = try WorkoutLogStore.nextExercise(log.sortedExercises[0], at: at, in: store.context)
         #expect(wrote)
@@ -130,7 +131,7 @@ import Testing
         let (store, log) = try started(11)
         let set = WorkoutStoreFixtures.sets(of: log)[0][0]
         try WorkoutLogStore.logSet(set, at: t0, in: store.context)
-        let wrote = try WorkoutLogStore.setRPE(rpe, on: set, in: store.context)
+        let wrote = try WorkoutLogStore.setRPE(rpe, on: set, at: t0, in: store.context)
         #expect(wrote)
         #expect(try freshSets(store)[0][0].rpe == rpe)
     }
@@ -139,9 +140,9 @@ import Testing
     func rpeOutOfRangeThrowsFirst(rpe: Int) throws {
         let (store, log) = try started(11)
         let set = WorkoutStoreFixtures.sets(of: log)[0][0]
-        #expect(throws: WorkoutLogStoreError.invalidRPE(rpe)) { try WorkoutLogStore.setRPE(rpe, on: set, in: store.context) }
+        #expect(throws: WorkoutLogStoreError.invalidRPE(rpe)) { try WorkoutLogStore.setRPE(rpe, on: set, at: t0, in: store.context) }
         try WorkoutLogStore.logSet(set, at: t0, in: store.context)
-        #expect(throws: WorkoutLogStoreError.invalidRPE(rpe)) { try WorkoutLogStore.setRPE(rpe, on: set, in: store.context) }
+        #expect(throws: WorkoutLogStoreError.invalidRPE(rpe)) { try WorkoutLogStore.setRPE(rpe, on: set, at: t0, in: store.context) }
         #expect(!store.context.hasChanges)
         let fresh = try freshSets(store)[0][0]
         #expect(fresh.rpe == nil && !fresh.rpeSkipped && fresh.status == .done)
