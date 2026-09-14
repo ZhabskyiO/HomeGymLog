@@ -6,6 +6,41 @@ Keep entries short. Date them. Newest at the top within each section.
 
 ## Architecture decisions
 
+### 2026-09-14 — M3 rest-timer decisions (from the m3-rest-timer slice spec, user-answered)
+
+- **Rest is two stored instants on `WorkoutLog`** (`restStartedAt`, `restEndsAt`, optional Dates, unversioned migration
+  verified): started by Set RPE, Skip RPE and Skip set when a pending set remains (including the next exercise's first
+  set), extended by +30s, cleared by Skip, Log set, Save & log and Next exercise. Resting is derived
+  (`now < restEndsAt` in `.logging`); nothing is written at zero (researcher m3-rest-timer).
+- **The next set stays swipeable during rest** (user chose over the prototype's blocked row): the focus row keeps its
+  accent border and "← →" under the overlay (a `wo-rest` deviation); a swipe, the "Log set" / "Adjust set" actions and
+  the adjust sheet all work mid-rest, and logging clears the rest in the same save.
+- **"Next exercise ›" is blocked during rest**: the overlay covers the bar, as in the prototype.
+- **At zero in the foreground** the overlay disappears and VoiceOver announces "Rest over" once (user chose over the
+  prototype's silent end; wording is the fixed "Rest over", not the next set); no announcement for Skip, a log, or a
+  relaunch past the end. Haptics stay M5.
+- **Architecture review (2026-09-14)**: the rest card **replaces the bottom bar inside the existing
+  `.safeAreaInset(edge: .bottom)`** (self-sizing, content kept clear, bar out of the tree), animated with
+  `.easeInOut(duration: 0.3)` on `rest != nil` (verified P1: card top y 704 / 726, 148 pt, rows scroll 16 pt clear). The
+  "Rest over" rule runs in `.onChange(of: resting)` / `.onChange(of: restEndsAt)` attached **inside** the timeline
+  closure (verified P2: outside, a time-based flip never fires), never as a `@State` write in `body`. Time-dependent
+  behaviour checks run on a live clock; `-seed` launches are screenshot-only. The live notifier checks
+  `Task.isCancelled` after every await and before `add` (verified P3: without it a superseded run overwrote the newer
+  request); `onDisappear` cancel runs on Exit → Discard (verified P4).
+- **Notifier seam**: `struct RestNotifier` of closures in `App/RestNotifier.swift` (the `AppClock` precedent, not a
+  protocol), `.live()` / `.silent()`, built over a `RestNotificationCenter` of four injected system calls so a test
+  recorder can hold the authorization await (`.live()` = `.using(.system())`, reading the system center lazily inside
+  each call), `@Entry` default `.live()` overridden to `.silent()` in the DEBUG seed branch;
+  `RestNotificationPlan.decide` (Engine) owns schedule-vs-cancel. Seeds, previews and tests never touch the system center.
+- **Invariant**: rest fields are nil on every finished log by construction; only the workout screen reads them, always
+  gated on `now < restEndsAt`. M4 history and Progress must not read `restEndsAt` as "a rest happened".
+- **M4 delegate rule**: if M4 installs a `UNUserNotificationCenterDelegate` for the reminder, it returns `[]` for the
+  `rest-timer` identifier, uses a different identifier for the reminder, and is installed in `App.init` and retained
+  (the delegate property is weak).
+- **Notifications**: permission is requested at the first rest (one prompt per install, reused by M4's reminder); denied
+  is silent this slice (M4 Settings shows status); text is generic "Rest over" / "Time for your next set."; no
+  notification delegate (a foreground app shows no banner). +30s is unlimited. Rest also runs between exercises.
+
 ### 2026-09-13 — M3 decisions (from the m3-logging slice spec, user-answered)
 
 - **M3 is three slices**, each merged before the next: `m3-logging` (workout screen, swipe/RPE/adjust, next exercise,
@@ -582,6 +617,13 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
   `DebugSeed` reference outside `#if DEBUG` that only Release could catch.
 
 ## Patterns
+
+### 2026-09-14 — Probe local notifications through SpringBoard
+Extends the real-touch probe (below): tap Allow / Don't Allow on
+`XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts.firstMatch`, detect banners by label in the
+SpringBoard process (`label CONTAINS 'Rest over'`), and report app-side facts (pending and delivered counts, the
+scheduled interval) through a `-probeLog <path>` launch argument appended with flushed lines. Uninstall the app between
+permission scenarios (`simctl privacy` cannot reset notifications). Used by `docs/reviews/m3-rest-timer-researcher.md`.
 
 ### 2026-09-13 — Force a failed SwiftData save in a test: reopen an on-disk store with `allowsSave: false`
 In-memory stores never fail to save. Write the fixture through a normal on-disk container, then open the same file with
