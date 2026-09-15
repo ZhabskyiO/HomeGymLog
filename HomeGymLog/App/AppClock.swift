@@ -31,7 +31,8 @@ extension EnvironmentValues {
     /// A fixed drag offset (pt) the workout's active set row draws with, so a mid-swipe frame can be screenshot
     /// without touches (`-seed wo-swipe` sets 72). Nil in Release and in every other launch; set the same way.
     @Entry var workoutDragPreview: CGFloat? = nil
-    /// True when the workout screen should open the adjust sheet on its active set as it first appears
-    /// (`-seed wo-adjust`). Nil in Release and in every other launch; set the same way.
-    @Entry var workoutAdjustPreview: Bool? = nil
+    /// The sheet the workout screen opens on its displayed exercise as it first appears (`-seed wo-adjust` → adjust on the
+    /// active set, `wo-detail` → detail, `wo-swap` / `wo-swap-rdl` → swap). Nil in Release and in every other launch; set the
+    /// same way.
+    @Entry var workoutSheetPreview: WorkoutSheetPreview? = nil
 }

@@ -35,6 +35,24 @@ import Testing
         let inWritingContext: LogValues
         let hasChanges: Bool
         let inStore: LogValues
+        /// The written set from the objects before the write, and through the writing context's first fetch after the
+        /// failure (researcher addendum P4: on 26.5 only that first fetch returned unsaved values under restore-then-rollback).
+        let setBefore: SetValues
+        let setFirstFetch: SetValues
+    }
+
+    private func setValues(_ set: LoggedSet) -> SetValues {
+        SetValues(status: set.status, weightLb: set.weightLb, reps: set.reps, rpe: set.rpe, rpeSkipped: set.rpeSkipped, loggedAt: set.loggedAt)
+    }
+
+    /// The set each action writes.
+    private func writtenSet(_ action: Action, of log: WorkoutLog) -> LoggedSet {
+        let sets = WorkoutStoreFixtures.sets(of: log)
+        switch action {
+        case .saveAndLogSetDuringRest, .nextExerciseDuringRest: return sets[0][1]
+        case .skipLastSetDuringRest: return sets[4][2]
+        case .setRPEOverStaleRest, .skipRPEOverStaleRest: return sets[0][0]
+        }
     }
 
     private func values(_ log: WorkoutLog) -> LogValues {
@@ -102,15 +120,26 @@ import Testing
         let context = ModelContext(readOnly)
         let log = try #require(try context.fetch(FetchDescriptor(predicate: WorkoutSnapshotBuilder.inProgressPredicate)).first)
         let before = values(log)
+        let written = writtenSet(action, of: log)
+        let setBefore = setValues(written)
+        let setID = written.id
         var threw = false
         do { try perform(action, on: log, in: context) } catch { threw = true }
+        // First fetch after the failure, before any other read: a later one hides the 26.5 behaviour.
+        let fetched = try context.fetch(FetchDescriptor<LoggedSet>(predicate: #Predicate { $0.id == setID }))
+        let setFirstFetch = setValues(try #require(fetched.first))
         let inWritingContext = values(log)
         let hasChanges = context.hasChanges
         let store = ModelContext(writer)
         let storeLog = try #require(try store.fetch(FetchDescriptor(predicate: WorkoutSnapshotBuilder.inProgressPredicate)).first)
         let inStore = values(storeLog)
+        // Every value is read: discard the restored originals the failed write left pending. Otherwise SwiftData processes
+        // them on a timer after `outcome` has removed the store file, faults a row from the missing file and aborts the test
+        // process (NSInternalInconsistencyException, Cocoa 256, seen on 26.5). Safe: a field writer has no insert or delete pending.
+        context.rollback()
         withExtendedLifetime((writer, readOnly, store)) {}   // 26.5 crashes when a container is released while its models are read
-        return Outcome(threw: threw, before: before, inWritingContext: inWritingContext, hasChanges: hasChanges, inStore: inStore)
+        return Outcome(threw: threw, before: before, inWritingContext: inWritingContext, hasChanges: hasChanges, inStore: inStore,
+                       setBefore: setBefore, setFirstFetch: setFirstFetch)
     }
 
     private func outcome(_ action: Action) throws -> Outcome {
@@ -129,8 +158,10 @@ import Testing
         #expect(result.before.restStartedAt == rest.startedAt)
         #expect(result.before.restEndsAt == rest.endsAt)
         #expect(result.threw)
-        #expect(!result.hasChanges)
+        #expect(result.hasChanges, "rollback first, then restore: the restored originals are pending (addendum P4)")
         #expect(result.inWritingContext == result.before)
         #expect(result.inStore == result.before)
+        // Researcher addendum P4: what a screen's @Query re-fetch returns. Red on 26.5 with restore-then-rollback.
+        #expect(result.setFirstFetch == result.setBefore, "first same-context fetch of the written set after the failure")
     }
 }

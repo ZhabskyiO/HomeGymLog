@@ -29,6 +29,10 @@ For each question:
 7. State the exact configuration every claim was verified under: OS runtime, build settings (language
    mode, default actor isolation), and which target the calling code lives in. A claim verified for one
    target does not transfer to another; say so explicitly.
+8. In a persistence probe, the first read-back after the action uses the app's own access path: a direct
+   `FetchDescriptor` or `@Query` of that row type, as a screen would. A relationship traversal first can read different
+   values (on iOS 26.5 it read restored fields where a direct fetch returned unsaved ones; m3-exercise-tools P4), so a
+   traversal-only read never verifies what the screen shows.
 
 Do not modify project files. Do not pad with background the user did not ask for.
 

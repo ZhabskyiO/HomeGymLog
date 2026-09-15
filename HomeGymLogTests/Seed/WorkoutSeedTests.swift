@@ -31,6 +31,10 @@ import Testing
         case .summary:
             let weights: [Double] = [120, 110, 110, 100, 100, 100, 47.5, 47.5, 47.5, 52.5, 52.5, 52.5, 27.5, 27.5, 27.5]
             rows = weights.enumerated().map { k, weight in Row(status: .done, rpe: 7, weightLb: weight, loggedOffset: Double(168 * (k + 1))) }
+        case .woSwapRDL:
+            for k in 0..<9 {
+                rows[k] = Row(status: .done, rpe: 7, weightLb: targets[k / 3], loggedOffset: Double(70 * (k + 1)))
+            }
         default:
             break
         }
@@ -44,6 +48,10 @@ import Testing
         (DebugSeed.woAdjust, 754.0, WorkoutState.logging(exercise: 0, set: 1)),
         (DebugSeed.woRest, 754.0, WorkoutState.logging(exercise: 0, set: 1)),
         (DebugSeed.summary, 2520.0, WorkoutState.summary),
+        (DebugSeed.woDetail, 754.0, WorkoutState.logging(exercise: 0, set: 0)),
+        (DebugSeed.woSwap, 754.0, WorkoutState.logging(exercise: 0, set: 0)),
+        (DebugSeed.woNotes, 754.0, WorkoutState.logging(exercise: 0, set: 0)),
+        (DebugSeed.woSwapRDL, 754.0, WorkoutState.logging(exercise: 3, set: 0)),
     ])
     func seed(seed: DebugSeed, secondsBeforeNoon: Double, state: WorkoutState) throws {
         let container = try seed.makeContainer(calendar: cal)
@@ -82,6 +90,11 @@ import Testing
         (DebugSeed.woAdjust, -586.0, -511.0),
         (DebugSeed.woRest, -13.0, 62.0),
         (DebugSeed.summary, nil, nil),
+        (DebugSeed.woDetail, nil, nil),
+        (DebugSeed.woSwap, nil, nil),
+        (DebugSeed.woNotes, nil, nil),
+        // Last rating 11:57:56, 75 s rest → 11:59:11: stale at noon, no card.
+        (DebugSeed.woSwapRDL, -124.0, -49.0),
     ] as [(DebugSeed, Double?, Double?)])
     func restInstants(seed: DebugSeed, startOffset: Double?, endOffset: Double?) throws {
         let container = try seed.makeContainer(calendar: cal)

@@ -1,6 +1,15 @@
 import Foundation
 import SwiftData
 
+/// What the swap sheet's candidates are computed from, read from the log at the tap: the session's stored week and phase,
+/// the program's starting weights (lb) and the log's current exercise keys in order.
+struct SwapContext: Equatable {
+    let week: Int
+    let phase: Phase
+    let startingWeightsLb: [String: Double]
+    let keysInWorkout: [String]
+}
+
 /// The workout screen's predicates and the row → Engine value mapping. Rows in, plain values out; maps, never
 /// validates (every Engine rule over these values is total). Main-actor isolated like the rows it reads.
 @MainActor
@@ -60,5 +69,36 @@ enum WorkoutSnapshotBuilder {
         let records = HomeStats.personalRecords(sessions: HomeSnapshotBuilder.sessionSummaries(from: rows),
                                                 logs: HomeSnapshotBuilder.finishedLogs(from: rows))
         return WorkoutSummary.bests(from: records)
+    }
+
+    /// The progression pill's baseline for one key (INSIGHTS Patterns "Per-key history reads"): the key's exercise rows whose
+    /// workout is finished (a one-hop `flatMap` predicate; the in-progress log never matches), kept in Swift only when the
+    /// workout's session belongs to `programID` (archived programs drop out). One entry per finished log: top = the heaviest
+    /// done set over that log's rows for the key; a log with no done set for it is dropped. Sorted by `finishedAt`.
+    /// ~55 ms at program end on 17.5, never the full `bestsBefore` traversal.
+    static func finishedTops(key: String, programID: UUID, in context: ModelContext) throws -> [FinishedExerciseTop] {
+        let rows = try context.fetch(FetchDescriptor<LoggedExercise>(predicate: #Predicate { exercise in
+            exercise.exerciseKey == key && exercise.workout.flatMap { log in log.finishedAt != nil } == true
+        }))
+        // Keyed by log id and merged by hand: a log holding the key twice must give one entry, never a duplicate-key trap.
+        var topsByLog: [UUID: FinishedExerciseTop] = [:]
+        for row in rows {
+            guard let log = row.workout, let finishedAt = log.finishedAt, log.session?.program?.id == programID,
+                  let top = row.sets.filter({ $0.status == .done }).map(\.weightLb).max() else { continue }
+            if let existing = topsByLog[log.id], existing.topWeightLb >= top { continue }
+            topsByLog[log.id] = FinishedExerciseTop(finishedAt: finishedAt, topWeightLb: top)
+        }
+        return topsByLog.values.sorted { ($0.finishedAt, $0.topWeightLb) < ($1.finishedAt, $1.topWeightLb) }
+    }
+
+    /// The swap sheet's inputs, read once at the tap. Total like `sessionInfo`: a log with no session reads week 1,
+    /// Foundation and no starting weights, with its own keys (the writer then does a log-only swap).
+    static func swapContext(of log: WorkoutLog) -> SwapContext {
+        let keys = log.sortedExercises.map(\.exerciseKey)
+        guard let session = log.session else {
+            return SwapContext(week: 1, phase: .foundation, startingWeightsLb: [:], keysInWorkout: keys)
+        }
+        return SwapContext(week: session.week, phase: session.phase, startingWeightsLb: session.program?.startingWeightsLb ?? [:],
+                           keysInWorkout: keys)
     }
 }

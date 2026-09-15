@@ -111,10 +111,60 @@ are kept as history.
   Recognize it: a crash inside a delete helper right after a save in a different `ModelContext`.
 - 2026-09-13 — Swift Testing can lose issues recorded just before a process crash; a probe that may crash should write
   flushed lines to a file instead of relying on `#expect` messages.
+- 2026-09-14 — **On 26.5, after a failed save, restore-then-`rollback()` lets a refetch bring back an unsaved Codable array.**
+  The swap probe (`allowsSave: false`) restored `PlannedSession.exercises`, then rolled back: the object read the original,
+  but a `FetchDescriptor` refetch in the same context returned the edited array (scalars stayed restored; 17.5 correct).
+  Fix (superseded by the P4 entry below, which covers every field writer): roll back first, then restore; it refetches
+  correctly on both runtimes and leaves `hasChanges == true`. Recognize it: a failed-save test that passes on object reads but fails once it
+  refetches. Source: `docs/reviews/m3-exercise-tools-researcher.md` Q4.
+- 2026-09-14 — **A failed insert does not undo in place even for a relationship-free row** (`ExerciseNote`, store reopened
+  with `allowsSave: false`). Nothing in the catch: the unsaved row stays in fetches and `@Query` (bar label "Notes ·", editor
+  reopens with the text); on 26.5 a fetch of all notes returns it **twice** while `fetchCount` says 2. `context.delete(note)`
+  without `rollback()`: `@Query` clean on both, but on 26.5 an immediate same-turn fetch still returns it. Fix: rehearse the
+  insert in a scratch `ModelContext` (clean on both). Recognize it: a fetch count that disagrees with the fetched array's
+  count after a failed save. Source: m3-exercise-tools researcher addendum P1.
+- 2026-09-14 — **`@ModelActor` created from the main actor runs its methods on the main thread** (17.5 and 26.5); created
+  inside `Task.detached` it runs off main. A four-hop nested-`flatMap` predicate fails to compile ("unable to type-check
+  this expression in reasonable time"); three hops compile and fetch. Source: m3-exercise-tools researcher Q5.
+- 2026-09-14 — **On 26.5, the first writing-context fetch after restore-then-`rollback()` brings back the unsaved scalars**,
+  and it overwrites the registered object too (same instance, `hasChanges == false`).
+  - **Probe:** a scratch copy built with Xcode 27.0; store reopened `allowsSave: false`; each case fetches by id right after the refused save.
+  - **Affected writers:** `logSet`, `saveAndLogSet`, `setRPE`, `nextExercise`, `finish`, the note update and `swapExercise`. All read restored on the object, then unsaved after the fetch. A hand-written edit → failed save → restore → `rollback()` does the same.
+  - **17.5:** restores every case.
+  - **Traversal first:** fetching the `PlannedSession` and traversing to the exercise before the direct fetch reads restored. That is why the researcher's Q4 probe saw scalars stay restored. That probe gives identical results from Xcode 26.6 and Xcode 27 builds, so the traversal shape is not a toolchain change. The direct-fetch shape was never run on Xcode 26.
+  - **Why suites stayed green:** the m3-logging and rest-timer rollback suites read objects and never refetch after the failure.
+  - **Recognize it:** a failed-save test green on object reads and on 17.5 that fails on 26.5 once it fetches in the writing context.
+  - **Fix (researcher addendum P4, all 11 field writers, 17.5 and 26.5):** `rollback()` first, then restore the snapshot, then rethrow; it leaves `hasChanges == true` (the restored originals). Insert writers keep "remove the inserts, then `rollback()`" (`StoreCommit.commitInsert`). In the app, the old order made a `@Query` show a failed `logSet` as done.
+- 2026-09-14 — **No simulator mechanism makes a SwiftData save fail and then succeed** (researcher P4): `chmod` on the open
+  store has no effect, a conflicting save from another context is silently overwritten, an exclusive SQLite lock from a
+  second connection is waited out (63 s, then success), and an SQL trigger raising on UPDATE crashes the process instead of
+  throwing; `allowsSave: false` always throws. So "a later successful save in the same context after a failure" cannot be
+  tested on the simulator.
+- 2026-09-14 — **Pending changes left in a context crash the test process once their store file is deleted** (26.5, Xcode 27).
+  With the rollback-then-restore order a failed field write leaves the restored originals pending (`hasChanges == true`); the
+  failed-save suites then removed their temporary on-disk store, and a SwiftData timer later threw
+  `NSInternalInconsistencyException` ("Unhandled error (NSCocoaErrorDomain, 256) occurred during faulting", naming the deleted
+  file) inside whichever test was running: 81 and 107 unrelated "signal abrt" failures. Fix (tests): after the assertions,
+  `context.rollback()` before deleting the store file (safe: field writers never hold a pending insert or delete). Recognize
+  it: a mass 26.5 abort with a store path from another suite in the console. Unverified in the app: what that timer does
+  with the pending originals in `mainContext` after a real failed save.
 - (expected areas still open: previews)
 
 ## Swift language
 
+- 2026-09-14 — **A long nested-tuple literal in `@Test(arguments:)` fails to compile** ("unable to type-check this expression
+  in reasonable time"; an 18-row `[(String, [String])]` in `SwapCandidatesEdgeTests`, Xcode 27). Fix: move it to a file-scope
+  constant with an explicit type. Also, `try` inside `#expect(...)` within a closure fails with "errors thrown from here are
+  not handled"; bind the throwing call to a `let` first. Recognize it: a test file that fails to build only after adding a
+  large argument table.
+
+- 2026-09-14 — **Xcode 27 warns on unapplied references to main-actor members passed to `map` / `contains(where:)`**
+  (`[#ActorIsolatedCall]` "call to main actor-isolated initializer 'init(_:)' in a synchronous nonisolated context").
+  With `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`, `sets.map(SetSnapshot.init)` and `sets.contains(where: awaitsRating)`
+  compiled silently on Xcode 26 and warn on Xcode 27.0 (27A266a); the function reference is treated as nonisolated,
+  while a closure literal (`sets.map { SetSnapshot($0) }`) inherits the caller's isolation and does not warn. Proven by
+  building the untouched commit `87c6780` on Xcode 27: three such warnings in `WorkoutLogStore.swift` (`saveAndLogSet`,
+  `nextExercise` ×2). Recognize it: warnings appear in unchanged files right after an Xcode update.
 - 2026-09-11 — **Integer division truncates toward zero, so a negative numerator does not floor.** `days / 7 + 1`
   is 1 for `days` = −1…−6, the same bucket as day 0 (JS: `Math.trunc`, not `Math.floor`; `Math.floor(-1/7)` is −1).
   Symptom: `ProgramTabStats.defaultDay` treated a Saturday before the program's first Monday as "today is in week 1"
@@ -177,6 +227,19 @@ are kept as history.
   .ignore)` plus label and value on a `VStack`, XCUITest lists the group as an `Other` element (`value: 1 minute 2
   seconds`, no longer a `StaticText`) and still lists the inner "Rest" `Text` as a `StaticText` with an empty value, so
   "exactly one element labelled X" cannot be asserted from XCUITest; VoiceOver checks stay manual.
+- 2026-09-14 — **`.task(id: text)` as a debounced save runs on appear** with the initial text and inserted an empty
+  `ExerciseNote` before any typing (17.5 and 26.5). Recognize it: a row appears when a sheet merely opens. Save in
+  `.onChange(of: text)` instead (it does not fire on appear).
+- 2026-09-14 — **A keyboard inside a `.fraction(0.78)` sheet grows the sheet to nearly full height** (17.5 top 233.7 → 69;
+  26.5 → 62) and returns to the detent when the keyboard goes; the presenting screen's `.safeAreaInset` bar moves up behind
+  the sheet and is never visible above it. `TextField(axis: .vertical)` does not focus on a tap in its padding below the
+  text line (both runtimes); `TextEditor` focuses anywhere in its frame.
+- 2026-09-14 — **XCUITest: `.accessibilityIdentifier` on a plain container (a `VStack`) overwrites every descendant's
+  identifier** (swap rows all reported the container's id). Put identifiers on leaf controls. `element.tap()` on a vertical
+  `TextField` in a sheet does not focus it on 17.5 (a coordinate tap does); on 26.5 partial-detent sheets are inset and
+  scaled, so never assert sheet widths.
+- 2026-09-14 — **`onGeometryChange(for:of:action:)` is iOS 16.0**, not 18 (SDK interface, typechecked at 17.0, run on 17.5);
+  only its old/new two-value overload and `presentationSizing` are iOS 18.
 - (expected areas still open: sheet + navigation interplay)
 
 ## User notifications
@@ -199,6 +262,24 @@ are kept as history.
 
 ## Xcode / build
 
+- 2026-09-14 — **After an Xcode update, byte-identical screenshot baselines break in the status bar only.** Seeded shots of
+  unchanged screens (`midProgram`, `restDay`, `freshProgram`, `missed`) differed from their Xcode 26 baselines in 38,711
+  pixels, all inside the top-left status-bar corner (0,0)–(259,48) pt; the pre-slice commit built on Xcode 27 rendered
+  byte-identically to the slice. Recognize it: every `cmp` regression check fails right after a toolchain update. Diff the
+  pixel region before blaming the slice, and retake baselines after any Xcode update.
+
+- 2026-09-14 — **Xcode can update itself mid-session, and every later `xcodebuild` / `xcrun` call is refused until the new
+  license is accepted.** During m3-exercise-tools Step 11 a build and test run succeeded, then the next `xcrun
+  xcresulttool` and every `xcrun simctl` printed "You have not agreed to the Xcode license agreements. Please run 'sudo
+  xcodebuild -license'…" and did nothing. `xcodebuild -version` had become Xcode 27.0 (27A266a) while
+  `/Library/Preferences/com.apple.dt.Xcode.plist` still read `IDEXcodeVersionForAgreedToGMLicense = "26.3"`. Accepting needs
+  `sudo` in a Terminal (the user's action; agents stop and report). Recognize it: simulator and result-bundle commands
+  failing right after a green run, with no code change in between. Afterwards rerun the whole suite: the SDK and
+  simulator runtimes may have changed too. After the user ran `sudo xcodebuild -license` and `sudo xcodebuild
+  -runFirstLaunch`: the only simulator SDK was `iphonesimulator27.0` (the 26.5 SDK gone; tests still build against 27.0
+  and run on the 17.5 and 26.5 runtimes), and a new iOS 27.0 runtime brought a second "iPhone 17", so
+  `name=iPhone 17` must always carry `OS=26.5`. Existing simulator udids and `build/DerivedData` survived (no stale-module
+  error; the first build rebuilt everything). Recognize it: `xcodebuild -version` newer than the last report.
 - 2026-09-13 — **`python3 -m http.server` needs more than `sleep 1` before headless Chrome renders from it**: Chrome got a
   connection-refused page and every `sips` crop came out blank. Fix: poll until the page answers
   (`until curl -sf -o /dev/null http://127.0.0.1:8765/; do sleep 0.2; done`). Recognize it: all prototype crops blank.

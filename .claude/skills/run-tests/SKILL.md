@@ -7,13 +7,16 @@ Run the test suite and report results honestly. Never edit production code from 
 
 ## Steps
 
-1. If no `*.xcodeproj` exists, stop and say so.
-2. Choose a simulator the same way `build-and-run` does (booted first, else newest iPhone). A test run on another
+1. If no `*.xcodeproj` exists, stop and say so. If `xcodebuild -version`, `xcrun` or `git` print "You have not agreed to
+   the Xcode license agreements" (Xcode updated itself), stop: ask the user to run `sudo xcodebuild -license accept` and
+   `sudo xcodebuild -runFirstLaunch` in Terminal, then re-check `xcrun simctl list runtimes` and `xcodebuild -showsdks`.
+2. Choose a simulator the same way `build-and-run` does (booted first, else newest iPhone), and always pass its OS in the
+   destination (`name=iPhone 15,OS=17.5`, `name=iPhone 17,OS=26.5`): names repeat across runtimes. A test run on another
    runtime can shut down other booted simulators; after the run, re-boot the one used for screenshots
    (`xcrun simctl boot <udid>; xcrun simctl bootstatus <udid> -b`) before any install or screenshot.
 3. Run. If an argument was given, treat it as a filter for `-only-testing:` (e.g. `HomeGymLogTests/ProgramGeneratorTests`).
    ```
-   xcodebuild test -scheme HomeGymLog -destination "platform=iOS Simulator,name=<name>" \
+   xcodebuild test -scheme HomeGymLog -destination "platform=iOS Simulator,name=<name>,OS=<os>" \
      -derivedDataPath build/DerivedData -resultBundlePath build/tests.xcresult \
      [ -only-testing:<filter> ] 2>&1 | tee build/last-test.log | grep -E "✔|✘|Test Suite|Executed|error:|TEST (SUCCEEDED|FAILED)"
    ```

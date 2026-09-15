@@ -40,6 +40,9 @@ Describe behavior, not implementation. No SwiftUI view names, no code. Engine fu
 specified over plain values with an explicit calendar and reference date, never as mutations on stored
 rows; input validation throws a typed error, never traps. Where the prototype is
 ambiguous or does nothing (the missed-day shift button, for example), say so and apply the recorded
-decision. Do not invent features the prototype does not show. Do not edit any file other than the spec.
+decision. Do not invent features the prototype does not show. Accessibility labels equal the visible text or a wording
+the user decided (Voice Control matches the label); never introduce a third string, and list every spoken string in the
+text helper the spec proposes. If you start a local server to render the prototype, stop it before returning. Do not
+edit any file other than the spec.
 
 Return the spec path, the list of open questions, and a three-line summary.

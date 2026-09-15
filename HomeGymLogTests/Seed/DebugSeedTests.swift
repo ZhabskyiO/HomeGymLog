@@ -15,6 +15,7 @@ import Testing
         switch seed {
         case .midProgram, .missed: expectedDay = TestCalendar.day(2026, 9, 15)
         case .woStart, .woSwipe, .woRPE, .woAdjust, .woRest, .summary: expectedDay = TestCalendar.day(2026, 9, 15)
+        case .woDetail, .woSwap, .woSwapRDL, .woNotes: expectedDay = TestCalendar.day(2026, 9, 15)
         case .restDay: expectedDay = TestCalendar.day(2026, 9, 19)
         case .freshProgram: expectedDay = TestCalendar.day(2026, 8, 31)
         default: expectedDay = TestCalendar.day(2026, 8, 31)
@@ -26,7 +27,8 @@ import Testing
     @Test("the workout seeds use the prototype's hyphenated names")
     func workoutNames() throws {
         let names: [(String, DebugSeed)] = [("wo-start", .woStart), ("wo-swipe", .woSwipe), ("wo-rpe", .woRPE),
-                                            ("wo-adjust", .woAdjust), ("wo-rest", .woRest), ("summary", .summary)]
+                                            ("wo-adjust", .woAdjust), ("wo-rest", .woRest), ("summary", .summary),
+                                            ("wo-detail", .woDetail), ("wo-swap", .woSwap), ("wo-swap-rdl", .woSwapRDL), ("wo-notes", .woNotes)]
         for (name, seed) in names {
             let parsed = try DebugSeed.parse(arguments: ["app", "-seed", name])
             #expect(parsed == seed)
@@ -55,18 +57,26 @@ import Testing
         #expect(DebugSeed.missed.forcesMissedDayPrompt && !DebugSeed.midProgram.forcesMissedDayPrompt)
         #expect(DebugSeed.restDay.initialDraft(calendar: cal) == nil && DebugSeed.freshProgram.initialDraft(calendar: cal) == nil)
         #expect(!DebugSeed.restDay.forcesMissedDayPrompt && !DebugSeed.freshProgram.forcesMissedDayPrompt)
-        for seed in [DebugSeed.woStart, .woSwipe, .woRPE, .woAdjust, .woRest, .summary] {
+        for seed in [DebugSeed.woStart, .woSwipe, .woRPE, .woAdjust, .woRest, .summary, .woDetail, .woSwap, .woSwapRDL, .woNotes] {
             #expect(seed.initialDraft(calendar: cal) == nil, "\(seed.rawValue)")
             #expect(!seed.forcesMissedDayPrompt, "\(seed.rawValue)")
         }
     }
 
-    @Test("drag preview only for wo-swipe (72 pt); adjust preview only for wo-adjust")
+    @Test("drag preview only for wo-swipe (72 pt); sheet preview adjust / detail / swap / swap for wo-adjust / wo-detail / wo-swap / wo-swap-rdl, nil otherwise")
     func previews() {
         #expect(DebugSeed.allCases.filter { $0.workoutDragPreview != nil } == [.woSwipe])
         #expect(DebugSeed.woSwipe.workoutDragPreview == 72)
-        #expect(DebugSeed.allCases.filter { $0.workoutAdjustPreview != nil } == [.woAdjust])
-        #expect(DebugSeed.woAdjust.workoutAdjustPreview == true)
+        for seed in DebugSeed.allCases {
+            let expected: WorkoutSheetPreview?
+            switch seed {
+            case .woAdjust: expected = .adjust
+            case .woDetail: expected = .detail
+            case .woSwap, .woSwapRDL: expected = .swap
+            default: expected = nil
+            }
+            #expect(seed.workoutSheetPreview == expected, "\(seed.rawValue)")
+        }
     }
 }
 #endif

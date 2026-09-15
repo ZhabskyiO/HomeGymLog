@@ -11,14 +11,16 @@ enum WorkoutSeedError: Error, Equatable {
 /// Written through the workout store functions only, exactly as the screen writes, with timestamps derived from the
 /// seed's frozen `now`.
 enum WorkoutSeed {
-    /// `started`: wo-start and wo-swipe. `awaitingRating`: wo-rpe. `rated`: wo-adjust. `resting`: wo-rest.
-    /// `finishedSets`: summary.
+    /// `started`: wo-start, wo-swipe, wo-detail, wo-swap. `awaitingRating`: wo-rpe. `rated`: wo-adjust. `resting`: wo-rest.
+    /// `finishedSets`: summary. `legsNext`: wo-swap-rdl. `noted`: wo-notes.
     enum Stage {
-        case started, awaitingRating, rated, resting, finishedSets
+        case started, awaitingRating, rated, resting, finishedSets, legsNext, noted
     }
 
     /// Seconds between consecutive set timestamps: set k is logged at `startedAt + 168·k`.
     private static let setInterval = 168.0
+    /// `legsNext`: set k (1…9) of exercises 1–3 is logged and rated at `startedAt + 70·k`.
+    private static let legsNextInterval = 70.0
 
     @discardableResult
     static func populate(_ stage: Stage, now: Date, in context: ModelContext) throws -> WorkoutLog {
@@ -62,6 +64,17 @@ enum WorkoutSeed {
             }
             try WorkoutLogStore.saveAndLogSet(firstSet, weightLb: 120, reps: 12, at: firstLoggedAt, in: context)
             try WorkoutLogStore.setRPE(7, on: firstSet, at: firstLoggedAt, in: context)
+        case .legsNext:
+            // Exercises 1–3 done at RPE 7; the last rating (11:57:56) starts a 75 s rest that ended at 11:59:11, 49 s
+            // before the frozen now, so no card is drawn and exercise 4 (rdl) is displayed with every set pending.
+            for (index, set) in sets.prefix(3).flatMap({ $0 }).enumerated() {
+                let at = startedAt.addingTimeInterval(legsNextInterval * Double(index + 1))
+                try WorkoutLogStore.logSet(set, at: at, in: context)
+                try WorkoutLogStore.setRPE(7, on: set, at: at, in: context)
+            }
+        case .noted:
+            try ExerciseNoteStore.save(text: "Seat notch 3, grip just outside the bend.", forExerciseKey: "latPull",
+                                       updatedAt: now.addingTimeInterval(-86_400), in: context)
         }
         return log
     }

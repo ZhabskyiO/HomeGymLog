@@ -18,6 +18,9 @@ struct WorkoutView: View {
     private let programID: UUID?
     @Query private var exerciseRows: [LoggedExercise]
     @Query private var setRows: [LoggedSet]
+    /// Every stored note (one per exercise key, 18 at most; ≈ useQuery of all notes). The bar label and the detail sheet's
+    /// seed text read it, so a note save re-renders the label at once.
+    @Query private var notes: [ExerciseNote]
     /// The one presented sheet, or nil. `.sheet(item:)` ≈ a modal rendered while a state value is non-null.
     @State private var sheet: WorkoutSheet?
     /// `.alert(isPresented:)` ≈ a controlled `<Dialog open>`.
@@ -29,14 +32,18 @@ struct WorkoutView: View {
     @State private var bestsBefore: [String: Double]?
     /// The rest end instant last seen while resting, for the "Rest over" rule (≈ a `useRef`: written only in effects).
     @State private var lastSeenRestEnd: Date?
+    /// The progression pill's baseline for one exercise key (≈ a memo keyed on the exercise, filled by an effect). Drawn
+    /// only while its key is the displayed one, so a key change never shows the previous key's pill. Finished logs cannot
+    /// change while a workout is open, so a key is never re-fetched while it stays displayed.
+    @State private var pillBaseline: (key: String, previous: PreviousTops)?
     @Environment(\.appClock) private var clock
     @Environment(\.modelContext) private var modelContext
     /// Live in the app, silent in seeds and previews.
     @Environment(\.restNotifier) private var notifier
     /// Active, inactive or background (≈ `document.visibilityState`).
     @Environment(\.scenePhase) private var scenePhase
-    /// Nil except a DEBUG `-seed wo-adjust` launch, which opens the sheet on the active set as the screen appears.
-    @Environment(\.workoutAdjustPreview) private var adjustPreview
+    /// Nil except a DEBUG sheet seed (`-seed wo-adjust`, …), which opens that sheet as the screen appears.
+    @Environment(\.workoutSheetPreview) private var sheetPreview
     @AppStorage("units") private var unitsRaw = WeightUnit.lb.rawValue
 
     init(log: WorkoutLog, onDone: @escaping (Date) -> Void) {
@@ -48,6 +55,7 @@ struct WorkoutView: View {
         _exerciseRows = Query(filter: WorkoutSnapshotBuilder.exercisePredicate(logID: log.id), sort: \LoggedExercise.order)
         // The exercise ids are fixed for the workout's lifetime (a swap rewrites a row's key, never the row).
         _setRows = Query(filter: WorkoutSnapshotBuilder.setPredicate(exerciseIDs: log.exercises.map(\.id)), sort: \LoggedSet.order)
+        _notes = Query(sort: \ExerciseNote.exerciseKey)
     }
 
     private var unit: WeightUnit { WeightUnit(rawValue: unitsRaw) ?? .lb }
@@ -55,6 +63,7 @@ struct WorkoutView: View {
     var body: some View {
         let exercises = WorkoutFlow.sorted(WorkoutSnapshotBuilder.values(exercises: exerciseRows, sets: setRows))
         let state = WorkoutFlow.state(exercises: exercises)
+        let displayed = WorkoutFlow.displayedExercise(exercises: exercises, state: state)
         Group {
             if isDiscarding {
                 Theme.bg.ignoresSafeArea()
@@ -68,8 +77,10 @@ struct WorkoutView: View {
                     let rest = RestTimer.display(restStartedAt: log.restStartedAt, restEndsAt: log.restEndsAt, now: clock.now(),
                                                  exercises: exercises, state: state)
                     WorkoutLoggingContent(info: info, startedAt: startedAt, exercises: exercises, state: state, sheetOpen: sheet != nil,
-                                          unit: unit, rest: rest,
-                                          onExit: { exitTapped(exercises) }, onNext: nextExercise,
+                                          unit: unit, rest: rest, previousTopLb: previousTop(for: displayed),
+                                          hasNote: hasNote(displayed?.exerciseKey),
+                                          onExit: { exitTapped(exercises) }, onDetail: openDetail,
+                                          onSwap: { openSwap($0, in: exercises) }, onNext: nextExercise,
                                           onLog: logSet, onAdjust: { openAdjust($0, in: exercises) }, onRate: rate, onSkipRating: skipRating,
                                           onAddRest: addRest, onSkipRest: skipRest)
                         // Once each and only here: outside this closure a time-based end never fires; twice, a save runs it twice.
@@ -79,14 +90,8 @@ struct WorkoutView: View {
             }
         }
         .sheet(item: $sheet) { item in
-            switch item {
-            case .adjust(let draft):
-                AdjustSheet(initial: draft, unit: unit, onSave: saveAndLog, onSkip: skipSet)
-                    .presentationDetents([.height(251)])
-                    .presentationCornerRadius(28)
-                    .presentationDragIndicator(.hidden)
-                    .presentationBackground(Theme.sf)
-            }
+            WorkoutSheetContent(item: item, unit: unit, noteText: noteText(for: item), onSaveAndLog: saveAndLog, onSkipSet: skipSet,
+                                onNoteChange: saveNote, onClose: { sheet = nil }, onPick: pick)
         }
         .alert(WorkoutText.discardTitle, isPresented: $isConfirmingExit) {
             Button("Discard", role: .destructive) { discard() }
@@ -95,9 +100,7 @@ struct WorkoutView: View {
             Text(WorkoutText.discardMessage)
         }
         .onAppear {
-            if adjustPreview == true, !WorkoutFlow.isRatingPending(state), let set = WorkoutFlow.focusSet(exercises: exercises, state: state) {
-                openAdjust(set.id, in: exercises)
-            }
+            if let sheetPreview { openPreview(sheetPreview, exercises: exercises, state: state) }
         }
         // ≈ an effect keyed on "is summary": the baseline traverses every finished set (~0.4 s at program end on 17.5),
         // so it is built once, when the summary first shows, never at mount, per render, or while Exit is leaving. It
@@ -114,6 +117,8 @@ struct WorkoutView: View {
         .task(id: isDiscarding ? nil : log.restEndsAt) {
             await notifier.reconcile(restEndsAt: isDiscarding ? nil : log.restEndsAt, clock: clock)
         }
+        // ≈ useEffect(load, [displayedKey]); keyed on nil while Exit deletes rows, so no fetch starts then (NB5).
+        .task(id: isDiscarding ? nil : displayed?.exerciseKey) { loadPillBaseline(key: displayed?.exerciseKey) }
         .onChange(of: scenePhase) { _, phase in   // ≈ a visibilitychange listener
             if phase == .active {
                 notifier.removeDelivered()
@@ -137,6 +142,94 @@ struct WorkoutView: View {
         lastSeenRestEnd = result.lastSeenEndsAt
         if result.announce {
             AccessibilityNotification.Announcement(RestText.restOver).post()
+        }
+    }
+
+    // MARK: Progression pill
+
+    /// The "last" previous top for the displayed exercise, only when the held baseline is for its key.
+    private func previousTop(for exercise: WorkoutExerciseValue?) -> Double? {
+        guard let exercise, let pillBaseline, pillBaseline.key == exercise.exerciseKey else { return nil }
+        return pillBaseline.previous.last
+    }
+
+    /// Fetches the key's finished tops in the current program on the main context (~55 ms at program end on 17.5). A
+    /// failure keeps the held baseline, which hides the pill for this key: the rest of the screen is unaffected.
+    private func loadPillBaseline(key: String?) {
+        guard let key, let programID, !isDiscarding, pillBaseline?.key != key else { return }
+        do {
+            let tops = try WorkoutSnapshotBuilder.finishedTops(key: key, programID: programID, in: modelContext)
+            pillBaseline = (key, ProgressionPill.previousTops(tops))
+        } catch {
+            assertionFailure("Pill baseline failed: \(error)")
+        }
+    }
+
+    // MARK: Notes and previews
+
+    /// True when `key` has a stored note with non-empty text (whitespace counts, as in the prototype).
+    private func hasNote(_ key: String?) -> Bool {
+        guard let key else { return false }
+        return notes.contains { $0.exerciseKey == key && !$0.text.isEmpty }
+    }
+
+    /// The stored text a `.detail` sheet opens with: a scalar read of the query rows, never a fetch (the sheet closure runs
+    /// on every body pass, i.e. every keystroke).
+    private func noteText(for item: WorkoutSheet) -> String {
+        guard case .detail(let key) = item else { return "" }
+        return notes.first { $0.exerciseKey == key }?.text ?? ""
+    }
+
+    /// The name button and "Add note" / "Notes ·".
+    private func openDetail(_ key: String) {
+        guard ExerciseLibrary.exercise(for: key) != nil else { return }   // an unknown key would present an empty sheet
+        sheet = .detail(exerciseKey: key)
+    }
+
+    /// Every editor change: the note for `key` with the full text, stamped `clock.now()` at the keystroke.
+    private func saveNote(_ key: String, _ text: String) {
+        do {
+            try ExerciseNoteStore.save(text: text, forExerciseKey: key, updatedAt: clock.now(), in: modelContext)
+        } catch {
+            assertionFailure("Save note failed: \(error)")
+        }
+    }
+
+    /// DEBUG sheet seeds: opens the requested sheet on the displayed exercise as the screen first appears. Adjust needs a
+    /// set being logged, so it does nothing while a rating is pending.
+    private func openPreview(_ preview: WorkoutSheetPreview, exercises: [WorkoutExerciseValue], state: WorkoutState) {
+        switch preview {
+        case .adjust:
+            guard !WorkoutFlow.isRatingPending(state), let set = WorkoutFlow.focusSet(exercises: exercises, state: state) else { return }
+            openAdjust(set.id, in: exercises)
+        case .detail:
+            if let displayed = WorkoutFlow.displayedExercise(exercises: exercises, state: state) { openDetail(displayed.exerciseKey) }
+        case .swap:
+            if let displayed = WorkoutFlow.displayedExercise(exercises: exercises, state: state) { openSwap(displayed.id, in: exercises) }
+        }
+    }
+
+    // MARK: Swap
+
+    /// Header Swap: the candidates for the exercise's current key at the session's stored week and phase with the program's
+    /// starting weights, computed at the tap. Nothing opens once a set of it is done or skipped (the button is disabled too).
+    private func openSwap(_ exerciseID: UUID, in exercises: [WorkoutExerciseValue]) {
+        guard let exercise = exercises.first(where: { $0.id == exerciseID }), WorkoutFlow.canSwap(exercise) else { return }
+        let context = WorkoutSnapshotBuilder.swapContext(of: log)
+        let candidates = SwapCandidates.candidates(for: exercise.exerciseKey, keysInWorkout: context.keysInWorkout, week: context.week,
+                                                   phase: context.phase, startingWeightsLb: context.startingWeightsLb)
+        sheet = .swap(SwapDraft(exerciseID: exercise.id, exerciseKey: exercise.exerciseKey, candidates: candidates))
+    }
+
+    /// A candidate row: the sheet closes first, then the one-save swap runs (as Save & log does), so a failed save never
+    /// leaves the list open over unchanged rows. The store guard refuses a stale draft (a set logged meanwhile).
+    private func pick(_ draft: SwapDraft, _ candidate: SwapCandidate) {
+        sheet = nil
+        guard let row = WorkoutSnapshotBuilder.byID(exerciseRows, id: \.id)[draft.exerciseID] else { return }
+        do {
+            try WorkoutLogStore.swapExercise(row, to: candidate.exerciseKey, targetWeightLb: candidate.targetWeightLb, in: modelContext)
+        } catch {
+            assertionFailure("Swap failed: \(error)")
         }
     }
 
