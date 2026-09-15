@@ -27,6 +27,15 @@ enum DebugSeed: String, CaseIterable {
     case woRest = "wo-rest"
     /// Session 11 started 42:00 ago with every set logged (set 1 at 120 lb): the summary screen.
     case summary = "summary"
+    /// `wo-start` rows with the exercise detail sheet open on Lat Pulldown (no note: the editor shows its placeholder).
+    case woDetail = "wo-detail"
+    /// `wo-start` rows with the swap sheet open on Lat Pulldown: 0 candidates, so the empty-state line shows.
+    case woSwap = "wo-swap"
+    /// Exercises 1–3 done at RPE 7 (set k logged and rated at start + 70·k; the last rest ended 49 s ago): the swap sheet
+    /// open on exercise 4, Dumbbell Romanian Deadlift, with its five Legs candidates.
+    case woSwapRDL = "wo-swap-rdl"
+    /// `wo-start` rows plus a stored Lat Pulldown note from a day earlier: the bar reads "Notes ·". No sheet.
+    case woNotes = "wo-notes"
 
     /// nil when no `-seed` is present; throws for an unknown name or a trailing `-seed` with no value.
     static func parse(arguments: [String]) throws -> DebugSeed? {
@@ -40,7 +49,7 @@ enum DebugSeed: String, CaseIterable {
     func referenceDate(calendar: Calendar) -> Date {
         let day: DateComponents
         switch self {
-        case .midProgram, .missed, .woStart, .woSwipe, .woRPE, .woAdjust, .woRest, .summary:
+        case .midProgram, .missed, .woStart, .woSwipe, .woRPE, .woAdjust, .woRest, .summary, .woDetail, .woSwap, .woSwapRDL, .woNotes:
             day = DateComponents(year: 2026, month: 9, day: 15, hour: 12)
         case .restDay: day = DateComponents(year: 2026, month: 9, day: 19, hour: 12)
         case .freshProgram: day = DateComponents(year: 2026, month: 8, day: 31, hour: 12)
@@ -62,7 +71,8 @@ enum DebugSeed: String, CaseIterable {
             let draft = OnboardingDraft(months: 6, frequency: 5)
             for _ in 0..<onboardingSteps { draft.advance(now: referenceDate(calendar: calendar), calendar: calendar) }
             return draft
-        case .midProgram, .missed, .restDay, .freshProgram, .woStart, .woSwipe, .woRPE, .woAdjust, .woRest, .summary:
+        case .midProgram, .missed, .restDay, .freshProgram, .woStart, .woSwipe, .woRPE, .woAdjust, .woRest, .summary,
+             .woDetail, .woSwap, .woSwapRDL, .woNotes:
             return nil
         }
     }
@@ -77,7 +87,7 @@ enum DebugSeed: String, CaseIterable {
             try MidProgramSeed.populate(in: container.mainContext, calendar: calendar, completedIndexes: Array(0...14).filter { $0 != 7 })
         case .freshProgram:
             try FreshProgramSeed.populate(in: container.mainContext, calendar: calendar)
-        case .woStart, .woSwipe, .woRPE, .woAdjust, .woRest, .summary:
+        case .woStart, .woSwipe, .woRPE, .woAdjust, .woRest, .summary, .woDetail, .woSwap, .woSwapRDL, .woNotes:
             try MidProgramSeed.populate(in: container.mainContext, calendar: calendar)
             if let workoutStage {
                 try WorkoutSeed.populate(workoutStage, now: referenceDate(calendar: calendar), in: container.mainContext)
@@ -91,11 +101,13 @@ enum DebugSeed: String, CaseIterable {
     /// Which `WorkoutSeed` recipe a workout seed runs; nil for every other seed.
     private var workoutStage: WorkoutSeed.Stage? {
         switch self {
-        case .woStart, .woSwipe: return .started
+        case .woStart, .woSwipe, .woDetail, .woSwap: return .started
         case .woRPE: return .awaitingRating
         case .woAdjust: return .rated
         case .woRest: return .resting
         case .summary: return .finishedSets
+        case .woSwapRDL: return .legsNext
+        case .woNotes: return .noted
         default: return nil
         }
     }
@@ -105,9 +117,14 @@ enum DebugSeed: String, CaseIterable {
         self == .woSwipe ? 72 : nil
     }
 
-    /// True when the workout screen opens the adjust sheet on first appearance (`workoutAdjustPreview`); nil otherwise.
-    var workoutAdjustPreview: Bool? {
-        self == .woAdjust ? true : nil
+    /// The sheet the workout screen opens on first appearance (`workoutSheetPreview`); nil for every seed without one.
+    var workoutSheetPreview: WorkoutSheetPreview? {
+        switch self {
+        case .woAdjust: return .adjust
+        case .woDetail: return .detail
+        case .woSwap, .woSwapRDL: return .swap
+        default: return nil
+        }
     }
 
     /// How many steps into onboarding an `obN` seed opens.

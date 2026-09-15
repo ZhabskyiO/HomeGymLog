@@ -14,7 +14,7 @@ struct HomeGymLogApp: App {
     private let preselection: ProgramTabPreselection?
     private let initialTab: AppTab?
     private let dragPreview: CGFloat?
-    private let adjustPreview: Bool?
+    private let sheetPreview: WorkoutSheetPreview?
     /// Nil except a DEBUG `-seed` launch, which silences rest notifications; every other launch keeps the environment's
     /// live default.
     private let restNotifier: RestNotifier?
@@ -29,7 +29,7 @@ struct HomeGymLogApp: App {
         var preselection: ProgramTabPreselection? = nil
         var initialTab: AppTab? = nil
         var dragPreview: CGFloat? = nil
-        var adjustPreview: Bool? = nil
+        var sheetPreview: WorkoutSheetPreview? = nil
         var restNotifier: RestNotifier? = nil
         #if DEBUG
         do {
@@ -41,7 +41,7 @@ struct HomeGymLogApp: App {
                 seedDraft = seed.initialDraft(calendar: live.calendar)
                 makeContainer = { try seed.makeContainer(calendar: live.calendar) }
                 dragPreview = seed.workoutDragPreview
-                adjustPreview = seed.workoutAdjustPreview
+                sheetPreview = seed.workoutSheetPreview
                 restNotifier = .silent()   // seeds freeze the clock: screenshot-only, never a real notification
             }
             // Outside the seed branch: the selection arguments work on their own too.
@@ -58,7 +58,7 @@ struct HomeGymLogApp: App {
         self.preselection = preselection
         self.initialTab = initialTab
         self.dragPreview = dragPreview
-        self.adjustPreview = adjustPreview
+        self.sheetPreview = sheetPreview
         self.restNotifier = restNotifier
         #if DEBUG
         if case .failure(let error) = containerResult {
@@ -78,7 +78,7 @@ struct HomeGymLogApp: App {
                     .environment(\.programTabPreselection, preselection)
                     .environment(\.initialTab, initialTab)
                     .environment(\.workoutDragPreview, dragPreview)
-                    .environment(\.workoutAdjustPreview, adjustPreview)
+                    .environment(\.workoutSheetPreview, sheetPreview)
                     // ≈ a provider that overrides a context value only when a prop is set; otherwise the live default stays.
                     .transformEnvironment(\.restNotifier) { value in
                         if let override = restNotifier { value = override }

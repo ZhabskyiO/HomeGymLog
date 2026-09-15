@@ -562,3 +562,183 @@ All three saves run synchronously in one handler, so `body` cannot run between t
   - **`context.delete(note)` without `rollback()`:** no trap, and `@Query` shows 0 rows on both runtimes. But on 26.5 an immediate fetch of all notes in the same run-loop turn still returns the row, and `hasChanges` stays true.
   - **Fix:** rehearse the insert in a scratch `ModelContext` first; this was clean on 17.5 and 26.5.
   - **Recognize it:** a fetch count that disagrees with the fetched array's count after a failed save.
+
+---
+
+## Addendum 2026-09-14: P4 (revert order for field writers)
+
+**Answer:** switch the field writers to **rollback first, then restore (order B)**. On iOS 26.5 today's restore-then-`rollback()` (A) is dirty for all 11 field writers, while B and C are clean for all 11 on both 17.5 and 26.5.
+- **What goes wrong with A:** the first same-context fetch after the failure returns the unsaved values, and the app's `@Query` showed an unsaved logged set.
+- **Insert writers:** keep "remove the inserts, then `rollback()`" in a separate helper.
+- **Later successful save:** still unverified. None of five ways to force a failed save clears in place on the simulator, so I could not test it.
+
+### Configuration
+
+- **Toolchain:** Xcode 27.0 (27A266a), iphonesimulator27.0 SDK.
+- **Simulators:** iPhone 15 on iOS 17.5 (`3CAE4D76…`) and iPhone 17 on iOS 26.5 (`834F0313…`). The iOS 27.0 runtime was not probed.
+- **Probe copy:** `scratchpad/p4`, a fresh rsync of the working tree; `HomeGymLog/Models` is byte-identical to the repo. Changes in the copy only:
+  - a UI-test target and bundle id `com.zhabskyi.homegymlog.probe`;
+  - a probe-only `StoreCommit.probeOrder` switch (A, B or C) with a log hook;
+  - an app hook (`-probeP4`).
+- **Build settings:** unchanged from the repo (app target Swift 5 mode, `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`); own DerivedData (`DD4`, `DD4_26`).
+- **Unit probe (`ProbeP4Tests`, `@MainActor`, in `HomeGymLogTests`):**
+  - On-disk store: the 6-month program with session 11 started.
+  - Writing context: `ModelContext` on the same file reopened with `allowsSave: false`.
+  - Each writer × order ran twice: fetch-by-id first, and fetch-all first.
+  - Reads after the failure, in order: the object, the first same-context fetch, the second fetch, the object again, `hasChanges`, a fresh context, and the routing count (`inProgressPredicate`).
+- **App probe:** XCUITest launch against a refusing on-disk store (`mainContext`).
+  - The root view owns `@Query` for the routing logs and all sets.
+  - Runs `logSet` or `finish`, then mounts a child with a fresh `@Query`.
+- **Clean-up:** probe bundles uninstalled from both simulators. `StoreCommit.swift` and `project.pbxproj` in the repo are untouched.
+
+### Per writer × order × runtime (refusing store, 2 read sequences each)
+
+- **CLEAN:** all five reads show the originals and the routing count is unchanged.
+- **DIRTY:** the **first** same-context fetch, by id or fetch-all, returns the unsaved values. The second fetch, the object and a fresh context show originals.
+
+| Writer | 17.5 A | 17.5 B | 17.5 C | 26.5 A | 26.5 B | 26.5 C |
+|---|---|---|---|---|---|---|
+| `logSet` | clean | clean | clean | **DIRTY** (set0 `done`, `loggedAt` set) | clean | clean |
+| `saveAndLogSet` | clean | clean | clean | **DIRTY** (set0 `done/120/11`; carried set1 read clean) | clean | clean |
+| `skipSet` | clean | clean | clean | **DIRTY** | clean | clean |
+| `setRPE` | clean | clean | clean | **DIRTY** | clean | clean |
+| `skipRPE` | clean | clean | clean | **DIRTY** | clean | clean |
+| `nextExercise` | clean | clean | clean | **DIRTY** | clean | clean |
+| `addRestTime` | clean | clean | clean | **DIRTY** | clean | clean |
+| `skipRest` | clean | clean | clean | **DIRTY** | clean | clean |
+| `finish` | clean | clean | clean | **DIRTY** (log `finishedAt` set; session and routing count clean) | clean | clean |
+| `ExerciseNoteStore` update | clean | clean | clean | **DIRTY** (text "new") | clean | clean |
+| `swapExercise` | clean | clean | clean | **DIRTY** (exercise `goblet<-rdl@50`; sets and planned element clean) | clean | clean |
+
+- **Totals:** 17.5 has 0/66 dirty cases. 26.5 has 22/22 dirty under A and 0/44 under B and C.
+- **`hasChanges` after the failure** (same on both runtimes):
+  - A: `false` for 10 writers, `true` for `swapExercise` (its extra post-catch reassign);
+  - B and C: `true` for all 11 writers.
+
+**App level** (`mainContext`, refusing store):
+
+| Case | 17.5 | 26.5 |
+|---|---|---|
+| `logSet`, A | pending everywhere | object `pending` right after the revert, then **`done` 1 s later with no explicit fetch**; the root `@Query` rendered set0 **`done`**; a freshly mounted child `@Query` showed `pending`; the next direct fetch showed `pending` and the root went back to `pending` |
+| `logSet`, B / C | pending everywhere, `hasChanges` true | pending everywhere, `hasChanges` true |
+| `finish`, A / B / C | routing `activeLogs` = 1, `finishedAt` nil throughout | same (no flash observed in the app; the unit first fetch is dirty under A) |
+
+### Invariants
+
+- **Field writers:** every one of the 132 failed commits (66 per runtime) had **0 pending inserts and 0 pending deletes**. B and C never call `rollback()` with an insert or delete pending from a field writer.
+- **`start`, the note insert branch, `discard`:** unaffected by the order on either runtime.
+  - On a refusing store, `start` and the note insert threw inside `rehearseInsert` and never reached `commit` (`hasChanges` false, 0 inserted).
+  - `discard` threw with 21 deletes pending and no `commit` call.
+  - `rehearseInsert` never calls `rollback()`.
+- **The insert last resort** (`commit(context) { context.delete(note) }` reached directly):
+  - Survived A, B and C on both runtimes.
+  - 17.5: a fetch of all notes is clean.
+  - 26.5: a fetch of all notes still returns the unsaved row under all three orders (the known P1 behaviour).
+  - Only a relationship-free row was tried. The `start` log graph under B was not, and the 2026-09-13 gotcha says 17.5 crashes on `rollback()` with that graph's insert pending. So insert writers must keep "remove, then `rollback()`".
+
+### Later successful save (item 4): no failure that clears in place
+
+| Mechanism | Result (26.5; the first four also on 17.5) |
+|---|---|
+| `chmod 0444` on the store and WAL/SHM files, `0555` on the directory | the save **succeeded** (the connection's open file descriptors ignore permissions) |
+| Merge conflict: a second context saves reps 50 on the same set first | **no error**; the writing context's value (99) was stored |
+| `BEGIN EXCLUSIVE` from a second SQLite connection, held 6 s | the save **waited 6.7 s, then succeeded** |
+| Same, held 60 s (26.5 only) | Core Data logged "optimistic locking failure", retried, and **succeeded after 63 s** |
+| `CREATE TRIGGER … BEFORE UPDATE … RAISE(ABORT)` on every Z table, dropped afterwards | the save **crashed the process** ("Test crashed with signal trap"), 26.5; not tried on 17.5 |
+| `allowsSave: false` | always throws, never clears |
+
+So whether a later successful save *in the same context* persists the unsaved values or the originals is **unverified** on Xcode 27, for every order. Related evidence:
+- **Xcode 26.6, first report above:** after "rollback then restore" with no failed save, an unrelated later save persisted the originals on both runtimes. That covered the Codable array only.
+- **B and C:** `hasChanges == true`, so the next save (including `mainContext` autosave) rewrites the restored originals.
+- **Order A on 26.5:** `hasChanges` is false, so the unsaved values sit only in the fetch path.
+
+### Recommended `StoreCommit`
+
+```swift
+enum StoreCommit {
+    /// Field writers. On a failed save: `rollback()` first, then put the snapshot back, then rethrow.
+    /// Restoring before the rollback leaves the unsaved values in the context on iOS 26.5: the first fetch of the row
+    /// returns them (probe P4: 11 writers). A field writer never has an insert or delete pending here.
+    /// Leaves `hasChanges == true` (the restored originals), which the next save rewrites harmlessly.
+    static func commit(_ context: ModelContext, revert: () -> Void) throws {
+        do {
+            try context.save()
+        } catch {
+            context.rollback()
+            revert()
+            throw error
+        }
+    }
+
+    /// Insert writers' last resort (after a successful rehearsal): remove the inserts, then roll back. Never roll back
+    /// first: 17.5 crashes on `rollback()` with an inserted graph pending (gotchas 2026-09-13).
+    static func commitInsert(_ context: ModelContext, removeInserts: () -> Void) throws {
+        do {
+            try context.save()
+        } catch {
+            removeInserts()
+            context.rollback()
+            throw error
+        }
+    }
+
+    // rehearseInsert(in:_:) unchanged
+}
+```
+
+- **Callers:** every field writer keeps `commit`, and so does the `ExerciseNoteStore` update branch. `WorkoutLogStore.start` and the note insert branch move to `commitInsert`.
+- **Swap:** with B, `swapExercise`'s post-catch `session.exercises = plannedSnapshot` duplicates the revert. The probe ran with it present; removing it is unverified.
+- **Alternative:** C (restore, rollback, restore again) was equally clean for field writers on both runtimes. It is not recommended as the single helper, because its second revert would re-run an insert writer's delete after the rollback, which was not probed for the `start` graph.
+
+### How the rollback suites' expectations must change
+
+- **`hasChanges` after a failed field write becomes `true`:**
+  - `WorkoutCommitRollbackTests.failedSaveLeavesStoreUnchanged` (`#expect(!result.hasChanges)`);
+  - `RestCommitRollbackTests.failedSaveKeepsRest`;
+  - `RestWriterRollbackTests.failedSaveRestoresRest`;
+  - the failed-update case in `ExerciseNoteSaveTests` (line 83).
+  - Alternatively drop the pin and assert values instead.
+- **Stay `false`:**
+  - the rehearsal paths (`WorkoutStartTests` line 102, the `start` refusal at `WorkoutCommitRollbackTests` line 193, the refused-insert case in `ExerciseNoteSaveTests`);
+  - every guard no-op (`WorkoutSetWriterTests`, `RestExtendSkipTests`, `SwapExerciseTests`);
+  - successful saves (`discard`, line 256).
+- **`StoreCommitTests` line 42:** I did not read its context. If it pins the failure path of `commit`, it becomes `true`.
+- **Add a first-fetch read to every field-writer failure suite.** Before any other fetch, read the row with a same-context `FetchDescriptor` by id and compare it to the originals.
+  - The Workout and Rest suites read only objects and a fresh context, which is why they pass on 26.5 under A.
+  - `SwapCommitRollbackTests` and `ExerciseNoteSaveTests` refetch, which is why they fail.
+  - Any extra fetch before the assertion (a routing fetch, for example) hides the bug, because only the first fetch is dirty.
+
+### Facts (addendum P4)
+
+1. **Order B for field writers.** Field writers revert a failed save by `rollback()`, then restore the snapshot, then rethrow.
+   - Clean for `logSet`, `saveAndLogSet`, `skipSet`, `setRPE`, `skipRPE`, `nextExercise`, `addRestTime`, `skipRest`, `finish`, the note update and `swapExercise`, on 17.5 and 26.5, with either fetch sequence.
+2. **Why not A.** On 26.5, restore-then-`rollback()` makes the first same-context fetch return the unsaved values. In the app, a `@Query` then rendered a set as logged that never saved. 17.5 is unaffected.
+3. **`hasChanges` after a failed field write is `true` under B**, holding the originals. Tests pin that, or pin values, never `false`.
+4. **Insert writers keep "remove the inserts, then `rollback()`"** in a separate helper.
+   - The last resort is unreachable after a successful rehearsal, and on 26.5 the unsaved inserted row stays in fetches under any order.
+   - `start`, the note insert, `discard` and `rehearseInsert` are unaffected by the field-writer order.
+5. **Field writers never hold a pending insert or delete** at the failure (132 of 132 commits).
+6. **Test rule.** Every field-writer failure test reads the row through a same-context fetch by id as its first fetch after the failure.
+7. **No failure that clears in place was found.** `allowsSave: false`, chmod, merge conflict and an exclusive SQLite lock never clear or never fail; an SQL trigger crashes the process. The "later save in the same context" behaviour cannot be tested on the simulator with these mechanisms.
+
+### Unverified
+
+- **A later successful save in the same context after a failure**, under any order. It needs a failure that clears in place without crashing; none was found. Probe idea: a device with a nearly full disk.
+- **The iOS 27.0 runtime.** Probe: run `ProbeP4Tests.revertOrder` on the iPhone 17 simulator with `OS=27.0`.
+- **The `start` log-graph insert under a rollback-first order** (the helper keeps it on remove-then-rollback), and the SQL-trigger crash on 17.5.
+- **`swapExercise` under B with its post-catch array reassign removed.**
+- **App-level `@Query` behaviour for writers other than `logSet` and `finish`.**
+
+### Suggested `insights/gotchas.md` entry (SwiftData)
+
+- 2026-09-14 — **On iOS 26.5, restore-then-`rollback()` after a failed save lets the first fetch bring back the unsaved values** (Xcode 27; a store reopened with `allowsSave: false`).
+  - **Seen in:** all 11 field writers. The object read the originals and `hasChanges` was false, but the first same-context `FetchDescriptor` (by id or all rows) returned the edited fields and a second fetch returned the originals again.
+  - **In the app:** a `@Query` showed a failed `logSet` as done for about a second.
+  - **17.5:** clean.
+  - **Fix:** `rollback()` first, then restore; this leaves `hasChanges == true`, clean on both runtimes. Keep "remove inserts, then rollback" for insert writers.
+  - **Recognize it:** a failed-save test that passes on object and fresh-context reads but fails once it refetches in the writing context.
+- 2026-09-14 — **There is no easy way to make a SwiftData save fail and then succeed on the simulator.**
+  - chmod has no effect on the open store.
+  - A conflicting save from another context is overwritten silently.
+  - An exclusive SQLite lock from a second connection is waited out (63 s, then success).
+  - An SQL trigger that raises on UPDATE crashes the process instead of throwing.

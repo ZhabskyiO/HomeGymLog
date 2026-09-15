@@ -42,7 +42,9 @@ file, or artifact a step uses must be declared in that step or an earlier one, a
 may read only files an earlier command writes. Pure Engine code, views
 separate. When the spec has tap- or time-dependent acceptance criteria (scripted taps are refused in the repo's
 simulator session), add an optional step that verifies them with XCUITest in a throwaway scratch copy of the repo
-(INSIGHTS Patterns "Real-touch probes"), never touching the repo's `project.pbxproj`, with a clean skip path. Static
+(INSIGHTS Patterns "Real-touch probes"), never touching the repo's `project.pbxproj`, with a clean skip path. In such a UI test, an assertion that something is absent follows a positive assertion of the
+same element in the same launch (otherwise it cannot fail), and every tap path is traced through the screen's state
+machine before it is written (a rating starts a rest whose card hides the bottom bar; a sheet covers the header). Static
 source tests anchor on stable tokens (a type or function name such as `DebugSeed.parse(`) and accept equivalent
 spellings (`Date?` with or without `= nil`), never on a whole literal line. Prefer the smallest plan that fully meets the spec. Do not write Swift code beyond signatures
 and short illustrative snippets. Do not edit any file other than the plan.

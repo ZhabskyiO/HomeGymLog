@@ -39,7 +39,10 @@ For every model-layer writer (a function that mutates rows and saves), add a fai
 an on-disk store, reopen the same file with `ModelConfiguration(..., allowsSave: false)`, run the writer on that
 context, and check both the store (a fresh context on the writable container) and the writing context's own rows
 (INSIGHTS Patterns 2026-09-13). Keep every `ModelContainer` bound for the whole test; releasing it early crashes the
-iOS 26.5 test process.
+iOS 26.5 test process. The first read after the failure is a same-context `FetchDescriptor` fetch of the row by id,
+before any other fetch (on 26.5 only the first fetch can return unsaved values; object reads hid a bug for two slices),
+and after the assertions call `context.rollback()` before deleting the temporary store file (pending changes crash the
+26.5 test process once the file is gone).
 
 Run test commands in the foreground (Bash timeout up to 600000 ms) or poll a background run to completion before
 ending your turn; a subagent is not woken when its own background command finishes.

@@ -10,7 +10,10 @@ Verify the working tree is ready to commit. Report failures; do not hide them.
 1. `git status --short` and `git diff --stat`. If the tree is clean, say so and stop.
 2. Run the `run-tests` skill on iPhone 15 / iOS 17.5. If tests fail, stop here and report; a red suite
    does not ship. If the diff touches `Models/` or any SwiftData call, also run the persistence suites on
-   iPhone 17 / iOS 26.5 (runtime behavior differs between the two; see gotchas "SwiftData").
+   iPhone 17 / iOS 26.5 (runtime behavior differs between the two; see gotchas "SwiftData"). Result bundles written
+   after the newest Swift edit may be reused instead of re-running: compare the bundle's mtime with the newest
+   `HomeGymLog*/**/*.swift` mtime and read `xcrun xcresulttool get test-results summary` for the counts and device.
+   The Release build in step 3 always runs fresh (a product's timestamp does not prove the current code compiles).
 3. Run the `build-and-run` skill build step only (no launch) if the diff touches anything outside
    tests and docs. Also build the Release configuration once, since `#if DEBUG`-only types leak silently
    otherwise: `xcodebuild -scheme HomeGymLog -configuration Release -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.5' -derivedDataPath build/DerivedData CODE_SIGNING_ALLOWED=NO build`. If the diff touches `Features/` or `Shared/`, run `/design-compare` for every prototype

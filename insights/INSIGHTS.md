@@ -28,7 +28,7 @@ Keep entries short. Date them. Newest at the top within each section.
 - No schema change.
 - **Architecture review (2026-09-14)**: **insert writers rehearse, field writers restore** (B1): a writer that inserts
   first saves and deletes the same row in a scratch `ModelContext` on the same container, so a refusing store throws before
-  the writing context changes; a writer that edits fields restores its snapshot, then `rollback()`. Callers of the rehearsal:
+  the writing context changes; a writer that edits fields calls `rollback()`, then restores its snapshot (order revised 2026-09-14 by researcher P4, below). Callers of the rehearsal:
   `WorkoutLogStore.start` and the insert branch of `ExerciseNoteStore.save` (never its update branch). Cost: three saves on
   the first keystroke per key (measured ~3 ms on 17.5, ~20 ms on the 26.5 simulator), once per key. Accepted edge: a rehearsal insert
   saved but its delete refused leaves the text stored, absorbed by the next keystroke's update. Reason: on 26.5 a failed
@@ -49,6 +49,23 @@ Keep entries short. Date them. Newest at the top within each section.
   `PlannedSession.exercises` from query rows in `body`; Home's `.task` fingerprint stays log-only.
 - **Bar button accessibility** (B4): label "Notes" (hint "Edit your note") / "Add note", matching the visible text; no
   third string. Swap pick closes the sheet before writing (NB4).
+- **Failed-save revert order revised (implementation finding; user decision 2026-09-14: fix in this slice; researcher P4).**
+  On iOS 26.5 (Xcode 27.0), "restore snapshot, then `rollback()`" left the object correct but the first same-context fetch
+  returned the unsaved values (a `@Query` showed a failed `logSet` as done); 17.5 was clean. It hit all 11 field writers since
+  m3-logging; the earlier rollback suites never refetched. **Decided: field writers `rollback()` first, then restore, then
+  rethrow** (`StoreCommit.commit`; clean for all 11 on both runtimes; leaves `hasChanges == true` holding the originals, which
+  the next save rewrites). **Insert writers keep "remove the inserts, then `rollback()`"** (`StoreCommit.commitInsert`, used
+  by `start` and the note insert branch after the rehearsal; 17.5 crashes on `rollback()` with an inserted graph pending).
+  Test rule: every field-writer failure test reads the row through a same-context fetch by id as its first fetch after the
+  failure. Unverified: whether a later successful save in the same context persists anything unsaved (no failure that
+  clears in place exists on the simulator).
+- **Implemented 2026-09-14** (branch `m3-exercise-tools`): 634 tests green on iOS 17.5 and 26.5, Release green, scratch-copy
+  XCUITests AC-9–AC-16 8/8 on 17.5, swift review "ship". Implementer deviations, none visible in the app: `SwapSheet`
+  aligns `.topLeading` (with no rows `.top` centred the texts); `SwapCandidates` also excludes the displayed key by name (it
+  is always among the log's keys, so the list is unchanged); the pill task skips a fetch when the held baseline is already
+  for that key (it only fires when a failed Exit → Discard flips the task id back); `swapExercise` snapshots its sets with a
+  closure, not `SetSnapshot.init` (Xcode 27 isolation warning, gotchas Swift language). Pending the user: VoiceOver hints
+  and reading order (AC-16) in the MVP pass; AC-17–AC-19 on the iPhone 14 Pro Max.
 
 ### 2026-09-14 — M3 rest-timer decisions (from the m3-rest-timer slice spec, user-answered)
 
@@ -121,6 +138,7 @@ Keep entries short. Date them. Newest at the top within each section.
   an all-skipped workout completes with 0 volume.
 - **Stray in-progress logs** (orphaned or archived program) are ignored by routing and left in the store.
 - **Later-slice controls** (Swap, Add note, ⓘ) are present but inert; progression pill hidden; no rest overlay yet.
+  (Superseded: the rest overlay by m3-rest-timer, the controls and the pill by m3-exercise-tools, both 2026-09-14.)
 - **Workout writers (architecture review)**: every workout action is one `WorkoutLogStore` function ending in one save,
   guarded to a no-op when the row is not in the expected state (log/skip set: pending; set/skip RPE: done, `rpe == nil`,
   not skipped; next exercise: no done set awaiting RPE). One shared start function for Home and Program looks the row up by
@@ -129,14 +147,18 @@ Keep entries short. Date them. Newest at the top within each section.
   is the entry below.
 - **Failed-save policy (ship-check, user-approved 2026-09-13)**, because `rollback()` keeps edited values and must never
   run with a pending insert or delete (gotchas SwiftData): **field writers** (log, save & log, skip set, RPE, skip RPE,
-  next exercise, finish) snapshot the fields they change and restore them, then `rollback()`, then rethrow. **`discard`**
+  next exercise, finish; later +30s, Skip rest, swap and the note update, 11 in all) snapshot the fields they change; on a
+  failed save they `rollback()`, then restore, then rethrow, through `StoreCommit.commit` (order revised 2026-09-14, M3
+  exercise-tools decisions: restoring first let 26.5's first fetch return the unsaved values). **`discard`**
   deletes and saves in the writing context and rethrows; on failure the deletes stay pending (the root already shows the
-  shell) and the next successful save completes them. (generalized 2026-09-14 into "insert writers rehearse", M3 exercise-tools decisions) **`start` is the first exception to "all writers stay on
-  `mainContext`"**: on 26.5 a failed insert cannot be undone in the same context (the unsaved log stays in that context's
-  routing fetch and reading it traps), so `start` first saves and deletes the same graph in a scratch `ModelContext` on
-  the same container; a refusing store throws there before the writing context changes. Cost: two extra saves per
-  start. Accepted edge: rehearsal insert saved but its delete refused leaves the tapped workout started. The single-context
-  alternatives were probed on 17.5 and 26.5 and all trap on 26.5 (implementer report, m3-logging swift review round 2).
+  shell) and the next successful save completes them. **`start` rehearses its insert**: on 26.5 a failed insert cannot be
+  undone in the same context (the unsaved log stays in that context's routing fetch and reading it traps), so `start`
+  first saves and deletes the same graph in a scratch `ModelContext` on the same container; a refusing store throws there
+  before the writing context changes. Cost: two extra saves per start. Accepted edge: rehearsal insert saved but its
+  delete refused leaves the tapped workout started. The single-context alternatives were probed on 17.5 and 26.5 and all
+  trap on 26.5 (implementer report, m3-logging swift review round 2). Generalized 2026-09-14 into "insert writers
+  rehearse" (M3 exercise-tools decisions): `start` and the note insert call `StoreCommit.rehearseInsert`, then save in
+  `mainContext` with `StoreCommit.commitInsert`. The rehearsal is the only write outside `mainContext`.
 - **Engine workout values carry row ids** (`UUID`); writes find rows by id through `Dictionary(_, uniquingKeysWith:)`,
   never by array position; ties in `order` break on the id.
 - **Every stored timestamp comes from `clock.now()` at the moment of the action**, never from a screen's cached `@State now`.
@@ -146,7 +168,7 @@ Keep entries short. Date them. Newest at the top within each section.
 - **The root owns `selectedTab`**; `initialTab` is applied behind a one-time flag; Done writes the tab before `finish`.
   **M4 note:** restart → onboarding would reopen the new shell on the old tab (e.g. Settings), so the restart path must
   reset the tab to Home. The Program tab now writes, only through the shared start function.
-- **Workout presentation**: one `WorkoutSheet` enum (`.adjust` now; `.detail`, `.swap` in m3-exercise-tools) plus a
+- **Workout presentation**: one `WorkoutSheet` enum (`.adjust`; `.detail` and `.swap` added by m3-exercise-tools on 2026-09-14) plus a
   separate exit-dialog flag; the drag offset is `@State` inside the swipe row. (implemented 2026-09-13) The screen also
   holds `isDiscarding`, raised before `discard` and lowered if it throws. While it is set, the screen renders only the
   background, so the emptied queries never show a summary frame or start the PR baseline while Exit is leaving. The
@@ -209,8 +231,9 @@ Keep entries short. Date them. Newest at the top within each section.
   its rows and re-fetches on every save. Session-derived stats are computed from the retained rows in `body`;
   `[FinishedLogValue]` (PRs, week volume) is built once per data change in `.task(id: fingerprint)` because a full
   log traversal costs ~0.4 s at program end on 17.5 and is never cached. Analogy: `useQuery` for rows, `useMemo`
-  keyed on a fingerprint for the expensive mapping. All writers stay on `mainContext` (one exception since 2026-09-13:
-  `WorkoutLogStore.start` rehearses its insert in a scratch context; see M3 "Failed-save policy").
+  keyed on a fingerprint for the expensive mapping. All writers stay on `mainContext`; only the insert writers'
+  rehearsal (`WorkoutLogStore.start` since 2026-09-13, the note insert since 2026-09-14, both through
+  `StoreCommit.rehearseInsert`) saves and deletes its rows in a scratch context first (M3 "Failed-save policy").
 - **Screens that depend on "today" hold one `@State now`**, written in `.onAppear` and in `.onChange(of: scenePhase)`
   when `.active` (verified: a bare `clock.now()` in `body` never refreshes on foreground); `now ?? clock.now()` covers
   only the pre-appear frame. Analogy: a `visibilitychange` effect.
@@ -418,7 +441,8 @@ strictly after today, and later pending sessions follow. Otherwise the missed se
 skipped sessions never move; sessions earlier than the missed one never move.
 
 ### 2026-09-09 — Accepted v1 limitations (from the M1 spec's open questions)
-Only the iOS 17.5, 18.0 and 26.5 simulator runtimes are installed; the schema's Codable collections
+Only the iOS 17.5, 18.0, 26.5 and 27.0 simulator runtimes are installed (27.0 arrived with Xcode 27.0 on 2026-09-14, and
+iOS 27.0 is now the only simulator SDK; tests still run on 17.5 and 26.5); the schema's Codable collections
 (`[PlannedExercise]`, `[Int]`, `[String: Double]`) were verified on 17.5 and 26.5, not on 17.0–17.4. The user's
 phone is the effective floor. If a 17.0 runtime is ever installed, run the persistence suites on it once.
 Scheduled dates are stored as local midnight and compared by calendar day; a time-zone change may shift a day.
@@ -428,7 +452,8 @@ empty store (formalized in M4).
 ### 2026-09-09 — Xcode project is wizard-created once; synchronized folders do the rest
 `HomeGymLog/` and `HomeGymLogTests/` are `PBXFileSystemSynchronizedRootGroup`s. Any `.swift` written under them
 (nested subfolders included) is compiled by the matching target with no pbxproj edit; verified with xcodebuild
-on the iOS 17.5 simulator. No xcodegen or tuist. Keep the Xcode 26 defaults: `SWIFT_VERSION = 5.0`,
+on the iOS 17.5 simulator. No xcodegen or tuist. Keep the wizard's Xcode 26 defaults (the Xcode 27.0 update of 2026-09-14
+changed none of them; `LastUpgradeCheck` still reads 2660): `SWIFT_VERSION = 5.0`,
 `SWIFT_APPROACHABLE_CONCURRENCY = YES`, `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` (app target). Do not move to
 Swift 6 language mode; it only adds friction with SwiftData's non-Sendable `ModelContext`.
 Observed 2026-09-10 after Step 0 of M1: `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` is set on the **app target only**
@@ -500,12 +525,39 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
 - Weight: see the step-based progression decision above (supersedes the prototype's +5/week, cap-first formula).
 - Starting weights: user-settable per exercise (the prototype's five anchors dbBench, latPull, goblet,
   shoulderPress, rdl are only the prototype's subset); library default otherwise.
-- Swap candidates: same muscle group, not already in the session, weight from the same formula.
+- Swap candidates: same muscle group, not already in the workout's log (its current keys, so a swapped-out planned key
+  is offered again), library order, weight from the same formula at the session's stored week and phase
+  (implemented 2026-09-14, `Engine/SwapCandidates`).
 - PR = top logged weight for an exercise exceeds the previous best across all completed sessions.
 - Streak counts consecutive completed scheduled sessions backward from today; today's unfinished session
   does not break it.
 
 ## Agent tuning
+
+- 2026-09-14 (m3-exercise-tools) — **researcher** was decisive four times (Q1–Q6; P1–P3 no in-place insert undo; P4 the revert
+  order across all 11 writers). Its miss: Q4 read the swap row after a failed save by traversing from the session first, which
+  reads restored values on 26.5, while the app's `@Query` and a direct fetch return the unsaved ones; it surfaced only in the
+  implementer's 26.5 run and cost a decision round. Prompt edit: a persistence probe's first read-back after the action uses
+  the app's own access path (a direct `FetchDescriptor` / `@Query` of that row type), never only a relationship traversal.
+- 2026-09-14 (m3-exercise-tools) — **implementation-planner** traced 30/30 ACs, but an XCUITest "no pill" assertion ran on a
+  launch that could never show the pill (verifier F1), and the main session's own fix then walked through the rest card that
+  hides "Next exercise" (verifier round 2). Prompt edit: an absence assertion follows a positive assertion of the same element
+  in the same launch, and every UI-test path is traced through the screen's state machine (rests start after a rating, sheets
+  and cards cover the bar).
+- 2026-09-14 (m3-exercise-tools) — **spec-creator** derived every table correctly, but AC-16 invented a third accessibility
+  string ("Edit note") against the user's decided label (architecture B4), and it left its prototype `http.server` running.
+  Prompt edits: accessibility labels equal the visible text or a decided wording and are listed in the text helper; stop any
+  server it starts before returning.
+- 2026-09-14 (m3-exercise-tools) — **implementer** stopped correctly twice (Xcode's mid-run self-update behind a license
+  prompt; a 26.5 failure whose fix changed a recorded policy), proved red-before-green on 26.5, and attributed three new
+  warnings and a screenshot byte-diff to Xcode 27 by building the base commit (Patterns). **architecture-reviewer** (4
+  blocking, all applied; its Q7 call was confirmed by P1), **plan-verifier** (3 scoped rounds, 0 false claims),
+  **test-writer** (+64, no bug, 3 vacuous assertions), **swift-reviewer** (ship; U3 flags a pre-existing failed-discard risk)
+  and **doc-writer** needed no re-prompt. Prompt edit (test-writer, implementer): a failed-save test's first read after the
+  failure is a same-context fetch by id, and it calls `context.rollback()` before deleting its temporary store.
+- 2026-09-14 (m3-exercise-tools) — **process**: the 26.5 failed-save bug predated the slice by two slices and was caught only
+  because this slice's spec demanded refetch assertions (researcher fact 12); the older suites read objects only. A
+  mid-slice toolchain change is handled as: stop at the license prompt, ask the user, re-baseline, then attribute.
 
 - 2026-09-14 (m3-rest-timer) — **implementer** stopped its turn while a scratch-copy `xcodebuild` it had started in the
   background was still compiling ("starts when the background run finishes and notifies me"); a stopped subagent is not
@@ -659,6 +711,13 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
   spec-creator in parallel at the start of `/milestone` saved a full round.
 
 ### Skill tuning
+- 2026-09-14 — **ship-check**: step 2 may reuse result bundles written after the newest Swift edit (check mtimes and read the
+  `xcresulttool` counts) instead of re-running both suites; the Release build always runs fresh, because the product's
+  timestamp does not prove the current code compiles (m3-exercise-tools: the Release `.app` predated the last test edits).
+- 2026-09-14 — **run-tests**: when `xcodebuild`, `xcrun` or even `git` print "You have not agreed to the Xcode license
+  agreements", stop and ask the user to run `sudo xcodebuild -license accept` and `sudo xcodebuild -runFirstLaunch` in
+  Terminal, then re-check `xcrun simctl list runtimes` and `xcodebuild -showsdks` before resuming (Xcode updated itself
+  mid-slice to 27.0).
 - 2026-09-14 — **milestone**: step 5 now says that when the architecture review marks platform claims unverified, the
   researcher is resumed for a scoped probe addendum in parallel with the spec revision (m3-rest-timer P1–P4 caught a
   handler placement that would never have fired).
@@ -696,6 +755,20 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
 
 ## Patterns
 
+### 2026-09-14 — Blame the toolchain only after building the base commit with it
+When Xcode or the SDK changes mid-slice, a new warning, a failing test or a screenshot byte-difference is reproduced on the
+pre-slice commit built with the same toolchain in a scratch folder before it is fixed or blamed on the slice (≈ re-running
+the last green commit in CI to tell a new failure from a changed runner).
+
+```
+git archive 87c6780 | tar -x -C "$SCRATCH/base"
+xcodebuild -project "$SCRATCH/base/HomeGymLog.xcodeproj" -scheme HomeGymLog \
+  -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.5' -derivedDataPath "$SCRATCH/DDbase" build
+```
+m3-exercise-tools: three `[#ActorIsolatedCall]` warnings and a status-bar pixel diff reproduced on the base under Xcode 27
+(toolchain); a fourth warning did not (slice, fixed). The 26.5 refetch bug could not be attributed this way because Xcode 26
+was gone, so it was recorded as "likely pre-existing", not proven.
+
 ### 2026-09-14 — Per-key history reads: fetch the key's rows, filter the program in Swift
 Never traverse the log history for one exercise. `FetchDescriptor<LoggedExercise>` with
 `exerciseKey == key && workout.flatMap { $0.finishedAt != nil } == true`, then keep rows whose
@@ -731,7 +804,9 @@ permission scenarios (`simctl privacy` cannot reset notifications). Used by `doc
 In-memory stores never fail to save. Write the fixture through a normal on-disk container, then open the same file with
 a second container configured read-only and run the writer on that context: `save()` throws NSCocoaErrorDomain 513.
 Check both halves: a fresh context on the writable container (the store) and the writing context's own rows (what a
-screen's `@Query` shows). Bind both containers for the whole test.
+screen's `@Query` shows). Bind both containers for the whole test. Since 2026-09-14 (researcher P4): the first read of the
+writing context after the failure is a same-context fetch by id, and after the assertions `context.rollback()` runs before
+the store file is deleted (both gotchas SwiftData 2026-09-14).
 
 ```swift
 let writer = try ModelContainer(for: AppSchema.schema, configurations: [ModelConfiguration(schema: AppSchema.schema, url: url)])
@@ -752,9 +827,12 @@ update).
 ```swift
 let snapshot = SetSnapshot(set)            // weightLb, reps, statusRaw, rpe, rpeSkipped, loggedAt
 set.status = .done; set.loggedAt = at
-try commit(context) { snapshot.restore() } // save; on throw: restore, rollback(), rethrow
+try StoreCommit.commit(context) { snapshot.restore() } // save; on throw: rollback(), restore, rethrow
 ```
-Never call `rollback()` with an insert or delete pending; `start` and `discard` follow INSIGHTS "Failed-save policy".
+The restore runs after `rollback()` (revised 2026-09-14, researcher P4: restoring first let 26.5's first fetch return the
+unsaved values). Never call `rollback()` with an insert or delete pending: insert writers (`start`, the note insert) first
+rehearse with `StoreCommit.rehearseInsert`, then save with `StoreCommit.commitInsert` (remove the inserts, then roll back);
+`discard` follows INSIGHTS "Failed-save policy".
 
 ### 2026-09-13 — Real-touch probes without touching the repo
 When a question needs real drags or cold-launch frames (not just a unit test), copy the repo to the scratchpad,

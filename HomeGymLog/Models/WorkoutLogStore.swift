@@ -11,9 +11,10 @@ enum WorkoutLogStoreError: Error, Equatable {
 /// Model-layer actions on workout logs. Deletion is explicit because the iOS 17 runtime does not
 /// honor `.cascade` (verified on the 17.5 simulator: children are orphaned, not deleted).
 /// Every action ends in one save, and none calls `rollback()` while an insert or a delete is pending (iOS 17.5 crashes the
-/// process). When the save fails: the set writers and `finish` put back the fields they changed, so no unsaved change is
-/// shown as logged; `start` has already proved the save in a rehearsal, so the writing context is not touched; `discard`
-/// rethrows with its deletes pending, and the next successful save in the context completes it.
+/// process). When the save fails: the set writers and `finish` put back the fields they changed through
+/// `StoreCommit.commit`, so no unsaved change is shown as logged; `start` has already proved the save with
+/// `StoreCommit.rehearseInsert`, so the writing context is not touched; `discard` rethrows with its deletes pending, and
+/// the next successful save in the context completes it.
 enum WorkoutLogStore {
     /// The fields a set writer may change, read before it writes so a failed save can put them back.
     private struct SetSnapshot {
@@ -64,20 +65,6 @@ enum WorkoutLogStore {
         }
     }
 
-    /// Saves. If the save throws: `revert` puts back every field the action changed (and removes anything it inserted),
-    /// then `rollback()` clears the unsaved-change flag, then the error is rethrown. ≈ a transaction that restores its own
-    /// snapshot on abort. Rollback alone is not enough: it clears `hasChanges` but leaves edited values on the rows
-    /// (iOS 17.5 and 26.5), and on 17.5 it crashes the process while an insert or a delete is still pending.
-    private static func commit(_ context: ModelContext, revert: () -> Void) throws {
-        do {
-            try context.save()
-        } catch {
-            revert()
-            context.rollback()
-            throw error
-        }
-    }
-
     /// Starts a workout for a planned session: one log, one `LoggedExercise` per planned exercise (in order,
     /// at its target), and `session.sets` pending `LoggedSet`s per exercise at the target weight and the
     /// session's reps. Links the log to the session and saves. The session stays `pending` until `finish`.
@@ -93,10 +80,10 @@ enum WorkoutLogStore {
         if let existing = session.workoutLog { return existing }
         try rehearseStart(sessionID: session.id, at: at, container: context.container)
         let log = insertLog(for: session, at: at, in: context)
-        try commit(context) {
+        try StoreCommit.commitInsert(context) {
             // Last resort only (the rehearsal just saved the same graph): unlink so a retry never returns this unsaved
-            // log as the session's existing one, and remove the inserts before the rollback, which crashes on 17.5 while
-            // they are pending.
+            // log as the session's existing one, and remove the inserts; `commitInsert` rolls back only after this, because
+            // `rollback()` crashes on 17.5 while they are pending.
             session.workoutLog = nil
             delete(log, in: context)
         }
@@ -118,16 +105,16 @@ enum WorkoutLogStore {
         return log
     }
 
-    /// Saves the start graph from a scratch context and removes it again, so a store that refuses the write throws here,
-    /// before the writing context changes. A session that is not in the store yet has nothing to rehearse against.
+    /// Saves the start graph from a scratch context and removes it again (`StoreCommit.rehearseInsert`), so a store that
+    /// refuses the write throws here, before the writing context changes. A session that is not in the store yet has
+    /// nothing to rehearse against.
     private static func rehearseStart(sessionID: UUID, at: Date, container: ModelContainer) throws {
-        let scratch = ModelContext(container)
-        let matches = try scratch.fetch(FetchDescriptor(predicate: #Predicate<PlannedSession> { $0.id == sessionID }))
-        guard let stored = matches.first else { return }
-        let rehearsal = insertLog(for: stored, at: at, in: scratch)
-        try scratch.save()
-        delete(rehearsal, in: scratch)
-        try scratch.save()
+        try StoreCommit.rehearseInsert(in: container) { scratch in
+            let matches = try scratch.fetch(FetchDescriptor(predicate: #Predicate<PlannedSession> { $0.id == sessionID }))
+            guard let stored = matches.first else { return nil }
+            let rehearsal = insertLog(for: stored, at: at, in: scratch)
+            return { delete(rehearsal, in: scratch) }
+        }
     }
 
     /// The shared "Start workout" of Home's Today card and the Program card. Finds the first row with
@@ -148,7 +135,7 @@ enum WorkoutLogStore {
         let previousStatusRaw = log.session?.statusRaw
         log.finishedAt = at
         log.session?.status = .completed
-        try commit(context) {
+        try StoreCommit.commit(context) {
             log.finishedAt = previousFinishedAt
             if let previousStatusRaw { log.session?.statusRaw = previousStatusRaw }
         }
@@ -187,7 +174,7 @@ enum WorkoutLogStore {
         guard let endsAt = log.restEndsAt, at < endsAt else { return false }
         let rest = RestSnapshot(log)
         log.restEndsAt = endsAt.addingTimeInterval(TimeInterval(seconds))
-        try commit(context) { rest.restore() }
+        try StoreCommit.commit(context) { rest.restore() }
         return true
     }
 
@@ -198,7 +185,7 @@ enum WorkoutLogStore {
         guard log.restEndsAt != nil else { return false }
         let rest = RestSnapshot(log)
         clearRest(log)
-        try commit(context) { rest.restore() }
+        try StoreCommit.commit(context) { rest.restore() }
         return true
     }
 
@@ -218,7 +205,7 @@ enum WorkoutLogStore {
         set.status = .done
         set.loggedAt = at
         clearRest(set.exercise?.workout)
-        try commit(context) { snapshot.restore(); rest.restore() }
+        try StoreCommit.commit(context) { snapshot.restore(); rest.restore() }
         return true
     }
 
@@ -241,7 +228,7 @@ enum WorkoutLogStore {
             sibling.reps = reps
         }
         clearRest(set.exercise?.workout)
-        try commit(context) { snapshots.forEach { $0.restore() }; rest.restore() }
+        try StoreCommit.commit(context) { snapshots.forEach { $0.restore() }; rest.restore() }
         return true
     }
 
@@ -257,7 +244,7 @@ enum WorkoutLogStore {
         set.status = .skipped
         set.loggedAt = at
         startRestIfSetFollows(set.exercise?.workout, at: at)
-        try commit(context) { snapshot.restore(); rest.restore() }
+        try StoreCommit.commit(context) { snapshot.restore(); rest.restore() }
         return true
     }
 
@@ -276,7 +263,7 @@ enum WorkoutLogStore {
         let rest = RestSnapshot(set.exercise?.workout)
         set.rpe = rpe
         startRestIfSetFollows(set.exercise?.workout, at: at)
-        try commit(context) { snapshot.restore(); rest.restore() }
+        try StoreCommit.commit(context) { snapshot.restore(); rest.restore() }
         return true
     }
 
@@ -288,7 +275,7 @@ enum WorkoutLogStore {
         let rest = RestSnapshot(set.exercise?.workout)
         set.rpeSkipped = true
         startRestIfSetFollows(set.exercise?.workout, at: at)
-        try commit(context) { snapshot.restore(); rest.restore() }
+        try StoreCommit.commit(context) { snapshot.restore(); rest.restore() }
         return true
     }
 
@@ -308,7 +295,63 @@ enum WorkoutLogStore {
             set.loggedAt = at
         }
         clearRest(exercise.workout)
-        try commit(context) { snapshots.forEach { $0.restore() }; rest.restore() }
+        try StoreCommit.commit(context) { snapshots.forEach { $0.restore() }; rest.restore() }
+        return true
+    }
+
+    // MARK: Swap (m3-exercise-tools spec 4.2)
+
+    /// Swap pick: guarded field writer, one save. Returns false and writes nothing unless `key` is in the library, differs
+    /// from the current key, no other exercise of the log has it, and every set of the exercise is pending (a done or
+    /// skipped weight is never credited to another key).
+    ///
+    /// Writes, in one save: the exercise's key; `swappedFromKey` = the planned key (kept across a second swap, cleared to nil
+    /// when `key` is the planned key again); its target; every set's weight (reps unchanged); and this session's planned
+    /// element with the same `order` (key and target, in place). No such element, or no session, is a log-only swap that
+    /// still returns true. `targetWeightLb` comes from the picked candidate (always loadable). Future sessions are never
+    /// touched. That it is one save is a code-review property (no test hook observes the save count).
+    ///
+    /// On a failed save `StoreCommit.commit` rolls back, then every changed field is restored (the planned array included),
+    /// then the error is rethrown.
+    @discardableResult
+    static func swapExercise(_ exercise: LoggedExercise, to key: String, targetWeightLb: Double, in context: ModelContext) throws -> Bool {
+        guard ExerciseLibrary.exercise(for: key) != nil, key != exercise.exerciseKey else { return false }
+        let others = (exercise.workout?.exercises ?? []).filter { $0.id != exercise.id }
+        guard !others.contains(where: { $0.exerciseKey == key }) else { return false }
+        let sets = exercise.sets
+        guard sets.allSatisfy({ $0.status == .pending }) else { return false }
+
+        let setSnapshots = sets.map { SetSnapshot($0) }   // a closure, not `SetSnapshot.init`: the unapplied reference warns on Xcode 27
+        let oldKey = exercise.exerciseKey
+        let oldSwappedFrom = exercise.swappedFromKey
+        let oldTarget = exercise.targetWeightLb
+        let session = exercise.workout?.session
+        let plannedSnapshot = session?.exercises
+
+        let plannedKey = oldSwappedFrom ?? oldKey
+        exercise.exerciseKey = key
+        exercise.swappedFromKey = key == plannedKey ? nil : plannedKey
+        exercise.targetWeightLb = targetWeightLb
+        for set in sets { set.weightLb = targetWeightLb }
+        if let session, let index = session.exercises.firstIndex(where: { $0.order == exercise.order }) {
+            session.exercises[index].exerciseKey = key   // an in-place element edit is detected and saved (17.5, 26.5)
+            session.exercises[index].targetWeightLb = targetWeightLb
+        }
+
+        do {
+            try StoreCommit.commit(context) {
+                exercise.exerciseKey = oldKey
+                exercise.swappedFromKey = oldSwappedFrom
+                exercise.targetWeightLb = oldTarget
+                setSnapshots.forEach { $0.restore() }
+                if let session, let plannedSnapshot { session.exercises = plannedSnapshot }
+            }
+        } catch {
+            // Redundant under rollback-then-restore (the revert above already ran after the rollback); kept because P4 probed
+            // swapExercise with it present, and its removal is unverified on 26.5.
+            if let session, let plannedSnapshot { session.exercises = plannedSnapshot }
+            throw error
+        }
         return true
     }
 

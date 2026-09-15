@@ -143,9 +143,25 @@ nonisolated enum WorkoutFlow {
         return false
     }
 
-    /// The exercise shown on screen: the focus set's exercise; nil in summary.
+    /// The exercise shown on screen as a position: the focus set's exercise; nil in summary. The header's progress
+    /// segments and "Exercise n of m" need the index; `displayedExercise(exercises:state:)` returns the value.
     static func displayedExercise(_ state: WorkoutState) -> Int? {
         focusPosition(state)?.exercise
+    }
+
+    /// The exercise shown on screen as a value: the focus position's exercise from `sorted(exercises)`; nil in summary or
+    /// for an out-of-range position (including a negative one). The one lookup the screen (bar label, pill, preview, Swap
+    /// state) and the logging content share.
+    static func displayedExercise(exercises: [WorkoutExerciseValue], state: WorkoutState) -> WorkoutExerciseValue? {
+        guard let index = displayedExercise(state) else { return nil }
+        let ordered = sorted(exercises)
+        return ordered.indices.contains(index) ? ordered[index] : nil
+    }
+
+    /// Spec 5.3: Swap is enabled only while every set of the exercise is pending, so a done or skipped weight is never
+    /// credited to another key. An exercise with no sets → true.
+    static func canSwap(_ exercise: WorkoutExerciseValue) -> Bool {
+        exercise.sets.allSatisfy { $0.status == .pending }
     }
 
     /// Spec 5.2: one row per set of the displayed exercise. Done → `.done(rpe)`, skipped → `.skipped`, the focus

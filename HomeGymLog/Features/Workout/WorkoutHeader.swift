@@ -1,11 +1,14 @@
 import SwiftUI
 
-/// "Exit" pill, the session name over the elapsed clock, an inert "Swap" pill, and one progress segment per exercise.
+/// "Exit" pill, the session name over the elapsed clock, the "Swap" pill, and one progress segment per exercise.
 struct WorkoutHeader: View {
     let name: String
     let startedAt: Date
     let tones: [ProgressTone]
+    /// True while every set of the displayed exercise is pending (spec 5.3); otherwise Swap is drawn at 40 % and inert.
+    let swapEnabled: Bool
     let onExit: () -> Void
+    let onSwap: () -> Void
 
     var body: some View {
         VStack(spacing: 14) {
@@ -14,7 +17,11 @@ struct WorkoutHeader: View {
                     Button(action: onExit) { HeaderPill(title: "Exit") }
                         .buttonStyle(.plain)
                     Spacer()
-                    HeaderPill(title: "Swap")   // inert until m3-exercise-tools: plain text, not a button
+                    // `.disabled` also tells VoiceOver the button is dimmed (≈ `disabled` on a <button>).
+                    Button(action: onSwap) { HeaderPill(title: "Swap") }
+                        .buttonStyle(.plain)
+                        .disabled(!swapEnabled)
+                        .opacity(swapEnabled ? 1 : 0.4)
                 }
                 VStack(spacing: 1) {
                     Text(name).font(.system(size: 12)).foregroundStyle(Theme.mu)

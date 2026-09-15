@@ -27,9 +27,11 @@ Compare one design state with the app. The output is a list of concrete differen
    Known crops (`sips -c <h> <w> --cropOffset <y> <x>`): ob0 640×720 @ (200, 45); ob1 640×370 @ (200, 790);
    ob2 640×430 @ (200, 1180); ob3 640×340 @ (200, 1620); ob4 640×455 @ (200, 1960); ob5 640×575 @ (200, 2425).
    Row B: home 900×700 @ (930, 40); wo-start 600×300 @ (930, 740); wo-swipe 600×300 @ (930, 1045);
-   wo-rpe 700×310 @ (930, 1345); wo-rest 600×300 @ (930, 1665); summary 640×330 @ (930, 1975). Row C: wo-adjust 570×300 @ (1890, 40).
+   wo-rpe 700×310 @ (930, 1345); wo-rest 600×300 @ (930, 1665); summary 640×330 @ (930, 1975). Row C: wo-adjust 570×300 @ (1890, 40); wo-detail 570×300 @ (1890, 350); wo-swap 570×300 @ (1890, 640) (recorded
+   by m3-exercise-tools; the prototype's `wo-swap` frame is the empty list on Lat Pulldown, seeded as `-seed wo-swap`).
    Row D: program 720×1620 @ (2530, 30) — that frame renders much wider than a
-   phone, so compare content, not width. Workout seeds (`wo-start`, `wo-swipe`, `wo-rpe`, `wo-adjust`, `summary`)
+   phone, so compare content, not width. Workout seeds (`wo-start`, `wo-swipe`, `wo-rpe`, `wo-adjust`, `wo-rest`, `summary`, `wo-detail`, `wo-swap`, `wo-swap-rdl`,
+   `wo-notes`)
    need no `-tab`: the workout replaces the shell at the root. For other rows B–E, view `sips -Z 1500 build/proto-all.png` first to locate the frame, then crop. Re-render only
    when the design export changes.
 2. **Capture the app.** Build if needed (`/build-and-run` build step), pick the iPhone 15 / iOS 17.5

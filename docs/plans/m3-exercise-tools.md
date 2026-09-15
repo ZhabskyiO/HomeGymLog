@@ -1,6 +1,26 @@
 # M3 slice 3 — Exercise tools (detail sheet with notes, swap, progression pill): implementation plan
 
-**Status: verified 2026-09-14 (plan-verifier round 3 PASS; `docs/reviews/m3-exercise-tools-verifier-1.md`…`-3.md`), awaiting the user's approval to implement.** For `docs/specs/m3-exercise-tools.md` (review B1–B4, NB1–NB13 applied; researcher facts 1–12 and addendum P1–P3
+**Status: implemented 2026-09-14 on branch `m3-exercise-tools`.** Verified by plan-verifier round 3 (`docs/reviews/m3-exercise-tools-verifier-1.md`…`-3.md`). Steps 0–13 ran on Xcode 27.0 (27A266a), which replaced 26.6 mid-slice.
+- **Tests (after ship-check):** iPhone 15 / iOS 17.5 634/634; iPhone 17 / iOS 26.5 634/634; Release build green; Step 12 scratch-copy XCUITests 8/8 passed on 17.5 (test1_notes, test2_keyboard, test3_swapEnabled, test4_pick, test5_swapMidRest, test6_exitAfterSwap, test7_pill, test8_a11y). Seeded screenshots `wo-start`, `wo-detail`, `wo-swap`, `wo-swap-rdl` match the prototype with the spec's §8 deviations. Swift review: ship (`docs/reviews/m3-exercise-tools-swift-review.md`).
+- **Pending the user:** VoiceOver hints and reading order (AC-16) in the MVP pass; AC-17–AC-19 on the iPhone 14 Pro Max.
+- **Swift-review fixes applied:**
+  - `swapExercise` comments now describe the rollback-then-restore order.
+  - The vacuous `StoreCommitTests` assertions are removed.
+  - The detail sheet opens only for a library key.
+  - `StoreCommitSourceTests` anchors on `StoreCommit.commit(` before `rehearseInsert(`.
+- **Failed-save revert order (user decision, researcher addendum P4):**
+  - `StoreCommit.commit` now rolls back first, then restores (all 11 field writers).
+  - The new `StoreCommit.commitInsert` removes the inserts, then rolls back (`start`, note insert).
+  - Every field-writer failed-save suite reads the written row with a first same-context fetch by id. Before the fix that fetch was red on 26.5 for every writer.
+  - Those suites discard the pending restored originals before deleting their temporary store. Otherwise a SwiftData timer faults the missing file and aborts the 26.5 test process.
+- **Deviations:**
+  - `SwapSheet` uses `.topLeading` instead of `.top`: with no rows, `.top` centred the texts.
+  - `SwapCandidates` also excludes the displayed key by name. The list is unchanged in the app, because that key is always among the log's keys.
+  - The pill's `.task(id:)` skips the fetch when the held baseline is already for that key. This only happens when a failed Exit → Discard flips the id back.
+  - `swapExercise` snapshots its sets with a closure instead of `SetSnapshot.init`, which triggers an Xcode 27 isolation warning.
+- **Regression screenshots:** the `cmp` differences against the Xcode 26 baselines are status-bar pixels only (38,711 px in (0,0)–(259,48) pt). HEAD built on Xcode 27 renders byte-identically to the slice.
+
+For `docs/specs/m3-exercise-tools.md` (review B1–B4, NB1–NB13 applied; researcher facts 1–12 and addendum P1–P3
 binding); spec §2–6 and §8 are the contract (`AC-1`…`AC-30`); shorthands follow `docs/plans/m3-rest-timer.md`; executed by `implementer`, one step per build.
 
 ## 1. Goal and scope

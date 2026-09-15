@@ -4,7 +4,8 @@ import Testing
 /// AC-39 (scan half): the quoted workout seed names exist only in `App/DebugSeed/`, which is compiled out of Release.
 /// Unquoted identifiers such as `WorkoutSummary` do not count. Each name must be found there, so an empty scan fails.
 @Suite struct SeedNameScanTests {
-    private static let names = ["\"wo-start\"", "\"wo-swipe\"", "\"wo-rpe\"", "\"wo-adjust\"", "\"wo-rest\"", "\"summary\""]
+    private static let names = ["\"wo-start\"", "\"wo-swipe\"", "\"wo-rpe\"", "\"wo-adjust\"", "\"wo-rest\"", "\"summary\"",
+                                "\"wo-detail\"", "\"wo-swap\"", "\"wo-swap-rdl\"", "\"wo-notes\""]
 
     /// `<repo>/HomeGymLog`, derived from `<repo>/HomeGymLogTests/Static/…`.
     private static var appSourceRoot: URL {
@@ -38,5 +39,17 @@ import Testing
         for name in Self.names {
             #expect(debugSeed.contains { $0.code.contains(name) }, "\(name) is declared in App/DebugSeed/")
         }
+    }
+
+    /// m3-exercise-tools AC-29: the Bool adjust preview is gone, generalized into one nil-by-default sheet preview entry.
+    @Test("no app code names workoutAdjustPreview; App/AppClock.swift declares the workoutSheetPreview @Entry on exactly one line")
+    func sheetPreviewEntry() throws {
+        let all = try Self.sources()
+        #expect(all.count > 40, "the whole app target was scanned")
+        let oldName = all.filter { $0.code.contains("workoutAdjustPreview") }.map(\.path)
+        #expect(oldName == [])
+        let appClock = try #require(all.first { $0.path == "App/AppClock.swift" })
+        let entryLines = appClock.code.components(separatedBy: "\n").filter { $0.contains("@Entry") && $0.contains("workoutSheetPreview") }
+        #expect(entryLines.count == 1)
     }
 }

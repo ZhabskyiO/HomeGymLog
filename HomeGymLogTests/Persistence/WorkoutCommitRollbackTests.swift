@@ -3,8 +3,8 @@ import SwiftData
 import Testing
 @testable import HomeGymLog
 
-/// Spec 4.2 failure policy and §6 "Save fails": no unsaved change is ever shown as logged. Field writers restore the
-/// fields they changed, then roll back; `start` rehearses its insert in a scratch context so a refusing store throws
+/// Spec 4.2 failure policy and §6 "Save fails": no unsaved change is ever shown as logged. Field writers roll back, then
+/// restore the fields they changed (m3-exercise-tools researcher addendum P4), so `hasChanges` stays true; `start` rehearses its insert in a scratch context so a refusing store throws
 /// before the writing context changes; `discard` leaves its deletes pending for the next successful save.
 ///
 /// A failed save is forced by writing the rows to an on-disk store, then reopening the same file through a second
@@ -58,12 +58,65 @@ import Testing
         }
     }
 
+    /// The row an action writes, as values: a set, or the log (for `finish`).
+    private enum RowValues: Equatable {
+        case set(SetValues)
+        case log(finishedAt: Date?, restStartedAt: Date?, restEndsAt: Date?)
+    }
+
+    private enum TargetRow {
+        case set(UUID)
+        case log(UUID)
+    }
+
     private struct Outcome {
         let threw: Bool
         let before: LogValues
         let inWritingContext: LogValues
         let hasChanges: Bool
         let inStore: LogValues
+        /// The written row read from the objects before the write, and through the writing context's first fetch after the
+        /// failure (researcher addendum P4: on 26.5 only that first fetch returned unsaved values under restore-then-rollback).
+        let rowBefore: RowValues
+        let rowFirstFetch: RowValues
+    }
+
+    private func setValues(_ set: LoggedSet) -> SetValues {
+        SetValues(status: set.status, weightLb: set.weightLb, reps: set.reps, rpe: set.rpe, rpeSkipped: set.rpeSkipped, loggedAt: set.loggedAt)
+    }
+
+    /// Which row each action writes (the fixture: E1S1 done unrated, everything else pending).
+    private func target(_ action: Action, of log: WorkoutLog) -> TargetRow {
+        let sets = WorkoutStoreFixtures.sets(of: log)
+        switch action {
+        case .logSet, .saveAndLogSet, .skipSet: return .set(sets[0][1].id)
+        case .setRPE, .skipRPE: return .set(sets[0][0].id)
+        case .nextExercise: return .set(sets[1][0].id)
+        case .finish: return .log(log.id)
+        }
+    }
+
+    private func objectValues(_ target: TargetRow, of log: WorkoutLog) throws -> RowValues {
+        switch target {
+        case .set(let id):
+            let set = try #require(WorkoutStoreFixtures.sets(of: log).flatMap { $0 }.first { $0.id == id })
+            return .set(setValues(set))
+        case .log:
+            return .log(finishedAt: log.finishedAt, restStartedAt: log.restStartedAt, restEndsAt: log.restEndsAt)
+        }
+    }
+
+    /// Must be the first fetch in `context` after the failure: a later one hides the 26.5 behaviour.
+    private func firstFetch(_ target: TargetRow, in context: ModelContext) throws -> RowValues {
+        switch target {
+        case .set(let id):
+            let rows = try context.fetch(FetchDescriptor<LoggedSet>(predicate: #Predicate { $0.id == id }))
+            return .set(setValues(try #require(rows.first)))
+        case .log(let id):
+            let rows = try context.fetch(FetchDescriptor<WorkoutLog>(predicate: #Predicate { $0.id == id }))
+            let row = try #require(rows.first)
+            return .log(finishedAt: row.finishedAt, restStartedAt: row.restStartedAt, restEndsAt: row.restEndsAt)
+        }
     }
 
     private func values(_ log: WorkoutLog) -> LogValues {
@@ -99,14 +152,22 @@ import Testing
         let context = ModelContext(readOnly)
         let log = try #require(try context.fetch(FetchDescriptor(predicate: WorkoutSnapshotBuilder.inProgressPredicate)).first)
         let before = values(log)
+        let row = target(action, of: log)
+        let rowBefore = try objectValues(row, of: log)
         var threw = false
         do { try perform(action, on: log, in: context) } catch { threw = true }
+        let rowFirstFetch = try firstFetch(row, in: context)   // first fetch after the failure, before any other read
         let inWritingContext = values(log)
         let hasChanges = context.hasChanges
         let storeLog = try #require(try ModelContext(writer).fetch(FetchDescriptor(predicate: WorkoutSnapshotBuilder.inProgressPredicate)).first)
         let inStore = values(storeLog)
+        // Every value is read: discard the restored originals the failed write left pending. Otherwise SwiftData processes
+        // them on a timer after `outcome` has removed the store file, faults a row from the missing file and aborts the test
+        // process (NSInternalInconsistencyException, Cocoa 256, seen on 26.5). Safe: a field writer has no insert or delete pending.
+        context.rollback()
         withExtendedLifetime((writer, readOnly)) {}   // 26.5 crashes when a container is released while its models are read
-        return Outcome(threw: threw, before: before, inWritingContext: inWritingContext, hasChanges: hasChanges, inStore: inStore)
+        return Outcome(threw: threw, before: before, inWritingContext: inWritingContext, hasChanges: hasChanges, inStore: inStore,
+                       rowBefore: rowBefore, rowFirstFetch: rowFirstFetch)
     }
 
     private func outcome(_ action: Action) throws -> Outcome {
@@ -125,23 +186,27 @@ import Testing
         #expect(result.before.finishedAt == nil && result.before.sessionStatus == .pending)
     }
 
-    @Test("a failed save rethrows, leaves no unsaved change, and the store keeps the rows as they were", arguments: Action.allCases)
+    @Test("a failed save rethrows, holds the restored originals as unsaved changes, and the store keeps the rows as they were",
+          arguments: Action.allCases)
     func failedSaveLeavesStoreUnchanged(action: Action) throws {
         let result = try outcome(action)
         #expect(result.threw)
-        #expect(!result.hasChanges)
+        #expect(result.hasChanges, "rollback first, then restore: the restored originals are pending (addendum P4)")
         #expect(result.inStore.changes(from: result.before) == [])
         #expect(result.inStore == result.before)
     }
 
     /// Spec-required. `ModelContext.rollback()` alone clears `hasChanges` but leaves every mutated property on the
-    /// registered rows (a refetch in the same context returns them too, on 17.5 and 26.5), so `WorkoutLogStore.commit`
-    /// restores a snapshot of the changed fields before rolling back. Red before that fix.
+    /// registered rows (a refetch in the same context returns them too, on 17.5 and 26.5), so `StoreCommit.commit` rolls
+    /// back and then restores a snapshot of the changed fields. Restoring before the rollback left the unsaved values in the
+    /// first same-context fetch on 26.5 (red for all seven actions before addendum P4's order).
     @Test("a failed save leaves the writing context's rows showing the values from before the write", arguments: Action.allCases)
     func failedSaveRevertsRowsInWritingContext(action: Action) throws {
         let result = try outcome(action)
         #expect(result.threw)
         #expect(result.inWritingContext.changes(from: result.before) == [])
+        // Researcher addendum P4: what a screen's @Query re-fetch returns. Red on 26.5 with restore-then-rollback.
+        #expect(result.rowFirstFetch == result.rowBefore, "first same-context fetch of the written row after the failure")
     }
 
     // MARK: start and discard (inserts and deletes: on 17.5 `rollback()` crashes the process while either is pending)
