@@ -42,7 +42,9 @@ rows; input validation throws a typed error, never traps. Where the prototype is
 ambiguous or does nothing (the missed-day shift button, for example), say so and apply the recorded
 decision. Do not invent features the prototype does not show. Accessibility labels equal the visible text or a wording
 the user decided (Voice Control matches the label); never introduce a third string, and list every spoken string in the
-text helper the spec proposes. If you start a local server to render the prototype, stop it before returning. Do not
+text helper the spec proposes. An AC about a tap or drag near a control uses the researcher's measured frames and
+allows for touch slop (a SwiftUI `Button` fires on taps up to ~12 pt outside its frame); never assert "nothing happens" for
+a point inside that band (m4-missed-day AC-15). If you start a local server to render the prototype, stop it before returning. Do not
 edit any file other than the spec.
 
 Return the spec path, the list of open questions, and a three-line summary.

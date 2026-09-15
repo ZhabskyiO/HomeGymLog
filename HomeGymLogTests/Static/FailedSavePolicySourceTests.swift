@@ -41,6 +41,13 @@ import Testing
         #expect(try Self.occurrences(of: "rollback()") == ["Models/StoreCommit.swift": 2])
     }
 
+    /// m4-missed-day: the shift and skip writers save through the field-writer helper, so `rollbackOnlyInStoreCommit` above
+    /// fails if either calls `rollback()` itself.
+    @Test("Models/ProgramStore.swift has exactly two code lines calling StoreCommit.commit(: the shift and skipMissed writers")
+    func programStoreWritersCommit() throws {
+        #expect(try Self.occurrences(of: "StoreCommit.commit(")["Models/ProgramStore.swift"] == 2)
+    }
+
     @Test("StoreCommit.commitInsert( is called once each by ExerciseNoteStore.swift and WorkoutLogStore.swift")
     func commitInsertOnlyForInsertWriters() throws {
         #expect(try Self.occurrences(of: "StoreCommit.commitInsert(") == ["Models/ExerciseNoteStore.swift": 1, "Models/WorkoutLogStore.swift": 1])

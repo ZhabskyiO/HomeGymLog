@@ -24,6 +24,11 @@ import Testing
         (DebugSeed.summary, 3, 10, 120, 7560.0, ["dbBench", "inclineDb", "shoulderPress", "pecDeck"], 3),
         (DebugSeed.woSwapRDL, 3, 10, 120, 7560.0, ["dbBench", "inclineDb", "shoulderPress", "pecDeck"], 3),
         (DebugSeed.woNotes, 3, 10, 120, 7560.0, ["dbBench", "inclineDb", "shoulderPress", "pecDeck"], 3),
+        // Missed-day seeds (spec 5.5): the shift makes s7 today's session (week 2) and restores the streak; a skip keeps
+        // midProgram's numbers; Thu 09-17 with s12 missed has no streak.
+        (DebugSeed.missedShifted, 10, 10, 120, 7560.0, ["dbBench", "inclineDb", "shoulderPress", "pecDeck"], 2),
+        (DebugSeed.missedSkipped, 3, 10, 120, 7560.0, ["dbBench", "inclineDb", "shoulderPress", "pecDeck"], 3),
+        (DebugSeed.missedSeveral, 0, 10, 120, 7560.0, ["dbBench", "inclineDb", "shoulderPress", "pecDeck"], 3),
         (DebugSeed.restDay, 7, 14, 120, 49320.0, ["chestPress", "skull", "latPull", "lowRow"], 4),
         (DebugSeed.freshProgram, 0, 0, 16, 0.0, [], 1),
     ])

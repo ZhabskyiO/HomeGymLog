@@ -1,6 +1,20 @@
 # M4 slice 1 — Missed day (Home prompt, Program-card shift and skip): implementation plan
 
-**Status: verified 2026-09-15 (plan-verifier round 1 PASS WITH FIXES, round 2 PASS; `docs/reviews/m4-missed-day-verifier-1.md`, `-2.md`), awaiting the user's approval to implement; branch `m4-missed-day`.** For `docs/specs/m4-missed-day.md` (agreed; architecture B1–B6 and NB1–NB9 applied;
+**Final status 2026-09-15: implemented.** 711 tests green on iOS 17.5 and 26.5 (671 after the implementer; 710 after the
+test-writer's six edge suites; 711 after the swift-review fix round), Release green. Step 8 is 10/10 on 17.5 once test8 expected the
+accepted 89 pt drag to dismiss. Swift review: ship (`docs/reviews/m4-missed-day-swift-review.md`). Items 2 (reset the drag offset
+after a dismiss) and 3 (a named `promptAllowed` local) are applied. Item 1 (`.isModal` on the inner container) waits on AC-17's
+device check, with the fallback in §6. The two paragraphs below record how the AC-15 and drag decisions were reached. Still open:
+the two user items in §6.
+
+**Update 2026-09-15 (AC-15 decision, card bottom padding 44 → 64 pt):** 671 green on 17.5, regression shots byte-identical; the card
+sits 20 pt higher and now hides "Start workout" completely on 17.5 (a strip still shows on 26.5). Tap boundary below Skip (17.5): fires
+at 5, 8, 10, 12 pt; not at 15, 18, 20, 25 pt, nor in the bottom 34 pt band. Step 8 rerun 9/10: test6 and test7 (rewritten to the new
+AC-15) pass; **test8_drags fails**: a drag from Skip can now travel 89 pt, so the 120 pt drag dismisses by drag (s7 still missed,
+Skip never fired, P2 holds) instead of springing back as recorded (INSIGHTS B6, spec 2.2 "~69 pt, always settles back"). Decided by the
+main session 2026-09-15: accepted (P2's rule "a drag never fires a button" holds; nothing is written); spec, INSIGHTS and test8 updated.
+
+**Status: implemented 2026-09-15 (implementer, Steps 0–9; user approved incl. Step 8): 671 tests green on iOS 17.5 and 26.5 (634 → 671), Release green, Step 9 greps clean, `project.pbxproj` untouched; every seeded shot read, all AC-11 regression shots byte-identical to the Step 0 baselines. Step 8 (scratch copy, 17.5): 8/10 passed (test1–5, test8, test9, test10); **test6_blocking failed** because its expectation is wrong (a coordinate tap on ⓘ or Start workout's visible strip lands on the scrim, which dismisses the prompt as designed; a diagnostic run showed no workout, no sheet, s7 still missed); **test7_pillUnderCard failed** on the app (a tap on the pill at y 814.8 pt, 6.8 pt below Skip's frame, performs Skip; 20 pt below does nothing), so AC-15's "tab pill below Skip" wording needs a decision. Visible deviations: the prompt body wraps to two lines on the phone (the prototype frame is wider; matches the researcher's 281 pt card), so less of "Start workout" shows above the card; the Program Missed card's Skip button sits under the floating bar at scroll top (the list scrolls). Verified 2026-09-15 (plan-verifier round 1 PASS WITH FIXES, round 2 PASS; `docs/reviews/m4-missed-day-verifier-1.md`, `-2.md`); branch `m4-missed-day`.** For `docs/specs/m4-missed-day.md` (agreed; architecture B1–B6 and NB1–NB9 applied;
 researcher report and addendum P1/P2 binding). Spec §2–6 and §8 are the contract (`AC-1`…`AC-28`); format follows `docs/plans/m3-exercise-tools.md`; executed by `implementer`, one step per build.
 
 ## 1. Goal and scope
@@ -321,8 +335,8 @@ of the same query in the same launch.
   Home → title absent; home button, 1 s, `activate()`, 1.5 s → title absent. `test6_blocking`: title → coordinate taps on "Start workout" and "About Lat Pulldown" → 1 s
   → title still present (fails if the workout unmounted the shell) and `buttons["Home"].isSelected`; then (0.5, 0.12) → gone (fails if a sheet opened: that tap would
   close the sheet instead). `test7_pillUnderCard`: title → tap `buttons["Program"]` at normalized (0.5, 0.9) (below Skip, open question 2) → `buttons["Home"].isSelected`,
-  title still present. `test8_drags`: launch A: `drag(title, 40)` → present after 1 s; `drag(Skip, 120)` (clamped ~69 pt) → present (s7 still missed: no skip, no
-  shift); `drag(shift, 120)` → gone, "Pull" present (no shift), Program → "Week 2" → day 9 → "Missed" (no skip); launch B: `drag(title, 120)` → gone → AC-15 (incl. P2).
+  title still present. `test8_drags`: launch A: `drag(title, 40)` → present after 1 s; `drag(Skip, 60)` → present; `drag(Skip, 120)` (~89 pt of room with the 64 pt padding) → gone by the drag (s7 still missed: no skip, no
+  shift; a fresh launch continues); `drag(shift, 120)` → gone, "Pull" present (no shift), Program → "Week 2" → day 9 → "Missed" (no skip); launch B: `drag(title, 120)` → gone → AC-15 (incl. P2).
 - `test9_programCard`: (a) `-seed missed -tab program -programWeek 2 -programDay 2`: "Missed" → shift → "Today", "Legs", no shift button; "Week 2" → day 9 → rest text;
   (b) same args: skip → "Skipped", "Legs", no skip button; (c) `-seed missed-several -tab program -programDay 2`: "Legs", "Missed" → shift → "Today", "Legs"; Home → "You
   skipped Legs on Wed, Sep 9"; (d) `-programDay 1`: "Pull", "Missed" → skip → "Skipped"; Home → the same title → AC-16.
@@ -377,7 +391,8 @@ iPhone 15 / iOS 17.5 and on 26.5 (Step 9). `SchemaSourceTests` unchanged.
       the three-button Missed card and the Skipped card read as AC-2, 3, 5–10; `midProgram` (dark, light, Program), `restDay` (Home, Program), `freshProgram` and the ten workout seeds unchanged.
 - [ ] Step 8 results recorded per test (or "skipped"); plan and spec status lines set; (the skill already carries the render size, crop and seed names).
 - [ ] **User, MVP pass (simulator or phone):** AC-12–AC-16 for every check Step 8 skipped or failed; the card's spring-back feel; a real finger drag from Skip.
-- [ ] **User, iPhone 14 Pro Max:** AC-17 VoiceOver: focus stays in the card, two-finger Z dismisses, no empty stop when hidden, Program buttons read their labels.
+- [ ] **User, iPhone 14 Pro Max:** AC-17 VoiceOver: focus stays in the card, two-finger Z dismisses, no empty stop when hidden, Program buttons read their labels. If focus escapes to Home or the tab bar, the swift review's fallback (unverified) moves the trait to the host's outer root while
+      showing: `.accessibilityAddTraits(shows ? .isModal : [])` (`docs/reviews/m4-missed-day-swift-review.md` item 1).
 
 ## 7. Traceability, files, test estimate
 | AC | Step | Check that fails when the AC breaks |

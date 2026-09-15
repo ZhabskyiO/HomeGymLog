@@ -17,7 +17,9 @@ change); only deleting or renaming an agent or skill needs the user's confirmati
    Read the changed Swift files enough to judge whether the house rules in `/swift-best-practices` were
    followed; note recurring patterns worth a Patterns entry or a rule.
 3. **Logs**: `build/last-build.log`, `build/last-test.log`, `build/last-device-build.log`, `build/diag*.log`
-   when present. Look for: warnings that repeat, tests slower than 1 s (`grep -E "passed .*\([0-9]+\.[0-9]+ seconds\)"`),
+   when present. Look for: warnings that repeat, tests slower than 1 s (`grep -E "passed .*\([0-9]+\.[0-9]+ seconds\)"` on the xcodebuild log; under parallel Swift Testing
+   both the log and the result bundle's `durationInSeconds` give a whole clone batch's wall time to every test in it, so many
+   identical values are batch time, and only an outlier above the shared value is a slow test),
    flaky or re-run tests, signing or destination errors, and anything that cost a retry. Read result
    bundles with `xcrun xcresulttool get test-results summary --path build/tests.xcresult` (and
    `build/tests26.xcresult`) for counts and durations.

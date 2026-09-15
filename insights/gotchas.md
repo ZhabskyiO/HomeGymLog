@@ -266,6 +266,19 @@ are kept as history.
   minimumDistance: 20))` cancels the button once the drag recognises and still lets taps through. A `DragGesture` inside the
   view's own `.offset` feeds its translation back and never reaches a threshold; attach it outside the offset. Recognize it:
   a "dismiss by drag" that also performs the button's action. Source: same addendum P2.
+- 2026-09-15 — **A SwiftUI `Button` also fires on a plain tap a few points outside its frame, and a scrim that dismisses on tap
+  makes "tap a covered control, the prompt stays" untestable.** m4-missed-day scratch-copy XCUITest (17.5, Xcode 27.0):
+  - **Tap slop:** a coordinate tap on the tab pill at y 814.8 pt, 6.8 pt below the prompt's Skip button (frame 20, 758, 353 × 50),
+    performed Skip (session 7 stored skipped). A tap 20 pt below the button did nothing. Measured after the card's bottom
+    padding went to 64 pt (user decision; Skip 20, 738, 353 × 50): taps 5, 8, 10 and 12 pt below the button fired it, 15, 18,
+    20 and 25 pt below did not, nor did taps 30 and 8 pt above the screen edge. The zone ends between 12 and 15 pt below a
+    50 pt SwiftUI button on 17.5.
+  - **Dismissing scrim:** coordinate taps on ⓘ (y 396) and on Start workout's visible top strip hit the 0.55 scrim and dismissed the
+    prompt as designed. No workout started and no sheet opened, but a "title still present" assertion failed.
+  - **Fix (tests):** assert outcomes (no `Exit`, no `Done`, the row's stored state read through the Program card), not the overlay's
+    presence. Tap at least 20 pt away from a button when the tap must miss it.
+  - **Recognize it:** a "tap beside the button" check that performs the button's action, or a blocking check that fails only
+    because the tap dismissed the overlay.
 - (expected areas still open: sheet + navigation interplay)
 
 ## User notifications

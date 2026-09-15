@@ -15,6 +15,8 @@ struct HomeGymLogApp: App {
     private let initialTab: AppTab?
     private let dragPreview: CGFloat?
     private let sheetPreview: WorkoutSheetPreview?
+    /// Nil except a DEBUG `-seed` launch: true for the missed-day seeds, false for every other seed (the prompt stays off).
+    private let missedPromptEnabled: Bool?
     /// Nil except a DEBUG `-seed` launch, which silences rest notifications; every other launch keeps the environment's
     /// live default.
     private let restNotifier: RestNotifier?
@@ -30,6 +32,7 @@ struct HomeGymLogApp: App {
         var initialTab: AppTab? = nil
         var dragPreview: CGFloat? = nil
         var sheetPreview: WorkoutSheetPreview? = nil
+        var missedPromptEnabled: Bool? = nil
         var restNotifier: RestNotifier? = nil
         #if DEBUG
         do {
@@ -42,6 +45,7 @@ struct HomeGymLogApp: App {
                 makeContainer = { try seed.makeContainer(calendar: live.calendar) }
                 dragPreview = seed.workoutDragPreview
                 sheetPreview = seed.workoutSheetPreview
+                missedPromptEnabled = seed.forcesMissedDayPrompt
                 restNotifier = .silent()   // seeds freeze the clock: screenshot-only, never a real notification
             }
             // Outside the seed branch: the selection arguments work on their own too.
@@ -59,6 +63,7 @@ struct HomeGymLogApp: App {
         self.initialTab = initialTab
         self.dragPreview = dragPreview
         self.sheetPreview = sheetPreview
+        self.missedPromptEnabled = missedPromptEnabled
         self.restNotifier = restNotifier
         #if DEBUG
         if case .failure(let error) = containerResult {
@@ -79,6 +84,7 @@ struct HomeGymLogApp: App {
                     .environment(\.initialTab, initialTab)
                     .environment(\.workoutDragPreview, dragPreview)
                     .environment(\.workoutSheetPreview, sheetPreview)
+                    .environment(\.missedPromptEnabled, missedPromptEnabled)
                     // ≈ a provider that overrides a context value only when a prop is set; otherwise the live default stays.
                     .transformEnvironment(\.restNotifier) { value in
                         if let override = restNotifier { value = override }

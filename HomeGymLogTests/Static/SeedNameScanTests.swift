@@ -1,11 +1,13 @@
 import Foundation
 import Testing
 
-/// AC-39 (scan half): the quoted workout seed names exist only in `App/DebugSeed/`, which is compiled out of Release.
-/// Unquoted identifiers such as `WorkoutSummary` do not count. Each name must be found there, so an empty scan fails.
+/// AC-39 (scan half): the quoted hyphenated seed names (the workout seeds, and the missed-day seeds added by m4-missed-day)
+/// exist only in `App/DebugSeed/`, which is compiled out of Release. Unquoted identifiers such as `WorkoutSummary` do not
+/// count. Each name must be found there, so an empty scan fails.
 @Suite struct SeedNameScanTests {
     private static let names = ["\"wo-start\"", "\"wo-swipe\"", "\"wo-rpe\"", "\"wo-adjust\"", "\"wo-rest\"", "\"summary\"",
-                                "\"wo-detail\"", "\"wo-swap\"", "\"wo-swap-rdl\"", "\"wo-notes\""]
+                                "\"wo-detail\"", "\"wo-swap\"", "\"wo-swap-rdl\"", "\"wo-notes\"",
+                                "\"missed-several\"", "\"missed-shifted\"", "\"missed-skipped\""]
 
     /// `<repo>/HomeGymLog`, derived from `<repo>/HomeGymLogTests/Static/…`.
     private static var appSourceRoot: URL {
