@@ -1,7 +1,7 @@
 ---
 name: researcher
 description: Investigates Apple platform questions (SwiftUI, SwiftData, ActivityKit, UserNotifications, Swift Charts, HealthKit, Xcode, App Store rules) and returns verified, iOS 17-aware findings with sources. Use when a plan or implementation hits an API question, an availability doubt, or a "how does Apple expect this to be done" question. Read-only on the project.
-model: opus
+model: Fable
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 ---
 
