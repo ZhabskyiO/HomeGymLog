@@ -6,6 +6,57 @@ Keep entries short. Date them. Newest at the top within each section.
 
 ## Architecture decisions
 
+### 2026-09-15 — M4 milestone-wide and missed-day decisions (from the m4-missed-day slice spec, user-answered)
+
+- **M4 is four slices**, each merged before the next: `m4-missed-day` → `m4-progress` (Swift Charts top-weight line, best /
+  since start, month calendar, archived history) → `m4-settings` (appearance, units, program rows, "Build a new program…"
+  restart, equipment) → `m4-reminder` (daily reminder notification, permission status in Settings). What remains of PRs and
+  streak goes into the slice that needs it. No preference in this slice: the prompt always asks (the Settings row "Missed a
+  day" is m4-settings).
+- **The Home prompt shows on the Home tab only** and names the first missed session (pending, dated before today; lowest
+  `(scheduledDate, index)`). **Dismissable** (scrim tap, swipe down on the card) with nothing written; silenced for that
+  session index and calendar day while the shell stays mounted; back on relaunch, after a workout (shell remount), on a new
+  day, or for a different first-missed session.
+- **Several missed sessions**: after "Skip it" the next missed one prompts at once; one shift re-dates all of them.
+- **A skipped session still breaks the streak** (M2 rule unchanged; resolves the M2 "M4 may revisit" note).
+- **Occupied day: `Reslot` stays as is** (resolves "Open for M4" of 2026-09-10): completed and skipped sessions consume no
+  day; the collision is unreachable in v1 (only today's or past sessions can be completed or skipped); an invariant test
+  guards "no two pending sessions share a date, pending dates ascend with index".
+- **The Program tab's Missed card gains shift and skip** (user chose over the prototype, which has them on Home only): every
+  missed card, two full-width `sf2` buttons stacked under "Start workout" with the prompt's verbatim labels ("Do it today ·
+  shift program", "Skip it · stay on schedule"), no confirmation on either surface. After a shift the tab's selection
+  follows today (the moved session's card); after a skip it stays on the card, which reads "Skipped".
+- **Title day text**: abbreviated weekday when the session is 1–6 days old ("You skipped Legs on Wed"), else "Wed, Sep 9".
+  Spoken labels equal the visible text.
+- **Presentation (researcher, 17.5 and 26.5)**: a custom scrim (black 0.55) + bottom card applied as `.overlay` on
+  `ShellView` after the tab bar's `.safeAreaInset`, shown only while the Home tab is selected; a system sheet dims only
+  0.29 / 0.48, floats inset on 26.5, and a Home-level overlay cannot cover the bar. VoiceOver containment of the overlay
+  (`.isModal`) is unverified and stays a manual check.
+- **DEBUG**: a nil-by-default `@Entry` suppresses the prompt for every seed outside the missed family, so existing seeds and
+  snapshots keep matching; new seeds `missed-shifted`, `missed-skipped`, and `missed-several` (Thu 2026-09-17: s7, s11,
+  s12 missed) so the several-missed and non-first-missed tap checks are reachable without a live clock.
+- No schema change.
+- **Architecture review (2026-09-15, approve with changes)**:
+  - **Prompt host**: a view in `ShellView`'s `.overlay` (after `.safeAreaInset`) owning a third `PlannedSession` `@Query`, its
+    own `now` (appear, scene-active, and the Home tab becoming selected) and the silence `@State`; keyed `.id(program.id)`;
+    show = `enabled != false ∧ selected == .home ∧ MissedDay.shouldPrompt`. Duplicating Home's query is deliberate: the shell
+    never becomes a query owner (it would re-render the whole `TabView` on every save). Silence lifetime = shell mount.
+  - **A derived overlay is never "closed before the write"** (B2): the close-then-write rule applies to UIKit sheets only.
+    The overlay disappears when the query re-fetches; a failed shift or skip leaves the prompt up.
+  - **`MissedDay.shiftMap` is total** (B1): `[:]` means "not a missed session". `ProgramStore.shift` returns the applied map
+    and saves nothing when it is empty; screens treat an empty result as a silent no-op and a throw as a failed save
+    (matches `start` returning nil).
+  - **A Program-card shift sets `.followToday` directly** (plus `now` and the scroll token), only when something moved; not
+    `reset`, which re-applies the DEBUG preselection (B3).
+  - **Host body root is a concrete `ZStack(alignment: .bottom) { if shows { scrim; card } }`** (B5, researcher addendum P1,
+    17.5 and 26.5): its `.onAppear`, scene-phase and selected-tab handlers all fire while it draws nothing, and the empty
+    overlay intercepts no touch; a bare `Group { if }` root skips `onAppear` at mount. No `ShellView`-owned `now` needed.
+  - **Card dismissal drag is `.highPriorityGesture(DragGesture(minimumDistance: 20))` applied after `.offset`** (B6, addendum
+    P2): the only variant where a drag starting on a button never fires it; ≥ 80 pt dismisses, less springs back, taps still
+    fire once. A drag from "Skip it" can travel only ~69 pt before the screen edge, so it always springs back (accepted).
+  - **The silence key is the day the card was rendered for** (the host's `now`), not `clock.now()` at the dismiss tap
+    (planner finding): a card left up across midnight would otherwise never match its own silence and not hide on the tap.
+
 ### 2026-09-14 — M3 exercise-tools decisions (from the m3-exercise-tools slice spec, user-answered)
 
 - **Swap is enabled only while every set of the displayed exercise is pending** (the button dims otherwise, so always
@@ -266,7 +317,7 @@ Keep entries short. Date them. Newest at the top within each section.
 - **Week window is the calendar week Mon–Sun containing today** for the week strip and the "this week" volume
   tile; only the "Week N · Phase" pill uses the stored program week (current-week rule in "Mid-week program start").
 - **Skipped sessions** show as a muted day number in the strip and break the streak (streak counts completed
-  sessions only). M4 may revisit when skip exists.
+  sessions only). M4 may revisit when skip exists. (Revisited 2026-09-15: unchanged, a skip still breaks the streak.)
 - **After today's session completes, Home shows the prototype's rest-day card** ("Recover. Next up: …"); no
   "done for today" variant.
 - **Start workout is present and inert until M3.** Volume counts finished logs only. Volume tile formatting follows
@@ -338,7 +389,7 @@ becomes `ShellView`; the new root switches on `currentPrograms.isEmpty`. Analogy
 - **No draft persistence in onboarding**: relaunch mid-onboarding starts over.
 - Welcome tile letter is "H" until the M5 icon; the A4 subtitle stays verbatim until the M5 copy audit.
 
-### 2026-09-10 — Open for M4: does an occupied day block re-slotting?
+### 2026-09-10 — Open for M4: does an occupied day block re-slotting? (decided 2026-09-15: Reslot stays as is, see M4 decisions)
 `Reslot` steps over completed and skipped sessions without reserving their day, exactly as the M1 spec says,
 so a pending session can be re-dated onto a day a completed or skipped session already holds (only when that
 session is dated after the cursor: a future session skipped, or finished early). The same spec also says no

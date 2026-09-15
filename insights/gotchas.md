@@ -240,6 +240,32 @@ are kept as history.
   scaled, so never assert sheet widths.
 - 2026-09-14 — **`onGeometryChange(for:of:action:)` is iOS 16.0**, not 18 (SDK interface, typechecked at 17.0, run on 17.5);
   only its old/new two-value overload and `presentationSizing` are iOS 18.
+- 2026-09-15 — **A `.height(h)` detent measured with `onGeometryChange` needs `.fixedSize(horizontal: false, vertical: true)`
+  on the content**: otherwise the content is compressed to the initial detent, body text truncates to one line and the
+  measured height is the truncated one (17.5). The sheet's 34 pt bottom safe area also stacks under the content's own bottom
+  padding. Source: `docs/reviews/m4-missed-day-researcher.md` Q2.
+- 2026-09-15 — **System sheet dim is not the prototype's scrim and differs by runtime**: black 0.29 / 0.12 (17.5 dark / light),
+  0.48 / 0.20 (26.5); 26.5 partial sheets float with 8 pt side insets and an 8 pt bottom gap (insets, not scaling). A 0.55
+  scrim only comes from a custom overlay. Recognize it: a seeded sheet screenshot "too light" next to the prototype.
+- 2026-09-15 — **An `.overlay` inside a tab never covers the shell's floating bar**: the `TabView`'s `.safeAreaInset` draws
+  above it and stays tappable. Apply the overlay on `ShellView` *after* `.safeAreaInset`; a bare `Color` scrim there blocks
+  taps and scrolls beneath (17.5, 26.5). Any UIKit `.sheet` still floats above such an overlay. `onAppear` inside a `TabView`
+  runs for the selected tab only, so a Home-owned prompt does not show when the app opens on another tab. Two `.sheet`
+  modifiers on one view queue (the second presents after the first closes, no warning); one enum `.sheet(item:)` swaps.
+- 2026-09-15 — **XCUITest `isHittable` is true for elements under a SwiftUI overlay scrim**, and the tree is identical with or
+  without `.accessibilityAddTraits(.isModal)`; verify blocking with a coordinate tap and an outcome check. XCUITest's
+  `swipeDown()` flick does not dismiss a ~315 pt sheet; use `press(forDuration:thenDragTo:)`.
+- 2026-09-15 — **A view whose body is `Group { if cond { … } }` gets no `onAppear` at mount while `cond` is false, and re-runs
+  it each time the content appears**; `.onChange(of:)` handlers on it fire regardless (17.5, 26.5). Use a concrete root
+  (`ZStack { if … }`) when a handler must run at mount; an empty `ZStack` in an `.overlay` has zero size and intercepts no
+  touch. Also, `.onChange(of: scenePhase)` to `.active` fires once during a cold launch, not only on return from background.
+  Source: `docs/reviews/m4-missed-day-researcher.md` addendum P1.
+- 2026-09-15 — **A SwiftUI `Button` fires on release up to ~70 pt outside its bounds**, so a container drag
+  (`.gesture` or `.simultaneousGesture`, or a gesture on a sibling text block) that starts on a button can end with the button
+  firing; with `.simultaneousGesture` both the drag and the button act (17.5, 26.5). `.highPriorityGesture(DragGesture(
+  minimumDistance: 20))` cancels the button once the drag recognises and still lets taps through. A `DragGesture` inside the
+  view's own `.offset` feeds its translation back and never reaches a threshold; attach it outside the offset. Recognize it:
+  a "dismiss by drag" that also performs the button's action. Source: same addendum P2.
 - (expected areas still open: sheet + navigation interplay)
 
 ## User notifications

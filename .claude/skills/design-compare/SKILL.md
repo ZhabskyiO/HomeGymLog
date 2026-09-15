@@ -30,9 +30,12 @@ Compare one design state with the app. The output is a list of concrete differen
    wo-rpe 700×310 @ (930, 1345); wo-rest 600×300 @ (930, 1665); summary 640×330 @ (930, 1975). Row C: wo-adjust 570×300 @ (1890, 40); wo-detail 570×300 @ (1890, 350); wo-swap 570×300 @ (1890, 640) (recorded
    by m3-exercise-tools; the prototype's `wo-swap` frame is the empty list on Lat Pulldown, seeded as `-seed wo-swap`).
    Row D: program 720×1620 @ (2530, 30) — that frame renders much wider than a
-   phone, so compare content, not width. Workout seeds (`wo-start`, `wo-swipe`, `wo-rpe`, `wo-adjust`, `wo-rest`, `summary`, `wo-detail`, `wo-swap`, `wo-swap-rdl`,
+   phone, so compare content, not width. Row E: the 5600 window cuts the `missed` card; render a second shot with
+   `--window-size=3000,6600 --screenshot=build/proto-all-6600.png` and crop missed 850×680 @ (4970, 44) from it (recorded by
+   m4-missed-day). Missed-day seeds: `-seed missed` (the prompt, E1), `missed-several` (prompt on Thu Sep 17),
+   `missed-shifted` and `missed-skipped` (Home right after each action; add `-tab program` for the Program tab). Workout seeds (`wo-start`, `wo-swipe`, `wo-rpe`, `wo-adjust`, `wo-rest`, `summary`, `wo-detail`, `wo-swap`, `wo-swap-rdl`,
    `wo-notes`)
-   need no `-tab`: the workout replaces the shell at the root. For other rows B–E, view `sips -Z 1500 build/proto-all.png` first to locate the frame, then crop. Re-render only
+   need no `-tab`: the workout replaces the shell at the root. For other frames in rows B–D, view `sips -Z 1500 build/proto-all.png` first to locate the frame, then crop. Re-render only
    when the design export changes.
 2. **Capture the app.** Build if needed (`/build-and-run` build step), pick the iPhone 15 / iOS 17.5
    simulator (udid via `xcrun simctl list devices available -j`), install, launch with any launch
