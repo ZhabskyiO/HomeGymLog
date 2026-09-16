@@ -46,6 +46,12 @@ are kept as history.
 
 ## SwiftData
 
+- 2026-09-16 — **A `PlannedSession → program` hop costs 322–347 µs per row on 17.5 and is not cached** (fresh context;
+  150 rows = 47–52 ms per body; `program?.id` alone ~170 µs; 26.5: 2–5 µs). m4-progress researcher addendum. Fetching
+  every `Program` first made it ~35 µs, but fetching only the current one by id did not, and the cause is unverified, so
+  don't design on it. Fix: never hop to `program` in `body`; query `Program` rows directly and fetch sessions per program
+  id in a task. One-hop predicates `$0.program?.archivedAt != nil` (and its `||` with a current-program clause) compile and
+  are correct on 17.5 and 26.5, and `!= nil` excludes orphans.
 - 2026-09-10 — **`.cascade` delete rules do nothing on the iOS 17.5 runtime.** Verified on the simulator with
   four declaration styles (inverse on the to-many side, on the to-one side, inferred), in-memory and on-disk,
   same context and fresh context, children loaded or not: after deleting the parent and saving, every child
@@ -178,6 +184,15 @@ are kept as history.
 
 ## SwiftUI
 
+- 2026-09-16 — **Swift Charts: `PointMark.accessibilityLabel/Value` are ignored while an unhidden `LineMark` shares the x
+  value** (17.5 and 26.5, m4-progress researcher probe). Charts merges both into one "0 to 0.5, 40 to 40, 2 values" element.
+  Fix: `.accessibilityHidden(true)` on the `LineMark` (and every `RuleMark`). Recognize it: VoiceOver or XCUITest reads
+  "N values" instead of your label.
+- 2026-09-16 — **Swift Charts: a `RuleMark` outside the scale domain draws outside the chart's frame** (80 pt beyond a 120 pt
+  chart in the probe), because marks are not clipped to the plot. Keep the rules inside the explicit domain, or `.clipped()`.
+- 2026-09-16 — **`scrollPosition(id:)` on iOS 17.5 scrolls the id to the leading edge even when it is already visible**, and
+  the binding is rewritten during user scrolls (26.5 scrolls minimally). To scroll a selected chip into view, use
+  `ScrollViewReader` + a deferred `scrollTo(id, anchor: nil)` (`WeekChipRow`).
 - 2026-09-10 — `containerRelativeFrame` on the segments of an `HStack` (the proportional phase bar) rendered the whole
   screen black: no crash, no console message. Fix: wrap the row in a `GeometryReader`, compute each segment width from
   `geometry.size.width`, and pin the reader's height with `.frame(height:)` (`Shared/PhaseBar.swift`). Recognize it: a
@@ -301,6 +316,8 @@ are kept as history.
 
 ## Xcode / build
 
+- 2026-09-16 — **`xcodebuild -only-testing:Target/Suite/function()` silently runs 0 Swift Testing tests.** Select the
+  suite (`-only-testing:HomeGymLogTests/SuiteName`) instead. Recognize it: a green run with 0 tests executed.
 - 2026-09-14 — **After an Xcode update, byte-identical screenshot baselines break in the status bar only.** Seeded shots of
   unchanged screens (`midProgram`, `restDay`, `freshProgram`, `missed`) differed from their Xcode 26 baselines in 38,711
   pixels, all inside the top-left status-bar corner (0,0)–(259,48) pt; the pre-slice commit built on Xcode 27 rendered
@@ -391,6 +408,8 @@ are kept as history.
 
 ## Agent workflow
 
+- 2026-09-16 — **zsh in this harness: `echo ====` fails** ("=== not found", from `=cmd` expansion), and an unmatched glob
+  like `rm ui-out/*` aborts the whole chained command. Quote such strings, or use `setopt nonomatch`, before chaining probe runs.
 - 2026-09-14 — **A subagent that ends its turn while its own `run_in_background` command is still running is not woken
   when that command finishes.** The m3-rest-timer implementer reported "starts when the background run finishes and
   notifies me" and then sat idle; it continued only after a SendMessage. Fix: agents run long builds in the foreground

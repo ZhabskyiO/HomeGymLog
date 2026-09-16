@@ -30,7 +30,10 @@ Compare one design state with the app. The output is a list of concrete differen
    wo-rpe 700×310 @ (930, 1345); wo-rest 600×300 @ (930, 1665); summary 640×330 @ (930, 1975). Row C: wo-adjust 570×300 @ (1890, 40); wo-detail 570×300 @ (1890, 350); wo-swap 570×300 @ (1890, 640) (recorded
    by m3-exercise-tools; the prototype's `wo-swap` frame is the empty list on Lat Pulldown, seeded as `-seed wo-swap`).
    Row D: program 720×1620 @ (2530, 30) — that frame renders much wider than a
-   phone, so compare content, not width. Row E: the 5600 window cuts the `missed` card; render a second shot with
+   phone, so compare content, not width. Row D `progress` sits past the 3000-px right edge: render with `--window-size=4400,5600
+   --screenshot=build/proto-all-4400.png` and crop progress 2340×2330 @ (2540, 1620) (m4-progress spec §8; content only, the frame is
+   ~2300 px wide). Progress seeds: `-seed midProgram -tab progress` (populated), `-seed freshProgram -tab progress` (empty),
+   `-seed progress-history -tab progress` (archived history); add `-progressExercise <key>` to preselect a chip, `-units kg` for kg. Row E: the 5600 window cuts the `missed` card; render a second shot with
    `--window-size=3000,6600 --screenshot=build/proto-all-6600.png` and crop missed 850×680 @ (4970, 44) from it (recorded by
    m4-missed-day). Missed-day seeds: `-seed missed` (the prompt, E1), `missed-several` (prompt on Thu Sep 17),
    `missed-shifted` and `missed-skipped` (Home right after each action; add `-tab program` for the Program tab). Workout seeds (`wo-start`, `wo-swipe`, `wo-rpe`, `wo-adjust`, `wo-rest`, `summary`, `wo-detail`, `wo-swap`, `wo-swap-rdl`,
