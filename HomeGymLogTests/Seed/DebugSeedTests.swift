@@ -13,7 +13,8 @@ import Testing
         #expect(parsed == seed)
         let expectedDay: Date
         switch seed {
-        case .midProgram, .missed: expectedDay = TestCalendar.day(2026, 9, 15)
+        case .midProgram, .missed, .missedShifted, .missedSkipped: expectedDay = TestCalendar.day(2026, 9, 15)
+        case .missedSeveral: expectedDay = TestCalendar.day(2026, 9, 17)
         case .woStart, .woSwipe, .woRPE, .woAdjust, .woRest, .summary: expectedDay = TestCalendar.day(2026, 9, 15)
         case .woDetail, .woSwap, .woSwapRDL, .woNotes: expectedDay = TestCalendar.day(2026, 9, 15)
         case .restDay: expectedDay = TestCalendar.day(2026, 9, 19)
@@ -36,6 +37,17 @@ import Testing
         #expect(throws: DebugSeedError.unknownSeed("woStart")) { try DebugSeed.parse(arguments: ["app", "-seed", "woStart"]) }
     }
 
+    @Test("the missed-day seeds use hyphenated names; the camel-case spelling is unknown")
+    func missedNames() throws {
+        let names: [(String, DebugSeed)] = [("missed-several", .missedSeveral), ("missed-shifted", .missedShifted),
+                                            ("missed-skipped", .missedSkipped)]
+        for (name, seed) in names {
+            let parsed = try DebugSeed.parse(arguments: ["app", "-seed", name])
+            #expect(parsed == seed)
+        }
+        #expect(throws: DebugSeedError.unknownSeed("missedSeveral")) { try DebugSeed.parse(arguments: ["app", "-seed", "missedSeveral"]) }
+    }
+
     @Test("absent, unknown, and trailing -seed")
     func edgeCases() throws {
         #expect(try DebugSeed.parse(arguments: []) == nil)
@@ -44,7 +56,7 @@ import Testing
         #expect(throws: DebugSeedError.unknownSeed("")) { try DebugSeed.parse(arguments: ["app", "-seed"]) }
     }
 
-    @Test("initial drafts")
+    @Test("initial drafts; the missed-day prompt is forced for the missed family only")
     func drafts() throws {
         let onboarding = try #require(DebugSeed.onboarding.initialDraft(calendar: cal))
         #expect(onboarding.step == 0 && onboarding.months == 1 && onboarding.frequency == 4)
@@ -54,12 +66,14 @@ import Testing
         let ob5 = try #require(DebugSeed.ob5.initialDraft(calendar: cal))
         #expect(ob5.step == 5 && ob5.preview?.totalSessions == 120)
         #expect(DebugSeed.midProgram.initialDraft(calendar: cal) == nil)
-        #expect(DebugSeed.missed.forcesMissedDayPrompt && !DebugSeed.midProgram.forcesMissedDayPrompt)
         #expect(DebugSeed.restDay.initialDraft(calendar: cal) == nil && DebugSeed.freshProgram.initialDraft(calendar: cal) == nil)
-        #expect(!DebugSeed.restDay.forcesMissedDayPrompt && !DebugSeed.freshProgram.forcesMissedDayPrompt)
-        for seed in [DebugSeed.woStart, .woSwipe, .woRPE, .woAdjust, .woRest, .summary, .woDetail, .woSwap, .woSwapRDL, .woNotes] {
+        for seed in [DebugSeed.woStart, .woSwipe, .woRPE, .woAdjust, .woRest, .summary, .woDetail, .woSwap, .woSwapRDL, .woNotes,
+                     .missed, .missedSeveral, .missedShifted, .missedSkipped] {
             #expect(seed.initialDraft(calendar: cal) == nil, "\(seed.rawValue)")
-            #expect(!seed.forcesMissedDayPrompt, "\(seed.rawValue)")
+        }
+        let missedFamily: [DebugSeed] = [.missed, .missedSeveral, .missedShifted, .missedSkipped]
+        for seed in DebugSeed.allCases {
+            #expect(seed.forcesMissedDayPrompt == missedFamily.contains(seed), "\(seed.rawValue)")
         }
     }
 

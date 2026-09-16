@@ -53,7 +53,7 @@ developer new to Swift: add one-line React analogies in doc comments where a Swi
     finishes. Run long builds and tests in the foreground (Bash timeout up to 600000 ms), or poll a background run to
     completion, then continue.
 13. A failed-save test (on-disk store reopened with `allowsSave: false`) reads the written row through a same-context
-    `FetchDescriptor` by id as its first fetch after the failure, and calls `context.rollback()` before deleting its
+    `FetchDescriptor` by id as its first fetch after the failure, and calls `context.rollback()` in a `defer` right after creating the writing context, before deleting its
     temporary store (INSIGHTS "M3 exercise-tools decisions", failed-save order; gotchas SwiftData 2026-09-14).
 
 ## Report

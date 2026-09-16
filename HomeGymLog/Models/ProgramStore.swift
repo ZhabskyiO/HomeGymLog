@@ -70,6 +70,45 @@ enum ProgramStore {
         session.status = .skipped
     }
 
+    /// "Do it today · shift program" (spec 4.2), shared by the Home prompt and the Program card. `rows` must be the program's
+    /// complete session set; a subset yields a partial map (NB4). Returns the applied map, one save; `[:]` means the session
+    /// is not missed any more (a stale or double tap): nothing is written or saved. Throws only on a failed save, after
+    /// `StoreCommit.commit` has rolled back and put every moved date back.
+    @discardableResult
+    static func shift(missedIndex: Int, rows: [PlannedSession], trainingWeekdays: [Int], today: Date, calendar: Calendar,
+                      in context: ModelContext) throws -> [Int: Date] {
+        let slots = rows.map { SessionSlot(index: $0.index, scheduledDate: $0.scheduledDate, status: $0.status) }
+        let map = MissedDay.shiftMap(slots: slots, missedIndex: missedIndex, trainingWeekdays: trainingWeekdays, today: today,
+                                     calendar: calendar)
+        guard !map.isEmpty else { return [:] }
+        var previous: [(row: PlannedSession, scheduledDate: Date)] = []   // a loop, never Dictionary(uniqueKeysWithValues:)
+        for row in rows {
+            guard let date = map[row.index] else { continue }
+            previous.append((row, row.scheduledDate))
+            row.scheduledDate = date
+        }
+        try StoreCommit.commit(context) {
+            for entry in previous { entry.row.scheduledDate = entry.scheduledDate }
+        }
+        return map
+    }
+
+    /// "Skip it · stay on schedule" (spec 4.2): marks the session skipped with one save, and returns true. Returns false and
+    /// writes nothing unless the row is pending and dated before `today` (a stale or double tap). Throws only on a failed
+    /// save, after `StoreCommit.commit` has rolled back and put the status back.
+    @discardableResult
+    static func skipMissed(sessionIndex: Int, rows: [PlannedSession], today: Date, calendar: Calendar,
+                           in context: ModelContext) throws -> Bool {
+        guard let row = rows.first(where: { $0.index == sessionIndex }),
+              MissedDay.isMissed(status: row.status, scheduledDate: row.scheduledDate, today: today, calendar: calendar) else {
+            return false
+        }
+        let previousStatus = row.statusRaw
+        skip(row)
+        try StoreCommit.commit(context) { row.statusRaw = previousStatus }
+        return true
+    }
+
     /// Deletes a program with every session, log, exercise and set under it. Explicit because the
     /// iOS 17 runtime does not honor `.cascade`. Notes are independent and untouched. Does not save.
     static func delete(_ program: Program, in context: ModelContext) {

@@ -82,7 +82,7 @@ import Testing
         #expect(Reslot.reslot(slots: slots, fromIndex: 99, startingAt: d(9, 9), inclusive: true, trainingWeekdays: mwf, calendar: cal).isEmpty)
     }
 
-    @Test("documents behavior, spec gap for M4: a pending session may land on a skipped session's date")
+    @Test("documented behaviour (M4 decision 2026-09-15, Reslot stays as is): a pending session may land on a skipped session's date; unreachable in v1")
     func skippedSlotCollision() {
         let slots = TestCalendar.exampleASlots(status: { $0 == 1 ? .skipped : .pending })
         let map = Reslot.reslot(slots: slots, fromIndex: 0, startingAt: d(9, 8), inclusive: true, trainingWeekdays: mwf, calendar: cal)

@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// The selected day's session: its name, its status relative to today, one row per planned exercise, and "Start
-/// workout" when the session can be started (today's or a missed pending session).
+/// workout" when the session can be started (today's or a missed pending session), plus the missed-day shift and skip
+/// under it on a missed card.
 /// Weights are the planned targets for every status, Completed included (logged weights are Progress, M4).
 struct SessionCard: View {
     let session: SessionSummary
@@ -13,6 +14,10 @@ struct SessionCard: View {
     let showsStart: Bool
     /// Reports the tap; `ProgramView` owns the rows and calls the shared start.
     let onStart: () -> Void
+    /// "Do it today · shift program" on a missed card; `ProgramView` calls the shift writer.
+    let onShift: () -> Void
+    /// "Skip it · stay on schedule" on a missed card; `ProgramView` calls the skip writer.
+    let onSkip: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -34,6 +39,13 @@ struct SessionCard: View {
             if showsStart {
                 StartWorkoutButton(action: onStart)
                     .padding(.top, 14)
+            }
+            if state == .missed {   // derived from state, no second flag beside showsStart (NB7)
+                VStack(spacing: 8) {
+                    SecondaryActionButton(title: MissedDayText.shift, action: onShift)
+                    SecondaryActionButton(title: MissedDayText.skip, action: onSkip)
+                }
+                .padding(.top, 8)
             }
         }
         .padding(.vertical, 14)

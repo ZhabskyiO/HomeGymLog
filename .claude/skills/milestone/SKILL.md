@@ -38,7 +38,8 @@ multiple-choice question when the slicing is not obvious.
    keeps context) and re-run once. Surface anything blocking to the user. If the review marks platform claims as
    unverified, resume the same `researcher` with a scoped probe list in parallel with the spec revision, append its
    addendum to `docs/reviews/<slug>-researcher.md`, and fold the results into the spec before planning.
-6. Launch `implementation-planner` → `docs/plans/<slug>.md`.
+6. Launch `implementation-planner` → `docs/plans/<slug>.md`. If it reports spec contradictions or ambiguities, fix the
+   spec wording in the main session before launching the verifier, align the plan's note, and tell the verifier.
 7. Launch `plan-verifier` on the plan. Save its reply to `docs/reviews/<slug>-verifier-<round>.md`. If
    not PASS, fix the plan and re-verify scoped to the finding ids by resuming the same verifier: apply mechanical
    should-fix items (one-line edits, typos, a missing command) directly in the main session; resume the planner
@@ -57,4 +58,5 @@ multiple-choice question when the slicing is not obvious.
 - Resume an agent with SendMessage for revisions instead of launching a fresh one; it keeps context.
 - If an agent's output is weak, say so and re-run with a sharper prompt rather than patching around it.
   Note what was weak; `/engineering-insight` will use it.
-- A rate-limit failure mid-agent is safe to relaunch from scratch.
+- A rate-limit failure mid-agent is safe to recover: first check whether its output already landed (grep the file for
+  the requested changes); if not, resume the same agent with SendMessage, and relaunch from scratch only if that fails.

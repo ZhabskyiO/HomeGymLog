@@ -36,6 +36,15 @@ enum DebugSeed: String, CaseIterable {
     case woSwapRDL = "wo-swap-rdl"
     /// `wo-start` rows plus a stored Lat Pulldown note from a day earlier: the bar reads "Notes ·". No sheet.
     case woNotes = "wo-notes"
+    /// midProgram rows on Thu 2026-09-17: sessions 7, 11 and 12 are missed and 13 is today, so the prompt names
+    /// "Legs on Wed, Sep 9" and the Program tab's WK 3 holds two more Missed cards.
+    case missedSeveral = "missed-several"
+    /// `missed` after "Do it today · shift program" on session 7 (Tue 2026-09-15): Home shows Legs as today's session, the
+    /// Program tab has 25 weeks, no prompt.
+    case missedShifted = "missed-shifted"
+    /// `missed` after "Skip it · stay on schedule" on session 7 (Tue 2026-09-15): Home equals `midProgram`, Program WK 2 · Wed 9
+    /// reads "Skipped", no prompt.
+    case missedSkipped = "missed-skipped"
 
     /// nil when no `-seed` is present; throws for an unknown name or a trailing `-seed` with no value.
     static func parse(arguments: [String]) throws -> DebugSeed? {
@@ -49,8 +58,10 @@ enum DebugSeed: String, CaseIterable {
     func referenceDate(calendar: Calendar) -> Date {
         let day: DateComponents
         switch self {
-        case .midProgram, .missed, .woStart, .woSwipe, .woRPE, .woAdjust, .woRest, .summary, .woDetail, .woSwap, .woSwapRDL, .woNotes:
+        case .midProgram, .missed, .missedShifted, .missedSkipped, .woStart, .woSwipe, .woRPE, .woAdjust, .woRest, .summary,
+             .woDetail, .woSwap, .woSwapRDL, .woNotes:
             day = DateComponents(year: 2026, month: 9, day: 15, hour: 12)
+        case .missedSeveral: day = DateComponents(year: 2026, month: 9, day: 17, hour: 12)
         case .restDay: day = DateComponents(year: 2026, month: 9, day: 19, hour: 12)
         case .freshProgram: day = DateComponents(year: 2026, month: 8, day: 31, hour: 12)
         default: day = DateComponents(year: 2026, month: 8, day: 31, hour: 12)
@@ -71,18 +82,22 @@ enum DebugSeed: String, CaseIterable {
             let draft = OnboardingDraft(months: 6, frequency: 5)
             for _ in 0..<onboardingSteps { draft.advance(now: referenceDate(calendar: calendar), calendar: calendar) }
             return draft
-        case .midProgram, .missed, .restDay, .freshProgram, .woStart, .woSwipe, .woRPE, .woAdjust, .woRest, .summary,
-             .woDetail, .woSwap, .woSwapRDL, .woNotes:
+        case .midProgram, .missed, .missedSeveral, .missedShifted, .missedSkipped, .restDay, .freshProgram, .woStart, .woSwipe,
+             .woRPE, .woAdjust, .woRest, .summary, .woDetail, .woSwap, .woSwapRDL, .woNotes:
             return nil
         }
     }
 
-    /// In-memory container, populated for the mid-program and workout seeds.
+    /// In-memory container, populated for the mid-program, missed-day and workout seeds.
     func makeContainer(calendar: Calendar) throws -> ModelContainer {
         let container = try AppSchema.makeContainer(inMemory: true)
         switch self {
-        case .midProgram, .missed:
+        case .midProgram, .missed, .missedSeveral:
             try MidProgramSeed.populate(in: container.mainContext, calendar: calendar)
+        case .missedShifted, .missedSkipped:
+            let program = try MidProgramSeed.populate(in: container.mainContext, calendar: calendar)
+            try MissedDaySeed.apply(self == .missedShifted ? .shift : .skip, to: program, today: referenceDate(calendar: calendar),
+                                    calendar: calendar, in: container.mainContext)
         case .restDay:
             try MidProgramSeed.populate(in: container.mainContext, calendar: calendar, completedIndexes: Array(0...14).filter { $0 != 7 })
         case .freshProgram:
@@ -139,7 +154,14 @@ enum DebugSeed: String, CaseIterable {
         }
     }
 
-    /// M4 reads this to show the missed-day prompt on launch.
-    var forcesMissedDayPrompt: Bool { self == .missed }
+    /// True for the missed-day family, whose screens show or follow the Home prompt; false for every other seed. `midProgram`,
+    /// `restDay` and the workout seeds share the `missed` data (session 7 is missed) but must match prototype snapshots with the
+    /// prompt off. The root passes this on as the `missedPromptEnabled` environment value.
+    var forcesMissedDayPrompt: Bool {
+        switch self {
+        case .missed, .missedSeveral, .missedShifted, .missedSkipped: return true
+        default: return false
+        }
+    }
 }
 #endif

@@ -17,6 +17,9 @@ struct ProgramContent: View {
     let onInfo: (Exercise) -> Void
     /// Receives the selected card's session index.
     let onStart: (Int) -> Void
+    /// Receive a missed card's session index for the shift and skip writers.
+    let onShift: (Int) -> Void
+    let onSkip: (Int) -> Void
 
     var body: some View {
         let chips = ProgramTabStats.weekChips(sessions: summaries, calendar: calendar)
@@ -57,7 +60,8 @@ struct ProgramContent: View {
         if let session = selected?.session {
             let state = HomeStats.sessionState(session, today: today, calendar: calendar)
             SessionCard(session: session, state: state, unit: unit, calendar: calendar, onInfo: onInfo,
-                        showsStart: WorkoutFlow.isStartable(state), onStart: { onStart(session.index) })
+                        showsStart: WorkoutFlow.isStartable(state), onStart: { onStart(session.index) },
+                        onShift: { onShift(session.index) }, onSkip: { onSkip(session.index) })
                 .padding(.top, 16)
         } else {
             RestCard().padding(.top, 16)

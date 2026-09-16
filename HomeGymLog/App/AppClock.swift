@@ -35,4 +35,8 @@ extension EnvironmentValues {
     /// active set, `wo-detail` → detail, `wo-swap` / `wo-swap-rdl` → swap). Nil in Release and in every other launch; set the
     /// same way.
     @Entry var workoutSheetPreview: WorkoutSheetPreview? = nil
+    /// Whether the Home missed-session prompt may present: nil or true = normal, false = never. Only the root's DEBUG seed
+    /// branch sets it (false for every seed outside the missed-day family, which share the `missed` data but match
+    /// prototype snapshots with the prompt off). Nil in Release and in every unseeded launch.
+    @Entry var missedPromptEnabled: Bool? = nil
 }

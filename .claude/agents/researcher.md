@@ -33,6 +33,10 @@ For each question:
    `FetchDescriptor` or `@Query` of that row type, as a screen would. A relationship traversal first can read different
    values (on iOS 26.5 it read restored fields where a direct fetch returned unsaved ones; m3-exercise-tools P4), so a
    traversal-only read never verifies what the screen shows.
+9. When a probe outcome depends on layout geometry (distance to a screen edge, a frame overlap, a travel threshold),
+   report the numbers it depends on and label it "geometry-dependent: re-check if padding, detents or screen size change".
+   m4-missed-day P2 recorded "a drag from Skip always springs back" (~69 pt to the edge); a later 20 pt padding change
+   flipped it and cost an implementer stop.
 
 Do not modify project files. Do not pad with background the user did not ask for.
 

@@ -40,7 +40,9 @@ struct ProgramView: View {
                        onSelectWeek: { selection = .week($0) },
                        onSelectDay: { week, day in selection = .day(week: week, day: day) },
                        onInfo: { infoExercise = $0 },
-                       onStart: start(sessionIndex:))
+                       onStart: start(sessionIndex:),
+                       onShift: shift(sessionIndex:),
+                       onSkip: skip(sessionIndex:))
             .background(Theme.bg.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
             .onAppear { reset(summaries) }
@@ -72,6 +74,34 @@ struct ProgramView: View {
             try WorkoutLogStore.start(sessionIndex: sessionIndex, rows: sessions, at: clock.now(), in: modelContext)
         } catch {
             assertionFailure("Start workout failed: \(error)")   // the store refused the write before this context changed; the shell stays
+        }
+    }
+
+    /// A missed card's "Do it today · shift program". Follows today only when something moved (B3): it sets the selection
+    /// directly, never through `reset`, which would re-apply the DEBUG preselection and re-select the emptied day. "Today" is
+    /// the clock read at the tap, never the cached `now`.
+    private func shift(sessionIndex: Int) {
+        let today = clock.now()
+        do {
+            let moved = try ProgramStore.shift(missedIndex: sessionIndex, rows: sessions, trainingWeekdays: program.trainingWeekdays,
+                                               today: today, calendar: clock.calendar, in: modelContext)
+            guard !moved.isEmpty else { return }   // stale tap: nothing written, nothing refreshed
+            selection = .followToday
+            now = today
+            scrollToken += 1
+        } catch {
+            assertionFailure("Shift failed: \(error)")   // rolled back and restored: the card stays "Missed" with its buttons
+        }
+    }
+
+    /// A missed card's "Skip it · stay on schedule". The selection stays, so the same card re-renders as "Skipped"; a stale
+    /// tap writes nothing.
+    private func skip(sessionIndex: Int) {
+        do {
+            try ProgramStore.skipMissed(sessionIndex: sessionIndex, rows: sessions, today: clock.now(), calendar: clock.calendar,
+                                        in: modelContext)
+        } catch {
+            assertionFailure("Skip failed: \(error)")   // rolled back and restored: the card stays "Missed" with its buttons
         }
     }
 }

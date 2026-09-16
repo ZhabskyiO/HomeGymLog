@@ -6,6 +6,78 @@ Keep entries short. Date them. Newest at the top within each section.
 
 ## Architecture decisions
 
+### 2026-09-15 — M4 milestone-wide and missed-day decisions (from the m4-missed-day slice spec, user-answered)
+
+- **M4 is four slices**, each merged before the next: `m4-missed-day` → `m4-progress` (Swift Charts top-weight line, best /
+  since start, month calendar, archived history) → `m4-settings` (appearance, units, program rows, "Build a new program…"
+  restart, equipment) → `m4-reminder` (daily reminder notification, permission status in Settings). What remains of PRs and
+  streak goes into the slice that needs it. No preference in this slice: the prompt always asks (the Settings row "Missed a
+  day" is m4-settings).
+- **The Home prompt shows on the Home tab only** and names the first missed session (pending, dated before today; lowest
+  `(scheduledDate, index)`). **Dismissable** (scrim tap, swipe down on the card) with nothing written; silenced for that
+  session index and calendar day while the shell stays mounted; back on relaunch, after a workout (shell remount), on a new
+  day, or for a different first-missed session.
+- **Several missed sessions**: after "Skip it" the next missed one prompts at once; one shift re-dates all of them.
+- **A skipped session still breaks the streak** (M2 rule unchanged; resolves the M2 "M4 may revisit" note).
+- **Occupied day: `Reslot` stays as is** (resolves "Open for M4" of 2026-09-10): completed and skipped sessions consume no
+  day; the collision is unreachable in v1 (only today's or past sessions can be completed or skipped); an invariant test
+  guards "no two pending sessions share a date, pending dates ascend with index".
+- **The Program tab's Missed card gains shift and skip** (user chose over the prototype, which has them on Home only): every
+  missed card, two full-width `sf2` buttons stacked under "Start workout" with the prompt's verbatim labels ("Do it today ·
+  shift program", "Skip it · stay on schedule"), no confirmation on either surface. After a shift the tab's selection
+  follows today (the moved session's card); after a skip it stays on the card, which reads "Skipped".
+- **Title day text**: abbreviated weekday when the session is 1–6 days old ("You skipped Legs on Wed"), else "Wed, Sep 9".
+  Spoken labels equal the visible text.
+- **Presentation (researcher, 17.5 and 26.5)**: a custom scrim (black 0.55) + bottom card applied as `.overlay` on
+  `ShellView` after the tab bar's `.safeAreaInset`, shown only while the Home tab is selected; a system sheet dims only
+  0.29 / 0.48, floats inset on 26.5, and a Home-level overlay cannot cover the bar. VoiceOver containment of the overlay
+  (`.isModal`) is unverified and stays a manual check.
+- **DEBUG**: a nil-by-default `@Entry` suppresses the prompt for every seed outside the missed family, so existing seeds and
+  snapshots keep matching; new seeds `missed-shifted`, `missed-skipped`, and `missed-several` (Thu 2026-09-17: s7, s11,
+  s12 missed) so the several-missed and non-first-missed tap checks are reachable without a live clock.
+- No schema change.
+- **Architecture review (2026-09-15, approve with changes)**:
+  - **Prompt host**: a view in `ShellView`'s `.overlay` (after `.safeAreaInset`) owning a third `PlannedSession` `@Query`, its
+    own `now` (appear, scene-active, and the Home tab becoming selected) and the silence `@State`; keyed `.id(program.id)`;
+    show = `enabled != false ∧ selected == .home ∧ MissedDay.shouldPrompt`. Duplicating Home's query is deliberate: the shell
+    never becomes a query owner (it would re-render the whole `TabView` on every save). Silence lifetime = shell mount.
+  - **A derived overlay is never "closed before the write"** (B2): the close-then-write rule applies to UIKit sheets only.
+    The overlay disappears when the query re-fetches; a failed shift or skip leaves the prompt up.
+  - **`MissedDay.shiftMap` is total** (B1): `[:]` means "not a missed session". `ProgramStore.shift` returns the applied map
+    and saves nothing when it is empty; screens treat an empty result as a silent no-op and a throw as a failed save
+    (matches `start` returning nil).
+  - **A Program-card shift sets `.followToday` directly** (plus `now` and the scroll token), only when something moved; not
+    `reset`, which re-applies the DEBUG preselection (B3).
+  - **Host body root is a concrete `ZStack(alignment: .bottom) { if shows { scrim; card } }`** (B5, researcher addendum P1,
+    17.5 and 26.5): its `.onAppear`, scene-phase and selected-tab handlers all fire while it draws nothing, and the empty
+    overlay intercepts no touch; a bare `Group { if }` root skips `onAppear` at mount. No `ShellView`-owned `now` needed.
+  - **Card dismissal drag is `.highPriorityGesture(DragGesture(minimumDistance: 20))` applied after `.offset`** (B6, addendum
+    P2): the only variant where a drag starting on a button never fires it; ≥ 80 pt dismisses, less springs back, taps still
+    fire once. With the 64 pt bottom padding a drag from "Skip it" has ~89 pt of room, so a long drag from Skip dismisses too and writes
+    nothing (accepted 2026-09-15; with the prototype's 44 pt it had ~69 pt and always sprang back).
+  - **Card bottom padding is 64 pt, not the prototype's 44** (user decision 2026-09-15, implementation finding): a SwiftUI
+    `Button` also fires on a tap a few points outside its frame (6.8 pt below "Skip it" skipped the session on 17.5; 20 pt
+    below did nothing), so with 44 pt a tap in the card's bottom padding over the hidden tab pill could skip a session.
+    64 pt keeps Skip's tolerance zone above the 34 pt home-indicator area. The user chose this over rewording AC-15 or
+    confirming Skip; the `missed` screenshot records the 20 pt deviation.
+  - **The silence key is the day the card was rendered for** (the host's `now`), not `clock.now()` at the dismiss tap
+    (planner finding): a card left up across midnight would otherwise never match its own silence and not hide on the tap.
+- **Implemented 2026-09-15** (branch `m4-missed-day`): 711 tests green on iOS 17.5 and 26.5 (634 → 671 implementer → 710
+  test-writer → 711 after the swift-review fix round), Release green, scratch-copy XCUITests AC-12–AC-17 10/10 on 17.5, swift
+  review "ship" with no blocking item. The three implementation decisions are the last three bullets above: 64 pt card padding,
+  a long drag from Skip dismisses, and the silence key. Visible deviations from the prototype:
+  - The prompt body wraps to two lines on the phone (the prototype frame is wider), and the 64 pt padding raises the card another
+    20 pt, so it hides Home's "Start workout" completely on 17.5 (a strip still shows on 26.5).
+  - At scroll top, the Program Missed card's Skip button sits under the floating bar (the list scrolls).
+  - A drag-dismiss removes the card at its dragged offset with no animation (swift review Q2; polish, not a bug).
+
+  Swift review items 2 (reset `dragY` after `onDismiss`) and 3 (`promptAllowed = enabled ?? true`) are applied. Item 1 is open:
+  `.isModal` (≈ `aria-modal`) sits on the inner scrim + card container, but VoiceOver only excludes siblings of the modal element.
+  Pending the user:
+  - **AC-17 VoiceOver on the iPhone 14 Pro Max.** If focus escapes the card, apply the unverified fallback on the host's outer
+    root: `.accessibilityAddTraits(shows ? .isModal : [])`.
+  - **MVP pass:** the card's spring-back feel and a real finger drag from Skip.
+
 ### 2026-09-14 — M3 exercise-tools decisions (from the m3-exercise-tools slice spec, user-answered)
 
 - **Swap is enabled only while every set of the displayed exercise is pending** (the button dims otherwise, so always
@@ -266,7 +338,7 @@ Keep entries short. Date them. Newest at the top within each section.
 - **Week window is the calendar week Mon–Sun containing today** for the week strip and the "this week" volume
   tile; only the "Week N · Phase" pill uses the stored program week (current-week rule in "Mid-week program start").
 - **Skipped sessions** show as a muted day number in the strip and break the streak (streak counts completed
-  sessions only). M4 may revisit when skip exists.
+  sessions only). M4 may revisit when skip exists. (Revisited 2026-09-15: unchanged, a skip still breaks the streak.)
 - **After today's session completes, Home shows the prototype's rest-day card** ("Recover. Next up: …"); no
   "done for today" variant.
 - **Start workout is present and inert until M3.** Volume counts finished logs only. Volume tile formatting follows
@@ -338,7 +410,7 @@ becomes `ShellView`; the new root switches on `currentPrograms.isEmpty`. Analogy
 - **No draft persistence in onboarding**: relaunch mid-onboarding starts over.
 - Welcome tile letter is "H" until the M5 icon; the A4 subtitle stays verbatim until the M5 copy audit.
 
-### 2026-09-10 — Open for M4: does an occupied day block re-slotting?
+### 2026-09-10 — Open for M4: does an occupied day block re-slotting? (decided 2026-09-15: Reslot stays as is, see M4 decisions)
 `Reslot` steps over completed and skipped sessions without reserving their day, exactly as the M1 spec says,
 so a pending session can be re-dated onto a day a completed or skipped session already holds (only when that
 session is dated after the cursor: a future session skipped, or finished early). The same spec also says no
@@ -534,6 +606,27 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
 
 ## Agent tuning
 
+- 2026-09-15 (m4-missed-day) — **researcher** was decisive three times: overlay over system sheet (dim 0.29 / 0.48 vs 0.55, a
+  Home-level overlay cannot cover the bar), P1 (a `Group { if }` root skips `onAppear`) and P2 (a `Button` fires from a
+  drag unless `.highPriorityGesture`; the architecture review's text-block fallback would have shipped that bug). Its miss:
+  P2 recorded "a drag from Skip always springs back" (~69 pt to the edge) as behaviour; the user's later 64 pt padding
+  flipped it and stopped the implementer. Prompt edit: geometry-dependent outcomes carry their numbers and a re-check label.
+- 2026-09-15 (m4-missed-day) — **spec-creator** wrote AC-15 "a tap on the pill below Skip does nothing" although researcher Q3
+  had measured Skip overlapping the bar; the implementer's scratch XCUITest then found a tap 6.8 pt below Skip skipping a
+  session (a user decision round). Prompt edit: tap and drag ACs use measured frames and allow ~12 pt touch slop.
+- 2026-09-15 (m4-missed-day) — **implementation-planner** reported five spec contradictions itself (AC-15 geometry, AC-26 count,
+  an unqueryable streak `Text`, the silence day key, a scan spelling); the main session fixed the spec before the verifier,
+  which then found 0 false claims and one duplicated derivation (F-2). **architecture-reviewer** (6 blocking, both
+  unverified items settled by probes), **plan-verifier** (round 2 in 57 s), **swift-reviewer** (ship, 3 non-blocking) and
+  **doc-writer** (wrote the expected 711 and flagged it) needed no re-prompt. Skill edit (milestone step 6).
+- 2026-09-15 (m4-missed-day) — **implementer** stopped correctly twice (the tap-slop finding; the padding change contradicting a
+  recorded drag note) and its optional Step 8 found the slice's only product issue, which no unit test could. **test-writer**
+  (+39, no bug) found `MissedDayRollbackTests` calling `rollback()` after a `#require` that could throw first, so a failure
+  would delete the store with changes pending (a 26.5 process abort). Prompt edit (test-writer, implementer): `rollback()`
+  goes in a `defer` right after creating the writing context.
+- 2026-09-15 — **process**: a session rate limit killed two agents mid-run; the spec-creator's revision had already landed
+  (checked by grep) and the researcher was resumed with SendMessage, so nothing was redone. Skill edit (milestone rules).
+
 - 2026-09-14 (m3-exercise-tools) — **researcher** was decisive four times (Q1–Q6; P1–P3 no in-place insert undo; P4 the revert
   order across all 11 writers). Its miss: Q4 read the swap row after a failed save by traversing from the session first, which
   reads restored values on 26.5, while the app's `@Query` and a direct fetch return the unsaved ones; it surfaced only in the
@@ -711,6 +804,12 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
   spec-creator in parallel at the start of `/milestone` saved a full round.
 
 ### Skill tuning
+- 2026-09-15 — **milestone**: rules say to check whether a rate-limited agent's output already landed and to resume with
+  SendMessage before relaunching; step 6 says the main session fixes spec contradictions the planner reports before the
+  verifier runs (m4-missed-day).
+- 2026-09-15 — **engineering-insight**: under parallel Swift Testing both the xcodebuild log (35.2 s) and the result bundle's
+  `durationInSeconds` (157 s on 17.5, 39 s on 26.5) give a clone batch's wall time to every test in it; the slow-test step now
+  treats many identical values as batch time and reports only outliers.
 - 2026-09-14 — **ship-check**: step 2 may reuse result bundles written after the newest Swift edit (check mtimes and read the
   `xcresulttool` counts) instead of re-running both suites; the Release build always runs fresh, because the product's
   timestamp does not prove the current code compiles (m3-exercise-tools: the Release `.app` predated the last test edits).
@@ -754,6 +853,30 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
   `DebugSeed` reference outside `#if DEBUG` that only Release could catch.
 
 ## Patterns
+
+### 2026-09-15 — A derived modal overlay on the tab shell
+A prompt that must dim everything, including the floating tab bar, is a host view in `ShellView`'s `.overlay` placed after
+`.safeAreaInset`, with a concrete `ZStack` root (a `Group { if }` root skips `onAppear`), its own `@Query`, and "show it"
+derived from rows + `now` + tab + a dismissal silence, never an `isOpen` flag (≈ rendering a modal from store state at the
+app root instead of a `useState` you must flip back on error). Writes make it disappear by changing rows; a failed save
+leaves it up.
+
+```swift
+TabView(selection: $selected) { … }
+    .safeAreaInset(edge: .bottom, spacing: 0) { FloatingTabBar(selected: $selected) }
+    .overlay { MissedPromptHost(program: program, selected: selected).id(program.id) }
+// host body
+ZStack(alignment: .bottom) {
+    if shows {
+        Color.black.opacity(0.55).ignoresSafeArea().onTapGesture { dismiss() }
+        MissedSessionCard(…).offset(y: dragY)
+            .highPriorityGesture(DragGesture(minimumDistance: 20).onChanged { … }.onEnded { … })
+    }
+}
+.onAppear { now = clock.now() }
+.onChange(of: scenePhase) { _, phase in if phase == .active { now = clock.now() } }
+```
+Used by m4-missed-day (`Features/Home/MissedPromptHost.swift`); verified on 17.5 and 26.5 (researcher report and addendum).
 
 ### 2026-09-14 — Blame the toolchain only after building the base commit with it
 When Xcode or the SDK changes mid-slice, a new warning, a failing test or a screenshot byte-difference is reproduced on the

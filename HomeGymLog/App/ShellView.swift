@@ -25,6 +25,11 @@ struct ShellView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             FloatingTabBar(selected: $selected)
         }
+        // After the inset, so the missed-session scrim also covers the floating bar (inside a tab it would not). The host
+        // draws nothing unless the prompt shows. `.id` ≈ key={program.id}: its `now` and silence reset with the program.
+        .overlay {
+            MissedPromptHost(program: program, selected: selected).id(program.id)
+        }
         .ignoresSafeArea(edges: .bottom)
         .background(Theme.bg.ignoresSafeArea())
     }
