@@ -25,22 +25,22 @@ multiple-choice question when the slicing is not obvious.
    iOS 17 availability doubt). Skip `researcher` when there are none.
 3. If there are platform questions, launch `researcher` with them. If a question decides the data flow
    (SwiftData observation, queries, what a view must own to re-render), wait for its answer and hand it to
-   `spec-creator`; only API-availability questions run in parallel with step 4. Save the researcher's reply verbatim to
-   `docs/reviews/<slug>-researcher.md`. Record findings that matter in `insights/`.
+   `spec-creator`; only API-availability questions run in parallel with step 4. It writes its report to
+   `docs/reviews/<slug>-researcher.md` itself (pass the path) and returns a summary; never paste the report back. Record findings that matter in `insights/`.
 4. Launch `spec-creator` for the slice → `docs/specs/<slug>.md`. For a UI slice the brief must name the
    prototype snapshots it covers, require a `-seed` launch state per screen (M2 adds the seeder; specs
    state which seed shows which screen), and require screenshot-based acceptance criteria that
    `/design-compare` can check. Read the spec. Present its open questions to the user as multiple-choice
    questions with a recommended default, batched. Fold answers into the spec and record decisions in
    `insights/INSIGHTS.md`.
-5. Launch `architecture-reviewer` on the spec. Save its reply to `docs/reviews/<slug>-architecture.md`.
+5. Launch `architecture-reviewer` on the spec. It writes its review to `docs/reviews/<slug>-architecture.md` (pass the path) and returns a summary.
    If the verdict is rework, fix the spec (resume the same `spec-creator` agent with SendMessage so it
    keeps context) and re-run once. Surface anything blocking to the user. If the review marks platform claims as
-   unverified, resume the same `researcher` with a scoped probe list in parallel with the spec revision, append its
-   addendum to `docs/reviews/<slug>-researcher.md`, and fold the results into the spec before planning.
+   unverified, resume the same `researcher` with a scoped probe list in parallel with the spec revision, which appends its
+   addendum to `docs/reviews/<slug>-researcher.md` itself, and fold the results into the spec before planning.
 6. Launch `implementation-planner` → `docs/plans/<slug>.md`. If it reports spec contradictions or ambiguities, fix the
    spec wording in the main session before launching the verifier, align the plan's note, and tell the verifier.
-7. Launch `plan-verifier` on the plan. Save its reply to `docs/reviews/<slug>-verifier-<round>.md`. If
+7. Launch `plan-verifier` on the plan. It writes its report to `docs/reviews/<slug>-verifier-<round>.md` (pass the path and round) and returns the verdict and finding list. If
    not PASS, fix the plan and re-verify scoped to the finding ids by resuming the same verifier: apply mechanical
    should-fix items (one-line edits, typos, a missing command) directly in the main session; resume the planner
    only for design changes.

@@ -20,7 +20,7 @@ Verify the working tree is ready to commit. Report failures; do not hide them.
    snapshot the slice's spec names and attach the verdicts; a visible difference is a blocking finding
    unless the spec records it as a deviation.
 4. Launch `swift-reviewer` on the diff (`git diff main...HEAD` plus untracked files) and `test-writer` in
-   parallel (they are independent). Save the reviewer's reply to `docs/reviews/<slug>-swift-review.md`. Wait for
+   parallel (they are independent). Pass the reviewer the path `docs/reviews/<slug>-swift-review.md`; it writes the review there and returns a summary. Wait for
    the test-writer before applying anything, then send the reviewer's findings to the `implementer` (resume it
    with SendMessage so it keeps the slice in context) with the exact fixes and the instruction to re-run the full
    suite on both runtimes and the Release build. Re-run the reviewer once only for blocking findings, or scoped to

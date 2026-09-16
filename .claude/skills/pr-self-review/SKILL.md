@@ -21,7 +21,7 @@ with confidence.
 6. **Code.** Launch `swift-reviewer` on the diff (or reuse `docs/reviews/<slug>-swift-review.md` from
    `/ship-check` if the diff has not changed since). Then scan for leftovers: `print(`, `TODO`, `FIXME`,
    force unwraps in new code, commented-out code, unused files, `#if DEBUG` that should not ship.
-7. **Docs.** Confirm `insights/`, `CLAUDE.md` commands and layout, and the spec/plan status lines reflect
+7. **Docs.** Confirm `insights/`, `CLAUDE.md` commands and directory layout, `docs/layout.md`, and the spec/plan status lines reflect
    the change. Launch `doc-writer` if not.
 8. **Acceptance.** Walk the spec's acceptance criteria and mark each met / not met / not verifiable
    without a device.

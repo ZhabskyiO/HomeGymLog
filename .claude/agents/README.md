@@ -32,12 +32,12 @@ For a milestone or feature, the intended order is:
 
 | Agent | Writes | Reads web |
 |---|---|---|
-| architecture-reviewer | nothing | no |
+| architecture-reviewer | its own report under docs/reviews/ | no |
 | doc-writer | CLAUDE.md, insights/, docs/, doc comments | no |
 | implementation-planner | docs/plans/ | no |
 | implementer | HomeGymLog/, HomeGymLogTests/ (per the plan), insights/gotchas.md | no |
-| plan-verifier | nothing | no |
-| researcher | nothing | yes |
+| plan-verifier | its own report under docs/reviews/ | no |
+| researcher | its own report under docs/reviews/ | yes |
 | spec-creator | docs/specs/ | no |
-| swift-reviewer | nothing | no |
+| swift-reviewer | its own report under docs/reviews/ | no |
 | test-writer | HomeGymLogTests/ | no |

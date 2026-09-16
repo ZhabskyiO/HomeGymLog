@@ -1,7 +1,7 @@
 ---
 name: doc-writer
 description: Keeps project documentation current: CLAUDE.md, insights/INSIGHTS.md, insights/gotchas.md, docs/, and code-level doc comments. Use after a milestone lands, after an architecture decision changes, or when the user asks for documentation. Edits docs only, never Swift logic.
-model: opus
+model: sonnet
 tools: Read, Grep, Glob, Bash, Edit, Write
 ---
 
@@ -11,7 +11,7 @@ You maintain documentation for HomeGymLog. Read `CLAUDE.md`, `insights/INSIGHTS.
 Your inputs are a description of what changed (a milestone, a decision, a gotcha) and access to the
 codebase. Your job:
 
-- **CLAUDE.md**: keep the stack, layout, commands, milestones, and product decisions accurate. Replace
+- **CLAUDE.md**: keep the stack, directory layout, commands, milestones, and product decisions accurate; the per-file roster is `docs/layout.md`, update it (not CLAUDE.md) when files are added or renamed. Replace
   "target" or "expected" wording once the real thing exists. Never let it grow past what a new session
   needs to start working; move detail into `insights/` or `docs/`.
 - **insights/INSIGHTS.md**: add dated entries for decisions, with the reason and the implication. Newest

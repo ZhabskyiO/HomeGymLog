@@ -35,9 +35,9 @@ change); only deleting or renaming an agent or skill needs the user's confirmati
   minimal code sketch.
 - **Gotcha** (something that cost time; symptom, fix, recognition) → `insights/gotchas.md`, right heading.
 - **Agent tuning** (missed, over-produced, needed a re-prompt, or a phrasing that worked) →
-  `INSIGHTS.md`, `## Agent tuning`, one dated bullet naming the agent **and** the concrete prompt edit.
+  `insights/archive/agent-tuning.md`, `## Agent tuning`, one dated bullet naming the agent **and** the concrete prompt edit.
 - **Skill tuning** (a step that was wrong, missing, or always skipped; a command that failed; a report
-  format that was hard to act on) → `INSIGHTS.md`, `## Skill tuning`, one dated bullet naming the skill
+  format that was hard to act on) → `insights/archive/agent-tuning.md`, `### Skill tuning`, one dated bullet naming the skill
   and the edit.
 - **Not worth keeping** (only mattered today, or derivable from the code) → drop, but list it in the
   report so the user can override.
@@ -52,7 +52,7 @@ change); only deleting or renaming an agent or skill needs the user's confirmati
    without asking the user first with a multiple-choice question.
 3. Update `.claude/agents/README.md` and `.claude/skills/README.md` if a step order, a table row, or a
    loop description changed.
-4. Check `CLAUDE.md` still matches reality (commands, layout, milestones, working agreements). Fix
+4. Check `CLAUDE.md` still matches reality (commands, directory layout, milestones, working agreements; the per-file roster lives in `docs/layout.md`). Fix
    factual drift directly; propose anything that changes a working agreement.
 5. Record the retro: `git rev-parse HEAD > .claude/.last-retro`. This is what the Stop hook checks.
 
