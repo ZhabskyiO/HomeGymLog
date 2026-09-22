@@ -5,6 +5,15 @@ Moved out of `INSIGHTS.md` on 2026-09-16 to keep session and agent reads small. 
 
 ## Agent tuning
 
+- 2026-09-22 — **implementation-planner**: added a paragraph requiring every number copied into a plan (crop, library
+  default, test literal) to come from the file that owns it, and a spec number that disagrees with code to be reported
+  as a finding. Both m4-settings `sips` crops arrived transposed (a blank band) and the spec's `lowRow 80` was an
+  earlier slice's chart point, not the library default of 90.
+- 2026-09-22 — **spec-creator**: added a closing rule that a constant quoted from code is read from its defining file
+  and cited with that file's name, never inferred from a rendered prototype number or another spec's derived value.
+- 2026-09-22 — **agents/README.md**: step 6 now says `implementer` and `test-writer` are strictly sequential — they
+  share one checkout and one DerivedData, so a concurrent run compiles the other's half-written files. Cost this
+  session: a phantom `TEST FAILED` at 888 tests whose failure message contradicted the file on disk.
 - 2026-09-16 (m4-progress) — **spec-creator** wrote a solid 399-line spec, but the planner found eight defects it should
   have caught itself: an AC contradicting its own rules table ("Sep 9 completed" vs s7 missed), a calendar example whose
   dates could not coexist (Feb 1–5 "scheduled" with today in February), a named function with no input for a value it had
@@ -218,6 +227,14 @@ Moved out of `INSIGHTS.md` on 2026-09-16 to keep session and agent reads small. 
 
 ### Skill tuning
 
+- 2026-09-22 — **ship-check**: step 4 now (a) hands the reviewer the implementer's deviation list and which ACs it
+  machine-checked on which runtimes — the m4-settings review spent a finding asking what the implementer's report had
+  already answered — and (b) states in bold that the test-writer must finish before the implementer is resumed, with
+  the mid-edit-snapshot symptom and the `ls -lT` recovery.
+- 2026-09-22 — **design-compare**: recorded the `settings` (800×290 @ 2555, 4148) and `home-light` (850×680 @ 2555,
+  4456) crops on the 5600-px render, the Settings seeds, and the `-appearance` / `-missedDayPolicy` / `-holdBanner`
+  launch arguments; added the warning that a transposed `sips -c` returns a blank band, so a crop is read before it is
+  trusted.
 - 2026-09-16 (m4-progress) — **/design-compare**: the `progress` crop was recorded in the skill from the spec's estimate
   without rendering it, and it cut the right edge (2330 vs the correct 2520 wide). Rule added: record a crop only after
   rendering and reading the cropped image.

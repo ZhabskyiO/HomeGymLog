@@ -715,6 +715,18 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
 
 ## Patterns
 
+### 2026-09-22 — A preference that writes by itself: one Equatable key, one synchronous pass
+When a stored preference makes the app write without a tap (m4-settings' Always shift / Always skip), the trigger is a
+task keyed on an `Equatable` struct of everything that should cause exactly one write — here
+`AutomaticActionKey(policy, firstMissedIndex, day)`, nil when there is nothing to do. `.task(id:)` then fires once per
+distinct situation: shell mount, a policy change, a new calendar day, a different first-missed session, and nothing
+else. The pass itself is synchronous with no `await`, so it cannot interleave with a second run, and the writers return
+optionals (`[Int: Date]?`, `Bool?`) so the follow-up UI names only what actually landed. Two rules learned here: such a
+path must **not** `assertionFailure` on a failed save (it runs at every launch with no user action, so a bad store would
+trap a Debug build repeatedly — the manual tap still asserts), and the key must not read anything `onAppear` writes,
+because on 26.5 the task runs first (gotchas 2026-09-22).
+React analogy: the key is the dependency array, and the effect body is deliberately sync.
+
 ### 2026-09-16 — Reading rows of another parent: query the parents, fetch children per id in a task
 A screen that must include archived programs never hops `child.parent` in `body` (~330 µs per row, uncached, on 17.5).
 Instead it owns a `@Query` of the parent rows (`Program` with `archivedAt != nil`), which gives each id and its scalar
