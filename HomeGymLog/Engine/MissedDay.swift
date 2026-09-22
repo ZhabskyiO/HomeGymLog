@@ -8,6 +8,21 @@ nonisolated enum MissedDayLabel: Equatable, Sendable {
     case fullDate
 }
 
+/// What the app does when a session is missed (spec 4.3): ask on Home (the default), always shift, or always skip.
+/// Raw strings so `@AppStorage(MissedDayPolicy.storageKey)` stores the value directly; the words the user reads live in
+/// `SettingsText.policy(_:)`, never here (Engine stays formatting-free).
+nonisolated enum MissedDayPolicy: String, CaseIterable, Sendable {
+    case ask, shift, skip
+
+    /// The `UserDefaults` key. Typed once here so the literal never appears anywhere else in the app (AC-22).
+    static let storageKey = "missedDayPolicy"
+
+    /// A stored raw value, falling back to `.ask` for anything unknown.
+    static func from(raw: String) -> MissedDayPolicy {
+        MissedDayPolicy(rawValue: raw) ?? .ask
+    }
+}
+
 /// The missed-day rules over plain values: which session the Home prompt names, whether a dismissal silences it, the
 /// shift's date map, and the title's day style. Total over stored rows (INSIGHTS 2026-09-14 B2): nothing throws or traps;
 /// nil, false and `[:]` mean "nothing to do". Analogy: selectors plus a reducer that returns the unchanged state for an
@@ -70,4 +85,71 @@ nonisolated enum MissedDay {
         if (1...6).contains(days) { return .weekday }
         return .fullDate
     }
+
+    /// m4-settings spec 5.5: what the prompt host should do, from the rows, the policy and the dismissal silence. Total: no
+    /// missed session means `.none` under every policy, and an automatic policy ignores the silence (it belongs to the prompt).
+    /// Analogy: a selector that turns store state plus one preference into the action to dispatch, or none.
+    static func resolution(policy: MissedDayPolicy, sessions: [SessionSummary], silence: PromptSilence?, today: Date,
+                           calendar: Calendar) -> MissedDayResolution {
+        let missed = HomeStats.ordered(sessions.filter { HomeStats.sessionState($0, today: today, calendar: calendar) == .missed })
+        guard let first = missed.first else { return .none }
+        switch policy {
+        case .ask:
+            return shouldPrompt(missed: first, silence: silence, today: today, calendar: calendar) ? .prompt(first) : .none
+        case .shift:
+            return .shift(missedIndex: first.index)
+        case .skip:
+            return .skip(indexes: missed.map(\.index))
+        }
+    }
+
+    /// m4-settings spec 5.5 / B1: the identity of the automatic write the host should run, or nil when there is nothing to do
+    /// automatically (`.none` and `.prompt`). Equal keys mean "already handled", so the host's `.task(id:)` re-runs only on a
+    /// policy change, a new calendar day, or a different first missed session. Analogy: the dependency array of a `useEffect`.
+    static func automaticActionKey(resolution: MissedDayResolution, policy: MissedDayPolicy, today: Date,
+                                   calendar: Calendar) -> AutomaticActionKey? {
+        let index: Int
+        switch resolution {
+        case .none, .prompt: return nil
+        case .shift(let missedIndex): index = missedIndex
+        case .skip(let indexes):
+            guard let first = indexes.first else { return nil }
+            index = first
+        }
+        return AutomaticActionKey(policy: policy, missedIndex: index, day: CalendarRules.startOfDay(today, calendar: calendar))
+    }
+
+    /// m4-settings spec 2.7 / NB4: whether the banner names the shifted session's new day as "today" or as a date. The Engine
+    /// decides, `MissedDayText.shiftedBanner` writes the words (the same split as `dayLabelStyle` → `MissedDayText.title`).
+    static func bannerDayStyle(newDate: Date, today: Date, calendar: Calendar) -> BannerDayStyle {
+        CalendarRules.isSameDay(newDate, today, calendar: calendar) ? .today : .date
+    }
+}
+
+/// What the prompt host should do about the missed sessions right now (m4-settings spec 5.5). One value per render, derived
+/// from the rows and the policy, never stored.
+nonisolated enum MissedDayResolution: Equatable, Sendable {
+    /// Nothing missed, or the prompt is silenced for today.
+    case none
+    /// Ask: draw the Home prompt for this session.
+    case prompt(SessionSummary)
+    /// Always shift: one `ProgramStore.shift` on this session index.
+    case shift(missedIndex: Int)
+    /// Always skip: one `ProgramStore.skipMissed` per index, earliest first.
+    case skip(indexes: [Int])
+}
+
+/// How the shift banner names the day the session landed on (m4-settings spec 2.7).
+nonisolated enum BannerDayStyle: Equatable, Sendable {
+    case today
+    case date
+}
+
+/// The identity of one automatic missed-day action (B1). A struct rather than a tuple because `.task(id:)` needs
+/// `Equatable` (and `Hashable`), which tuples do not conform to.
+nonisolated struct AutomaticActionKey: Equatable, Hashable, Sendable {
+    let policy: MissedDayPolicy
+    let missedIndex: Int
+    /// Local midnight of the day the action was derived for, so a new calendar day re-runs it.
+    let day: Date
 }

@@ -8,7 +8,8 @@ import Testing
     private static let names = ["\"wo-start\"", "\"wo-swipe\"", "\"wo-rpe\"", "\"wo-adjust\"", "\"wo-rest\"", "\"summary\"",
                                 "\"wo-detail\"", "\"wo-swap\"", "\"wo-swap-rdl\"", "\"wo-notes\"",
                                 "\"missed-several\"", "\"missed-shifted\"", "\"missed-skipped\"",
-                                "\"progress-history\"", "\"-progressExercise\""]
+                                "\"progress-history\"", "\"-progressExercise\"",
+                                "\"settings-restart\"", "\"restarted\"", "\"-holdBanner\""]
 
     /// `<repo>/HomeGymLog`, derived from `<repo>/HomeGymLogTests/Static/…`.
     private static var appSourceRoot: URL {
@@ -54,5 +55,39 @@ import Testing
         let appClock = try #require(all.first { $0.path == "App/AppClock.swift" })
         let entryLines = appClock.code.components(separatedBy: "\n").filter { $0.contains("@Entry") && $0.contains("workoutSheetPreview") }
         #expect(entryLines.count == 1)
+    }
+
+    /// m4-settings AC-22: both new DEBUG switches are nil-by-default `Bool?` `@Entry`s declared on one line each.
+    @Test("AppClock declares settingsRestartPreview and missedBannerHold as nil-by-default Bool? entries")
+    func settingsEntries() throws {
+        let all = try Self.sources()
+        let appClock = try #require(all.first { $0.path == "App/AppClock.swift" })
+        for name in ["settingsRestartPreview", "missedBannerHold"] {
+            let lines = appClock.code.components(separatedBy: "\n").filter { $0.contains("@Entry") && $0.contains(name) }
+            #expect(lines.count == 1, "\(name)")
+            let line = try #require(lines.first).trimmingCharacters(in: .whitespaces)
+            #expect(line.contains("Bool?"), "\(name)")
+            let initializer = line.components(separatedBy: "=").dropFirst().joined(separator: "=").trimmingCharacters(in: .whitespaces)
+            #expect(initializer == "" || initializer == "nil", "\(name) initializer: \(initializer)")
+        }
+    }
+
+    /// m4-settings AC-22: each switch is provided on exactly one line of the root's `body`, outside `#if DEBUG`, while the
+    /// seed read sits inside the `DebugSeed.parse(` block.
+    @Test("HomeGymLogApp provides both DEBUG switches once, and reads the seed's preview inside the seed branch")
+    func settingsEnvironmentWiring() throws {
+        let all = try Self.sources()
+        for key in [".environment(\\.settingsRestartPreview", ".environment(\\.missedBannerHold"] {
+            let files = all.filter { $0.code.contains(key) }.map(\.path)
+            #expect(files == ["App/HomeGymLogApp.swift"], "\(key)")
+            let app = try #require(all.first { $0.path == "App/HomeGymLogApp.swift" })
+            #expect(app.code.components(separatedBy: "\n").filter { $0.contains(key) }.count == 1, "\(key)")
+        }
+        let app = try #require(all.first { $0.path == "App/HomeGymLogApp.swift" })
+        let lines = app.code.components(separatedBy: "\n")
+        let seedBranch = try #require(lines.firstIndex { $0.contains("DebugSeed.parse(") })
+        let endif = try #require(lines.indices.first { $0 > seedBranch && lines[$0].trimmingCharacters(in: .whitespaces).hasPrefix("#endif") })
+        let read = try #require(lines.indices.first { lines[$0].contains("seed.settingsRestartPreview") })
+        #expect(read > seedBranch && read < endif)
     }
 }

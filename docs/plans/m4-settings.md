@@ -1,6 +1,12 @@
 # M4 slice 3 — Settings tab (appearance, units, program rows, missed-day policy, restart, equipment): implementation plan
 
-**Status: ready for review 2026-09-22.** For `docs/specs/m4-settings.md` (agreed; architecture B1–B3 / NB1–NB10 and the
+**Status: done 2026-09-22, 917 tests.** Steps 0–11 green: 807 → 917 tests on iOS 17.5 and 26.5, Release green,
+`project.pbxproj` untouched. Step 12 scratch-copy XCUITest: 7/7 on 17.5 plus AC-12 re-run on 26.5. Swift review "ship"
+(`docs/reviews/m4-settings-swift-review.md`; three non-blocking findings, none applied — F1 the two-query restart-flip
+race is unverified but expected safe, F2 the untapped-assert risk was already fixed by a spec §2.6 amendment made
+during implementation, F3 a redundant discard, cosmetic). Deviations from Step 7's open question: the policy control
+ships as `Menu { Picker }`, not `Picker(.menu)` (`.font` is ignored on 17.5); full deviation list in INSIGHTS
+"Implemented 2026-09-22". For `docs/specs/m4-settings.md` (agreed; architecture B1–B3 / NB1–NB10 and the
 researcher addendum P1–P4 folded in). Spec §2–6 and §8 are the contract (`AC-1`…`AC-23`); format follows
 `docs/plans/m4-progress.md`; `implementer`, one step per build, nothing committed by it.
 

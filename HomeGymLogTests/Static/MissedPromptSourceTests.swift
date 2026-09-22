@@ -57,4 +57,33 @@ import Testing
         }
         #expect(found == ["App/HomeGymLogApp.swift"])
     }
+
+    /// m4-settings AC-22: the policy is read by the prompt host and the Settings screen, and nowhere else.
+    @Test("@AppStorage(MissedDayPolicy.storageKey) appears in exactly two files")
+    func policyReaders() throws {
+        let enumerator = try #require(FileManager.default.enumerator(at: Self.appSourceRoot, includingPropertiesForKeys: nil))
+        let files = enumerator.compactMap { $0 as? URL }.filter { $0.pathExtension == "swift" }
+        #expect(files.count > 40, "the whole app target was scanned")
+        var found: [String] = []
+        for file in files {
+            for line in try Self.codeLines(file) where line.contains("@AppStorage(MissedDayPolicy.storageKey)") {
+                found.append(file.path.replacingOccurrences(of: Self.appSourceRoot.path + "/", with: ""))
+            }
+        }
+        #expect(found.sorted() == ["Features/Home/MissedPromptHost.swift", "Features/Settings/SettingsView.swift"])
+    }
+
+    /// m4-settings B1: the automatic pass runs from one keyed task, synchronously — an `await` between the skip saves would
+    /// cancel the task after the first one.
+    @Test("the host derives the resolution in a keyed task and never awaits around a write")
+    func automaticPassIsSynchronous() throws {
+        let host = Self.appSourceRoot.appendingPathComponent("Features/Home/MissedPromptHost.swift")
+        let lines = try Self.codeLines(host)
+        let code = lines.joined(separator: "\n")
+        #expect(code.contains("MissedDay.resolution("))
+        #expect(code.contains(".task(id:"))
+        let writers = lines.filter { $0.contains("ProgramStore.skipMissed(") || $0.contains("ProgramStore.shift(") }
+        #expect(writers.isEmpty == false)
+        #expect(writers.allSatisfy { !$0.contains("await") }, "a write line must not await")
+    }
 }

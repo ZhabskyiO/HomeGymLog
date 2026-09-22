@@ -187,6 +187,22 @@ are kept as history.
 
 ## SwiftUI
 
+- 2026-09-22 — **A `.task(id:)` started during the first frames of launch is not reliably cancelled by the `-tab <name>`
+  flip that follows**: `MissedPromptHost`'s 3 s banner timer keys on `selected == .home ? banner?.token : nil`, and a real
+  tab tap does cancel it (probe: banner survives 5 s on Program and returns), but with `-seed missed -missedDayPolicy shift
+  -tab settings` the banner is already gone when Home is first tapped (XCUITest assertion immediately after the tap, 17.5
+  **and** 26.5). Only reachable through the DEBUG `-tab` argument — production always mounts the shell on Home — so it is
+  documented, not worked around. Recognize it: a "held" transient survives a user tab switch but not a launch-time one.
+- 2026-09-22 — **`Picker(.menu)` ignores `.font` on its label (iOS 17.5)**: the Settings "Missed a day" value rendered at
+  the system body size instead of the row's 14 pt `mu`, so the row looked nothing like the other value rows. Fix (shipped):
+  a `Menu { Picker … } label: { HStack { Text(value); Image(systemName: "chevron.up.chevron.down") } }`, which takes the
+  font and keeps the system check mark. Recognize it: one row's value is visibly larger than its neighbours.
+- 2026-09-22 — **`.accessibilityElement(children: .ignore)` on a `Button` adds a *second* element with the same label**:
+  XCUITest reported "Multiple matching elements found" for the missed-action banner, i.e. VoiceOver would stop on it twice.
+  A `Button` with a text label is already one element with the button trait; only add `.accessibilityLabel`.
+- 2026-09-22 — **A row label and its control can collide in the accessibility tree**: the Settings policy row has a
+  `Text("Missed a day")` and a `Menu` whose `.accessibilityLabel` is the same string, so `descendants(...).firstMatch`
+  picked the static text and the tap did nothing. In XCUITest select the control by type (`app.buttons["Missed a day"]`).
 - 2026-09-22 — **`.task` and `onAppear` run in a different order per runtime**: on 26.5 the `.task` runs before `onAppear`,
   on 17.5 after (probe, `docs/reviews/m4-settings-researcher.md` P2). A task must never read state that `onAppear` writes.
 - 2026-09-22 — **A transparent full-size view intercepts no touch**: a full-size `.frame` or a full-size `Color.clear` in an
@@ -334,6 +350,15 @@ are kept as history.
 
 ## Xcode / build
 
+- 2026-09-22 — **The throwaway `seed` preferences suite can survive a launch**: after a run with `-appearance light`, later
+  seeded launches read `appearance = light` even though the root calls `removePersistentDomain(forName: "seed")` at start
+  and the app was uninstalled (`xcrun simctl spawn <udid> defaults read seed` showed the stale key; cfprefsd flushes the
+  argument-domain value after the process is killed and wins the race with the next launch's removal). Symptom: a
+  "default preferences" screenshot shows a preference nobody set. Fix: `xcrun simctl spawn <udid> defaults delete seed`
+  before such a shot, or always pass the preference argument explicitly.
+- 2026-09-22 — **The simulator's home-indicator pill fades on a timer, so a `cmp` of two screenshots taken at different
+  delays differs by ~6 270 px in (380…799, 2517…2531) pt** on iPhone 15. It is not an app change; diff the region (as with
+  the status-bar corner artifact) before blaming the slice.
 - 2026-09-22 — **`xcodebuild test` clones the simulator** and shuts the original down afterwards. When a probe needs to read
   the app container, pass `-parallel-testing-enabled NO`, and re-boot the device before `simctl launch`.
 - 2026-09-16 — **`xcresulttool … summary` prints two different counts**: the top-level `totalTestCount` / `passedTests`
@@ -343,6 +368,10 @@ are kept as history.
 - 2026-09-16 — **In the test target, a nested helper struct's method inside a `@MainActor` suite is not main-actor
   isolated** (the target has no default isolation). Calling app builders from it fails with `[#ActorIsolatedCall]`. Fix: mark
   the helper method `@MainActor`.
+- 2026-09-22 — **`sips -c` takes height then width and `--cropOffset` takes y then x**, and both pairs are easy to swap in
+  a recorded recipe: the m4-settings plan's `sips -c 290 800 --cropOffset 4148 2555` returned a blank band; the working
+  crops are `sips -c 800 290 --cropOffset 2555 4148` (`settings`) and `sips -c 850 680 --cropOffset 2555 4456`
+  (`home-light`) on the 5600 × 5600 render. Read every crop before comparing against it.
 - 2026-09-16 — **`sips --cropOffset` misbehaved in m4-progress**: an offset of (200, 0) on a 2556-px screenshot returned rows
   near the top rather than the expected band, and a negative offset returned blank white. This contradicts the 2026-09-11
   note. Read every crop image before comparing against it.

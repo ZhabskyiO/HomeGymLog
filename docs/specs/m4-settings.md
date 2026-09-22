@@ -1,6 +1,10 @@
 # M4 slice 3 — Settings tab (appearance, units, program rows, missed-day policy, restart, equipment)
 
-**Status: spec agreed 2026-09-22 (answers folded, architecture review applied, platform claims verified)** (the user's §9 answers of
+**Status: done 2026-09-22, 917 tests** (917 tests on iOS 17.5 and 26.5, Release green; scratch-copy XCUITests 7/7 on 17.5 plus AC-12 re-run
+on 26.5; swift review "ship" (`docs/reviews/m4-settings-swift-review.md`, three non-blocking findings, none applied); §2.6 "Failed write"
+amended during implementation to drop the assert on the automatic (untapped) write path only, see INSIGHTS "Implemented 2026-09-22"; pending
+the user's MVP pass: AC-9–AC-14 (live taps) and AC-15 VoiceOver order). Agreed 2026-09-22 (answers folded, architecture review applied, platform claims verified)
+(the user's §9 answers of
 2026-09-22 are applied throughout; researcher report `docs/reviews/m4-settings-researcher.md` folded into 2.1 and 4.4 and its addendum P1–P4
 into 2.6, 2.7, 4.2 and 4.4, facts binding; architecture review `docs/reviews/m4-settings-architecture.md` applied: B1–B3, NB1–NB10, marked inline). Branch `m4-settings`. Depends on `m4-progress` (merged
 2026-09-16). Milestone-wide decisions live in `docs/specs/m4-missed-day.md` §1.1; archived-history rules in `docs/specs/m4-progress.md` §5.6;
@@ -105,7 +109,7 @@ appear) and the write's `today` is `clock.now()` inside the task, never the `@St
 return to Home. The shift, or the **whole skip pass, runs synchronously inside one task body with no `await`**, so the query cannot re-fetch between
 the skip saves and change the key mid-pass (an `await` would cancel the task after the first save and the banner would read "Skipped Legs" for three).
 `today` for the write is `clock.now()` at fire time (M3 rule); `today` for the resolution is the host's `now ?? clock.now()`, as for the prompt.
-**Failed write:** rolled back and restored (existing writers), Debug asserts, no alert, no banner; **the Program tab's Missed card keeps its manual
+**Failed write:** rolled back and restored (existing writers), **no assert** (amended 2026-09-22 during implementation: the automatic path runs with no user tap and at every shell mount, so an assert here would trap a Debug build repeatedly on a persistently failing store; a manual tap on the Program card still asserts), no alert, no banner; **the Program tab's Missed card keeps its manual
 buttons** and Start workout under every policy and is the fallback until one of the four re-run points. **Silence** (scrim tap) applies to the
 prompt only and is **reset when the policy changes** (NB3), so switching to an automatic policy while a prompt is silenced acts at once, and
 switching back to Ask with a session still missed shows the prompt again. **An automatic shift while the Program tab is showing does not move its

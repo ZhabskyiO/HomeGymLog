@@ -22,6 +22,10 @@ struct HomeGymLogApp: App {
     /// Nil except a DEBUG `-seed` launch, which silences rest notifications; every other launch keeps the environment's
     /// live default.
     private let restNotifier: RestNotifier?
+    /// Nil except `-seed settings-restart`, which opens Settings with its restart confirmation already up.
+    private let settingsRestartPreview: Bool?
+    /// Nil unless a DEBUG launch argument holds the missed-action banner up (`App/DebugSeed/DebugBannerHold.swift`).
+    private let missedBannerHold: Bool?
 
     init() {
         let live = AppClock.live()   // the only place the real clock is read
@@ -37,6 +41,8 @@ struct HomeGymLogApp: App {
         var missedPromptEnabled: Bool? = nil
         var progressPreselection: String? = nil
         var restNotifier: RestNotifier? = nil
+        var settingsRestartPreview: Bool? = nil
+        var missedBannerHold: Bool? = nil
         #if DEBUG
         do {
             if let seed = try DebugSeed.parse(arguments: ProcessInfo.processInfo.arguments) {
@@ -49,12 +55,14 @@ struct HomeGymLogApp: App {
                 dragPreview = seed.workoutDragPreview
                 sheetPreview = seed.workoutSheetPreview
                 missedPromptEnabled = seed.forcesMissedDayPrompt
+                settingsRestartPreview = seed.settingsRestartPreview
                 restNotifier = .silent()   // seeds freeze the clock: screenshot-only, never a real notification
             }
             // Outside the seed branch: the selection arguments work on their own too.
             preselection = DebugProgramSelection.parse(arguments: ProcessInfo.processInfo.arguments)
             initialTab = DebugInitialTab.parse(arguments: ProcessInfo.processInfo.arguments)
             progressPreselection = DebugProgressExercise.parse(arguments: ProcessInfo.processInfo.arguments)
+            missedBannerHold = DebugBannerHold.parse(arguments: ProcessInfo.processInfo.arguments)
         } catch {
             fatalError("Unknown -seed argument: \(error). Valid: \(DebugSeed.allCases.map(\.rawValue).joined(separator: ", "))")
         }
@@ -70,6 +78,8 @@ struct HomeGymLogApp: App {
         self.missedPromptEnabled = missedPromptEnabled
         self.progressPreselection = progressPreselection
         self.restNotifier = restNotifier
+        self.settingsRestartPreview = settingsRestartPreview
+        self.missedBannerHold = missedBannerHold
         #if DEBUG
         if case .failure(let error) = containerResult {
             fatalError("SwiftData store failed to open: \(error)")
@@ -91,6 +101,8 @@ struct HomeGymLogApp: App {
                     .environment(\.workoutSheetPreview, sheetPreview)
                     .environment(\.missedPromptEnabled, missedPromptEnabled)
                     .environment(\.progressPreselection, progressPreselection)
+                    .environment(\.settingsRestartPreview, settingsRestartPreview)
+                    .environment(\.missedBannerHold, missedBannerHold)
                     // ≈ a provider that overrides a context value only when a prop is set; otherwise the live default stays.
                     .transformEnvironment(\.restNotifier) { value in
                         if let override = restNotifier { value = override }

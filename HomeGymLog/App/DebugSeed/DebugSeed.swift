@@ -49,6 +49,12 @@ enum DebugSeed: String, CaseIterable {
     /// archived Mon 08-31 05:00, then `midProgram` as the current program; today is Tue 2026-09-15. The Progress chart
     /// spans both programs (dbBench 40 · 40 · 45 · 30 · 37.5 · 40 · 42.5).
     case progressHistory = "progress-history"
+    /// `midProgram` data with the restart confirmation already presented on the Settings tab, so the dialog can be
+    /// screenshot without a tap.
+    case settingsRestart = "settings-restart"
+    /// `midProgram` data archived Tue 2026-09-15 11:59 with no current program: the root shows onboarding at A2, prefilled
+    /// from the archived row.
+    case restarted = "restarted"
 
     /// nil when no `-seed` is present; throws for an unknown name or a trailing `-seed` with no value.
     static func parse(arguments: [String]) throws -> DebugSeed? {
@@ -65,6 +71,7 @@ enum DebugSeed: String, CaseIterable {
         case .midProgram, .missed, .missedShifted, .missedSkipped, .woStart, .woSwipe, .woRPE, .woAdjust, .woRest, .summary,
              .woDetail, .woSwap, .woSwapRDL, .woNotes, .progressHistory:
             day = DateComponents(year: 2026, month: 9, day: 15, hour: 12)
+        case .settingsRestart, .restarted: day = DateComponents(year: 2026, month: 9, day: 15, hour: 12)
         case .missedSeveral: day = DateComponents(year: 2026, month: 9, day: 17, hour: 12)
         case .restDay: day = DateComponents(year: 2026, month: 9, day: 19, hour: 12)
         case .freshProgram: day = DateComponents(year: 2026, month: 8, day: 31, hour: 12)
@@ -87,7 +94,8 @@ enum DebugSeed: String, CaseIterable {
             for _ in 0..<onboardingSteps { draft.advance(now: referenceDate(calendar: calendar), calendar: calendar) }
             return draft
         case .midProgram, .missed, .missedSeveral, .missedShifted, .missedSkipped, .restDay, .freshProgram, .woStart, .woSwipe,
-             .woRPE, .woAdjust, .woRest, .summary, .woDetail, .woSwap, .woSwapRDL, .woNotes, .progressHistory:
+             .woRPE, .woAdjust, .woRest, .summary, .woDetail, .woSwap, .woSwapRDL, .woNotes, .progressHistory,
+             .settingsRestart, .restarted:
             return nil
         }
     }
@@ -96,8 +104,10 @@ enum DebugSeed: String, CaseIterable {
     func makeContainer(calendar: Calendar) throws -> ModelContainer {
         let container = try AppSchema.makeContainer(inMemory: true)
         switch self {
-        case .midProgram, .missed, .missedSeveral:
+        case .midProgram, .missed, .missedSeveral, .settingsRestart:
             try MidProgramSeed.populate(in: container.mainContext, calendar: calendar)
+        case .restarted:
+            try RestartSeed.populate(in: container.mainContext, calendar: calendar)
         case .missedShifted, .missedSkipped:
             let program = try MidProgramSeed.populate(in: container.mainContext, calendar: calendar)
             try MissedDaySeed.apply(self == .missedShifted ? .shift : .skip, to: program, today: referenceDate(calendar: calendar),
@@ -137,6 +147,12 @@ enum DebugSeed: String, CaseIterable {
     /// The fixed drag offset the active set row draws with (`workoutDragPreview`); nil except `wo-swipe`.
     var workoutDragPreview: CGFloat? {
         self == .woSwipe ? 72 : nil
+    }
+
+    /// Whether the Settings screen opens with its restart confirmation up (`settingsRestartPreview`); nil for every other
+    /// seed, so the environment value stays at its nil default.
+    var settingsRestartPreview: Bool? {
+        self == .settingsRestart ? true : nil
     }
 
     /// The sheet the workout screen opens on first appearance (`workoutSheetPreview`); nil for every seed without one.

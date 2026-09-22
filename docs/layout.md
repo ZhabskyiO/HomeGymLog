@@ -1,4 +1,4 @@
-# File layout (as of M4 progress slice, 2026-09-16)
+# File layout (as of M4 settings slice, 2026-09-22)
 
 The per-file roster, moved out of `CLAUDE.md` on 2026-09-16 so every session and agent stops paying for it. `CLAUDE.md` keeps
 the directory map; read this file when you need to know which file owns what. `doc-writer` updates it after each slice.
@@ -7,22 +7,30 @@ the directory map; read this file when you need to know which file owns what. `d
 HomeGymLog/                app target (synchronized folder: every .swift under it is compiled)
   App/                     HomeGymLogApp (entry point: container, clock, DEBUG seed), RootView (router from live @Querys,
                            nothing navigates: the workout while the current program has an in-progress log, else the
-                           shell, else onboarding; owns selectedTab, applies initialTab once), ShellView (tab shell,
+                           shell, else onboarding; owns selectedTab, applies initialTab once; a third @Query on
+                           archivedProgramPredicate feeds the restart prefill; the appearance applier: sets
+                           overrideUserInterfaceStyle on every window of every connected scene on appear and on an
+                           `appearance` preference change, the app's only import UIKit), ShellView (tab shell,
                            selection bound from RootView; MissedPromptHost as an .overlay after the tab bar's inset, so
-                           its scrim covers the bar), AppTab, AppClock (the only Date()/Calendar.current in the app;
-                           an environment value, and the file holding the restNotifier @Entry (default .live()) and the
-                           nil-by-default debug @Entry values: programTabPreselection, initialTab, workoutDragPreview,
-                           workoutSheetPreview, missedPromptEnabled), RestNotifier (rest-end local notification: a struct
-                           of closures over RestNotificationCenter, .live() / .silent(), reconcile), StoreErrorView
+                           its scrim covers the bar; routes .settings to SettingsView), AppTab, AppClock (the only
+                           Date()/Calendar.current in the app; an environment value, and the file holding the
+                           restNotifier @Entry (default .live()) and the nil-by-default debug @Entry values:
+                           programTabPreselection, initialTab, workoutDragPreview, workoutSheetPreview,
+                           missedPromptEnabled, settingsRestartPreview, missedBannerHold), RestNotifier (rest-end local
+                           notification: a struct of closures over RestNotificationCenter, .live() / .silent(),
+                           reconcile), StoreErrorView
   App/DebugSeed/           DebugSeed (-seed launch names → frozen clock, in-memory store, prepared draft, workout
-                           previews, forcesMissedDayPrompt: true only for the missed family), MidProgramSeed (completed
-                           indexes are a parameter), FreshProgramSeed, WorkoutSeed (session 11 of midProgram written
-                           through the workout and note stores; one Stage per row state, so wo-detail and wo-swap reuse
-                           wo-start's), MissedDaySeed (missed-shifted / missed-skipped: session 7 of `missed` through the
-                           ProgramStore writers), DebugProgramSelection (-programWeek, -programDay, -tab parsers),
-                           DebugProgressExercise (-progressExercise parser), ProgressHistorySeed (the archived program half
-                           of `progress-history`: a completed 1-month program through the store functions, then
-                           ProgramStore.archive); all eight files under #if DEBUG
+                           previews, forcesMissedDayPrompt: true only for the missed family, settingsRestartPreview true
+                           only for settings-restart), MidProgramSeed (completed indexes are a parameter),
+                           FreshProgramSeed, WorkoutSeed (session 11 of midProgram written through the workout and note
+                           stores; one Stage per row state, so wo-detail and wo-swap reuse wo-start's), MissedDaySeed
+                           (missed-shifted / missed-skipped: session 7 of `missed` through the ProgramStore writers),
+                           RestartSeed (`restarted`: MidProgramSeed archived through ProgramStore.archive at 09-15
+                           11:59, so no program is current), DebugProgramSelection (-programWeek, -programDay, -tab
+                           parsers), DebugProgressExercise (-progressExercise parser), DebugBannerHold (-holdBanner
+                           parser: keeps the Settings missed-day automatic action's Home banner up with no auto-dismiss),
+                           ProgressHistorySeed (the archived program half of `progress-history`: a completed 1-month
+                           program through the store functions, then ProgramStore.archive); all ten files under #if DEBUG
   Models/                  AppSchema, six @Model classes (Program, PlannedSession, WorkoutLog, LoggedExercise,
                            LoggedSet, ExerciseNote), write helpers ProgramStore (current, start, apply, skip, shift and
                            skipMissed (the missed-day field writers: one StoreCommit.commit each; a session no longer
@@ -48,19 +56,27 @@ HomeGymLog/                app target (synchronized folder: every .swift under i
                            RestTimer (remaining seconds and fraction, resting display, "Rest over" end rule,
                            RestNotificationPlan), SwapCandidates (same muscle, library order, target weights),
                            ProgressionPill (previous best and last top, delta), MissedDay (isMissed, firstMissed,
-                           shouldPrompt over a PromptSilence, total shiftMap built on Reslot, dayLabelStyle),
+                           shouldPrompt over a PromptSilence, total shiftMap built on Reslot, dayLabelStyle,
+                           MissedDayPolicy (ask/shift/skip preference), resolution (policy + rows + silence → prompt,
+                           shift or skip), automaticActionKey (the automatic pass's retry key), bannerDayStyle),
                            ProgressStats (chip order across programs, chart point order, Best, Since start, the empty-history
-                           fallback, the month calendar, chart geometry from the prototype's SVG);
+                           fallback, the month calendar, chart geometry from the prototype's SVG),
+                           RestartPrefill (OnboardingAnswers value type; answers(...) turns an archived program's scalar
+                           fields into onboarding defaults, per-field fallback, never throws);
                            CalendarRules owns days(from:to:), the one day-difference helper
   Features/Onboarding/     OnboardingView (flow root), OnboardingDraft (@Observable answers + step), OnboardingChrome
                            (header, footer), StepTitle, one file per step: WelcomeStep, LengthStep, FrequencyStep,
                            AboutYouStep, StartingWeightsStep, GeneratedProgramStep
   Features/Home/           HomeView (owns the @Query on PlannedSession, `now` state, fingerprint task, info sheet, the
                            shared start), HomeContent (layout), HomeHeader, StatTiles, WeekStrip, TodayCard (+ExerciseRow),
-                           RestDayCard, RecentRecords (+PRCard), MissedPromptHost (the missed-session prompt mounted on
-                           ShellView: own @Query, `now` and dismissal silence, Home tab only, concrete ZStack root; calls
-                           the shift and skip writers), MissedSessionCard (the prompt card, 64 pt bottom padding; a ≥ 80 pt
-                           drag dismisses through .highPriorityGesture)
+                           RestDayCard, RecentRecords (+PRCard), MissedPromptHost (the missed-session prompt and the
+                           Settings missed-day policy's automatic action, both mounted on ShellView: own @Query, `now`
+                           and dismissal silence, full-size root so the banner can sit in an .overlay(alignment: .top);
+                           the prompt shows only under resolution .prompt and Home tab only; a keyed .task runs the
+                           automatic shift/skip pass and sets the banner), MissedSessionCard (the prompt card, 64 pt
+                           bottom padding; a ≥ 80 pt drag dismisses through .highPriorityGesture), MissedActionBanner
+                           (+MissedDayBanner: the one-line Home banner after an automatic shift or skip, a second keyed
+                           .task clears it after 3 s of visible time)
   Features/Program/        ProgramView (own @Query, `now` state, selection state, info sheet, the shared start, shift and
                            skip handlers; a shift follows today), ProgramContent (layout, +PhaseLine, RestCard),
                            WeekChipRow, ProgramDayRow, SessionCard (+ProgramExerciseRow, start button for today's or a
@@ -84,8 +100,14 @@ HomeGymLog/                app target (synchronized folder: every .swift under i
                            into view), ProgressChartCard (Best, Since start, from/to captions, empty-state line),
                            TopWeightChart (Swift Charts line over ProgressStats.chartGeometry, hidden axes and rules),
                            MonthCalendar (+MonthDayCell; the month containing today, one accessibility element per cell)
-  Features/<Screen>/       later slice: Settings
-  Shared/                  Theme, FloatingTabBar, TabIcon, PlaceholderScreen, SegmentedPicker, PhaseBar, StepperButton,
+  Features/Settings/       SettingsView (the three @AppStorage preferences, restart confirmation dialog and
+                           failed-archive alert, `program`'s immutable fields, the root-owned selectedTab binding),
+                           SettingsContent (layout, +SettingsSectionHeader), SettingsRows (SettingsValueRow, one
+                           accessibility element; SettingsControlRow, deliberately not combined so a control stays its
+                           own stop), RestartAction (the one write behind the restart confirmation, split out so its
+                           outcome — archived / alreadyArchived / failed(message) — is a unit test, never asserts itself)
+  Shared/                  Theme, FloatingTabBar, TabIcon, AppearanceMode (System/Dark/Light preference, UIKit-free),
+                           SegmentedPicker (a fourth `.settings` style, colours and padding only), PhaseBar, StepperButton,
                            ProgramSummaryText, HomeText (dates, greeting, pill), VolumeText (kfmt), ProgramTabText
                            (+StatusTone), ExerciseInfoSheet (moved here from Features/Home; generic over a `notes` view
                            slot (≈ a children prop) that only the workout's detail sheet fills; its four presentation
@@ -93,10 +115,12 @@ HomeGymLog/                app target (synchronized folder: every .swift under i
                            (Home and Program), WorkoutText (clock, grouping, set and record text), FlowLayout (wrapping
                            chips), RestText (m:ss, spoken countdown, "Next:" and notification text), ExerciseToolsText
                            (pill, note label and hints, swap title, empty state, candidate rows), MissedDayText (prompt
-                           strings, "You skipped … on …" title), SecondaryActionButton (full-width sf2 button: the
+                           strings, "You skipped … on …" title, plus the automatic-action banner text:
+                           shiftedBanner, skippedBanner), SecondaryActionButton (full-width sf2 button: the
                            prompt's Skip and the Program card's shift and skip), ProgressText (chip labels, weight and delta
-                           text, month title, calendar cell values, chart point and container summaries); all formatting
-                           lives here, never in Engine
+                           text, month title, calendar cell values, chart point and container summaries),
+                           SettingsText (every string the Settings tab shows or speaks; equipment values derived from
+                           EquipmentKind, never typed); all formatting lives here, never in Engine
   Assets.xcassets/         theme color sets (bg, sf, sf2, bd, tx, mu, success, warning, phaseFoundation, phaseDeload)
 HomeGymLogTests/           Swift Testing target
   Support/                 TestCalendar (fixed calendar), TestContainer (makeTestStore, insertSampleGraph), TestInputs,
@@ -115,7 +139,10 @@ HomeGymLogTests/           Swift Testing target
                            ProgressionPill(+Edge), WorkoutFlowTools(+Edge)), the missed-day suites (MissedDay(+Edge),
                            MissedDayShift(+Edge), MissedDayStats: Home and Program numbers over shifted schedules) and the
                            Progress suites (ProgressStats(+Edge), ProgressMonth(+Edge), ChartGeometry(+Edge), SessionOnDay:
-                           the shared HomeStats.session(on:) rule both the Home strip and the Progress calendar follow)
+                           the shared HomeStats.session(on:) rule both the Home strip and the Progress calendar follow),
+                           MissedDayPolicy (raw round trip, from(raw:) fallback, storageKey), MissedDayResolution(+Edge)
+                           (rows A–D of the spec's policy table, automaticActionKey, bannerDayStyle), RestartPrefill(+Edge)
+                           (the midProgram worked row and every hand fallback case)
   Persistence/             ModelRoundTrip, ProgramStore, ProgramStart, ProgramStartMidWeek, WorkoutLogStore,
                            WorkoutLogStoreSets, RoutingPredicate, ExerciseNoteStore, StatusInvariant, CascadeDelete,
                            HomeSnapshotBuilder, ProgramTabSnapshot (seed rows → ProgramTabStats, no validating step),
@@ -128,10 +155,16 @@ HomeGymLogTests/           Swift Testing target
                            allowsSave: false; the first read after the failure is a same-context fetch by id, and
                            rollback() runs before the store file is deleted), ProgramArchive(+Rollback) (the single
                            archivedAt writer and its failed-save restore), ProgressSnapshotBuilder(+Edge) (cross-program
-                           sessions and tops, the fingerprint)
-  Onboarding/              OnboardingDraft suites (steps, clamps, preview)
+                           sessions and tops, the fingerprint), RestartFlow(+Edge) (archive → start round trip: the
+                           archived program's rows unchanged, the new program current), AutomaticPolicyPass(+Edge) (the
+                           shift and skip passes over store rows, driven by MissedDay.resolution, never hand-typed
+                           indexes), RestartAction (archived / alreadyArchived / failed(message) outcomes, the
+                           allowsSave: false failure path), AutomaticBannerText (the banner text a real shift/skip pass
+                           produces, matched against MissedDayText)
+  Onboarding/              OnboardingDraft suites (steps, clamps, preview, the restart-prefill init)
   Shared/                  HomeText, VolumeText (incl. kfmt boundaries), ProgramTabText(+Edge), WorkoutText(+Edge),
-                           RestText(+Edge), ExerciseToolsText(+Edge), MissedDayText(+Edge), ProgressText(+Edge) suites
+                           RestText(+Edge), ExerciseToolsText(+Edge), MissedDayText(+Edge), ProgressText(+Edge),
+                           AppearanceMode, SettingsText suites
   Seed/                    DebugSeed, MidProgramSeed, RestDaySeed, FreshProgramSeed, SeedHomeStats
                            (seed → Home numbers end to end), DebugProgramSelection(+Edge), WorkoutSeed(+Edge),
                            SummaryDoneHomeStats (Done on `summary` → Home numbers), RestSeedFlow (rest card actions on
@@ -139,20 +172,33 @@ HomeGymLogTests/           Swift Testing target
                            ToolsSeedPill (displayed exercise and pill delta per seed), MissedSeed(+Edge) (the missed-day
                            seeds' rows, pending-date invariant, the prompt each seed shows), DebugProgressExercise(+Edge)
                            (the -progressExercise parser), SeedProgressHistoryMonth, SeedProgressStats (the progress-history
-                           seed's rows through ProgressStats: chip order, chart points, Best, Since start, the calendar)
+                           seed's rows through ProgressStats: chip order, chart points, Best, Since start, the calendar),
+                           RestartSeed (settings-restart / restarted rows, forcesMissedDayPrompt, settingsRestartPreview),
+                           AutomaticPolicySeed (Home stats after the automatic shift and skip passes on missed and
+                           missed-several rows), DebugBannerHold (the -holdBanner parser)
                            suites (Debug only)
   Static/                  source scans: ClockUsageTests (Date() / Calendar.current only in App/AppClock.swift),
                            SchemaSourceTests (rpeSkipped keeps its default, rest instants stay optional),
-                           SeedNameScanTests (workout and missed-day seed names only in App/DebugSeed/; no
-                           workoutAdjustPreview left), RestNotifierSourceTests (.silent() only in the root's seed branch,
+                           SeedNameScanTests (workout, missed-day and settings seed names — including settings-restart,
+                           restarted, -holdBanner — only in App/DebugSeed/; no workoutAdjustPreview left;
+                           settingsRestartPreview and missedBannerHold declared nil-by-default on one @Entry line each
+                           in AppClock.swift and provided once each, outside #if DEBUG, in HomeGymLogApp.swift),
+                           RestNotifierSourceTests (.silent() only in the root's seed branch,
                            .live() only as the @Entry default), StoreCommitSourceTests (ModelContext( in Models/ only in
                            StoreCommit.swift; the note store rehearses after its update branch),
                            FailedSavePolicySourceTests (rollback() only in StoreCommit; commitInsert only in the two
                            insert writers; ProgramStore's shift and skipMissed call StoreCommit.commit),
                            MissedPromptSourceTests (forcesMissedDayPrompt read only in the root's seed branch; the
-                           missedPromptEnabled @Entry nil by default and set on one line), ProgressSourceTests (no
-                           session.program hop in any Progress view body; the -progressExercise parse line stays inside
-                           the root's #if DEBUG block)
+                           missedPromptEnabled @Entry nil by default and set on one line; the automatic pass's
+                           MissedDay.resolution / .task(id:) usage, no await on the shift/skip lines), ProgressSourceTests
+                           (no session.program hop in any Progress view body; the -progressExercise parse line stays
+                           inside the root's #if DEBUG block), SettingsSourceTests (the "appearance" / "missedDayPolicy"
+                           literals only on their storageKey lines; @AppStorage(AppearanceMode.storageKey) in exactly
+                           RootView.swift and SettingsView.swift; preferredColorScheme nowhere; overrideUserInterfaceStyle
+                           and import UIKit only in RootView.swift; no PlaceholderScreen or placeholderMilestone; no
+                           FetchDescriptor in RootView.swift), SettingsScreenSourceTests (Features/Settings/'s row order
+                           matches spec 2.1-2.4, every visible string comes from SettingsText, the two reserved rows stay
+                           off and disabled, the screen's one write goes through RestartAction)
 design/                    prototype export (read-only reference)
 docs/specs, docs/plans     specs from spec-creator, plans from implementation-planner (dated status when done)
 docs/reviews               saved agent reports per slice (researcher, architecture, verifier rounds, swift review)
