@@ -17,6 +17,8 @@ struct HomeGymLogApp: App {
     private let sheetPreview: WorkoutSheetPreview?
     /// Nil except a DEBUG `-seed` launch: true for the missed-day seeds, false for every other seed (the prompt stays off).
     private let missedPromptEnabled: Bool?
+    /// Nil unless a DEBUG launch argument preselects a Progress chip (see `App/DebugSeed/DebugProgressExercise.swift`).
+    private let progressPreselection: String?
     /// Nil except a DEBUG `-seed` launch, which silences rest notifications; every other launch keeps the environment's
     /// live default.
     private let restNotifier: RestNotifier?
@@ -33,6 +35,7 @@ struct HomeGymLogApp: App {
         var dragPreview: CGFloat? = nil
         var sheetPreview: WorkoutSheetPreview? = nil
         var missedPromptEnabled: Bool? = nil
+        var progressPreselection: String? = nil
         var restNotifier: RestNotifier? = nil
         #if DEBUG
         do {
@@ -51,6 +54,7 @@ struct HomeGymLogApp: App {
             // Outside the seed branch: the selection arguments work on their own too.
             preselection = DebugProgramSelection.parse(arguments: ProcessInfo.processInfo.arguments)
             initialTab = DebugInitialTab.parse(arguments: ProcessInfo.processInfo.arguments)
+            progressPreselection = DebugProgressExercise.parse(arguments: ProcessInfo.processInfo.arguments)
         } catch {
             fatalError("Unknown -seed argument: \(error). Valid: \(DebugSeed.allCases.map(\.rawValue).joined(separator: ", "))")
         }
@@ -64,6 +68,7 @@ struct HomeGymLogApp: App {
         self.dragPreview = dragPreview
         self.sheetPreview = sheetPreview
         self.missedPromptEnabled = missedPromptEnabled
+        self.progressPreselection = progressPreselection
         self.restNotifier = restNotifier
         #if DEBUG
         if case .failure(let error) = containerResult {
@@ -85,6 +90,7 @@ struct HomeGymLogApp: App {
                     .environment(\.workoutDragPreview, dragPreview)
                     .environment(\.workoutSheetPreview, sheetPreview)
                     .environment(\.missedPromptEnabled, missedPromptEnabled)
+                    .environment(\.progressPreselection, progressPreselection)
                     // ≈ a provider that overrides a context value only when a prop is set; otherwise the live default stays.
                     .transformEnvironment(\.restNotifier) { value in
                         if let override = restNotifier { value = override }

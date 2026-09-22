@@ -109,15 +109,14 @@ nonisolated enum ProgramTabStats {
     }
 
     /// Seven cells, Monday first, for any week number (out of range gives dated cells with no sessions).
-    /// A day holding two sessions takes the lowest index. Empty only for no sessions.
+    /// A day holding two sessions follows `HomeStats.session(on:in:calendar:)`: completed wins, else lowest index.
+    /// Empty only for no sessions.
     static func dayCells(sessions: [SessionSummary], week: Int, calendar: Calendar) -> [ProgramDayCell] {
         guard let anchor = weekAnchor(sessions: sessions, calendar: calendar) else { return [] }
         let start = CalendarRules.day(anchor, adding: 7 * (week - 1), calendar: calendar)
         return (0..<7).map { offset in
             let date = CalendarRules.day(start, adding: offset, calendar: calendar)
-            let session = sessions
-                .filter { CalendarRules.isSameDay($0.scheduledDate, date, calendar: calendar) }
-                .min { $0.index < $1.index }
+            let session = HomeStats.session(on: date, in: sessions, calendar: calendar)
             return ProgramDayCell(date: date, dayNumber: calendar.component(.day, from: date), session: session)
         }
     }

@@ -1,6 +1,6 @@
 # M4 slice 2 — Progress tab (top-weight chart, best / since start, month calendar)
 
-**Status: agreed 2026-09-16** (user answers §9; researcher report `docs/reviews/m4-progress-researcher.md` folded into 4.4 and 5.8, facts
+**Status: done 2026-09-16, 807 tests** (807 tests on iOS 17.5 and 26.5, Release green; scratch-copy XCUITests AC-9–AC-14 6/6; swift review "ship"; VoiceOver order (AC-13) and a real finger chip scroll pending the user's device pass). Agreed 2026-09-16 (user answers §9; researcher report `docs/reviews/m4-progress-researcher.md` folded into 4.4 and 5.8, facts
 binding; architecture review `docs/reviews/m4-progress-architecture.md` applied, B1–B5 and NB1–NB10, and the researcher's 2026-09-16 addendum (predicates verified, `program` hop cost, `.task` per tab return) folded into 4.1; both listed in §9). Branch `m4-progress`.
 Depends on `m4-missed-day` (merged 2026-09-16); milestone-wide decisions live in `docs/specs/m4-missed-day.md` §1.1. Sources: prototype
 markup `tabProgress` (216–243), script "// progress tab" (690–702) and the Home "Progress ›" link (180, `goProgress`); `CLAUDE.md`; INSIGHTS

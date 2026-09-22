@@ -17,6 +17,7 @@ import Testing
         case .missedSeveral: expectedDay = TestCalendar.day(2026, 9, 17)
         case .woStart, .woSwipe, .woRPE, .woAdjust, .woRest, .summary: expectedDay = TestCalendar.day(2026, 9, 15)
         case .woDetail, .woSwap, .woSwapRDL, .woNotes: expectedDay = TestCalendar.day(2026, 9, 15)
+        case .progressHistory: expectedDay = TestCalendar.day(2026, 9, 15)
         case .restDay: expectedDay = TestCalendar.day(2026, 9, 19)
         case .freshProgram: expectedDay = TestCalendar.day(2026, 8, 31)
         default: expectedDay = TestCalendar.day(2026, 8, 31)
@@ -48,6 +49,13 @@ import Testing
         #expect(throws: DebugSeedError.unknownSeed("missedSeveral")) { try DebugSeed.parse(arguments: ["app", "-seed", "missedSeveral"]) }
     }
 
+    @Test("the Progress history seed uses its hyphenated name; the camel-case spelling is unknown")
+    func progressName() throws {
+        let parsed = try DebugSeed.parse(arguments: ["app", "-seed", "progress-history"])
+        #expect(parsed == .progressHistory)
+        #expect(throws: DebugSeedError.unknownSeed("progressHistory")) { try DebugSeed.parse(arguments: ["app", "-seed", "progressHistory"]) }
+    }
+
     @Test("absent, unknown, and trailing -seed")
     func edgeCases() throws {
         #expect(try DebugSeed.parse(arguments: []) == nil)
@@ -68,7 +76,7 @@ import Testing
         #expect(DebugSeed.midProgram.initialDraft(calendar: cal) == nil)
         #expect(DebugSeed.restDay.initialDraft(calendar: cal) == nil && DebugSeed.freshProgram.initialDraft(calendar: cal) == nil)
         for seed in [DebugSeed.woStart, .woSwipe, .woRPE, .woAdjust, .woRest, .summary, .woDetail, .woSwap, .woSwapRDL, .woNotes,
-                     .missed, .missedSeveral, .missedShifted, .missedSkipped] {
+                     .missed, .missedSeveral, .missedShifted, .missedSkipped, .progressHistory] {
             #expect(seed.initialDraft(calendar: cal) == nil, "\(seed.rawValue)")
         }
         let missedFamily: [DebugSeed] = [.missed, .missedSeveral, .missedShifted, .missedSkipped]

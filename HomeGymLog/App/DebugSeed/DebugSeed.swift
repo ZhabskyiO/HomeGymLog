@@ -45,6 +45,10 @@ enum DebugSeed: String, CaseIterable {
     /// `missed` after "Skip it · stay on schedule" on session 7 (Tue 2026-09-15): Home equals `midProgram`, Program WK 2 · Wed 9
     /// reads "Skipped", no prompt.
     case missedSkipped = "missed-skipped"
+    /// An archived 1-month, 3-day (Mon/Wed/Fri) program started Mon 2026-08-03 with all 12 sessions completed at target and
+    /// archived Mon 08-31 05:00, then `midProgram` as the current program; today is Tue 2026-09-15. The Progress chart
+    /// spans both programs (dbBench 40 · 40 · 45 · 30 · 37.5 · 40 · 42.5).
+    case progressHistory = "progress-history"
 
     /// nil when no `-seed` is present; throws for an unknown name or a trailing `-seed` with no value.
     static func parse(arguments: [String]) throws -> DebugSeed? {
@@ -59,7 +63,7 @@ enum DebugSeed: String, CaseIterable {
         let day: DateComponents
         switch self {
         case .midProgram, .missed, .missedShifted, .missedSkipped, .woStart, .woSwipe, .woRPE, .woAdjust, .woRest, .summary,
-             .woDetail, .woSwap, .woSwapRDL, .woNotes:
+             .woDetail, .woSwap, .woSwapRDL, .woNotes, .progressHistory:
             day = DateComponents(year: 2026, month: 9, day: 15, hour: 12)
         case .missedSeveral: day = DateComponents(year: 2026, month: 9, day: 17, hour: 12)
         case .restDay: day = DateComponents(year: 2026, month: 9, day: 19, hour: 12)
@@ -83,7 +87,7 @@ enum DebugSeed: String, CaseIterable {
             for _ in 0..<onboardingSteps { draft.advance(now: referenceDate(calendar: calendar), calendar: calendar) }
             return draft
         case .midProgram, .missed, .missedSeveral, .missedShifted, .missedSkipped, .restDay, .freshProgram, .woStart, .woSwipe,
-             .woRPE, .woAdjust, .woRest, .summary, .woDetail, .woSwap, .woSwapRDL, .woNotes:
+             .woRPE, .woAdjust, .woRest, .summary, .woDetail, .woSwap, .woSwapRDL, .woNotes, .progressHistory:
             return nil
         }
     }
@@ -102,6 +106,9 @@ enum DebugSeed: String, CaseIterable {
             try MidProgramSeed.populate(in: container.mainContext, calendar: calendar, completedIndexes: Array(0...14).filter { $0 != 7 })
         case .freshProgram:
             try FreshProgramSeed.populate(in: container.mainContext, calendar: calendar)
+        case .progressHistory:
+            try ProgressHistorySeed.populate(in: container.mainContext, calendar: calendar)
+            try MidProgramSeed.populate(in: container.mainContext, calendar: calendar)
         case .woStart, .woSwipe, .woRPE, .woAdjust, .woRest, .summary, .woDetail, .woSwap, .woSwapRDL, .woNotes:
             try MidProgramSeed.populate(in: container.mainContext, calendar: calendar)
             if let workoutStage {

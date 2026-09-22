@@ -316,6 +316,12 @@ are kept as history.
 
 ## Xcode / build
 
+- 2026-09-16 — **In the test target, a nested helper struct's method inside a `@MainActor` suite is not main-actor
+  isolated** (the target has no default isolation). Calling app builders from it fails with `[#ActorIsolatedCall]`. Fix: mark
+  the helper method `@MainActor`.
+- 2026-09-16 — **`sips --cropOffset` misbehaved in m4-progress**: an offset of (200, 0) on a 2556-px screenshot returned rows
+  near the top rather than the expected band, and a negative offset returned blank white. This contradicts the 2026-09-11
+  note. Read every crop image before comparing against it.
 - 2026-09-16 — **`xcodebuild -only-testing:Target/Suite/function()` silently runs 0 Swift Testing tests.** Select the
   suite (`-only-testing:HomeGymLogTests/SuiteName`) instead. Recognize it: a green run with 0 tests executed.
 - 2026-09-14 — **After an Xcode update, byte-identical screenshot baselines break in the status bar only.** Seeded shots of

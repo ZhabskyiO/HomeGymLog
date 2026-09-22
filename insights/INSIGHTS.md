@@ -39,6 +39,17 @@ session start, so nothing here depends on it.
   - **Probes (researcher addendum)**: the session → program hop costs ~330 µs per row on 17.5, so Progress never hops in `body`.
     It uses an archived-programs `@Query` and fetches those programs' sessions by id in the fingerprint task. `.task(id:)`
     restarts on every return to a TabView tab (not on re-tapping the selected tab), and `@State` survives, on 17.5 and 26.5.
+- **Implemented 2026-09-16** (branch `m4-progress`): 807 tests green on iOS 17.5 and 26.5 (711 → 774 implementer → 807
+  test-writer, review cleanups kept 807), Release green, scratch-copy XCUITests 6/6, swift review "ship" (two of its
+  three non-blocking cleanups applied, the `MonthCalendar` negative-id item skipped as harmless). Deviations: `HomeStats.session(on:)`
+  now lets a completed session win a same-day tie (`tieIgnoresStatus` renamed `completedSessionWinsTheDay`); unreachable
+  within one program (a completed session is never re-dated onto a lower-index pending one), so it only changes the
+  Progress calendar's cross-program cells. `ProgressTabView.load` uses independent do/catch blocks per fetch, so a failed
+  archived-history read still leaves the chart working and vice versa. Weekday letters are hidden from accessibility (each
+  calendar cell is its own labelled element already). Known issue outside the slice: `WeightDisplay.text` would print
+  −0.5 lb as "0.5" (the whole part rounds toward zero and drops the sign); unreachable today because steps are 2.5 lb and
+  `ProgressText.delta` passes `abs`. Pending the user's MVP pass: AC-13 VoiceOver order on the iPhone 14 Pro Max (does
+  VoiceOver stop on the chart container before its dots) and a real finger scroll of the chip row.
 
 ### 2026-09-15 — M4 milestone-wide and missed-day decisions (from the m4-missed-day slice spec, user-answered)
 

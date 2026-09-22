@@ -1,6 +1,6 @@
 # M4 slice 2 — Progress tab (top-weight chart, best / since start, month calendar): implementation plan
 
-**Status: verified 2026-09-16 (plan-verifier PASS, round 3), awaiting user approval to implement.** For `docs/specs/m4-progress.md` (agreed; architecture B1–B5, NB1–NB10 and
+**Status: done 2026-09-16, 807 tests.** Steps 0–11 green: 711 → 774 (implementer) → 807 (test-writer) tests on iOS 17.5 and 26.5, Release green, `project.pbxproj` untouched. Step 10 scratch-copy XCUITest: test1–test6 all passed (AC-9–AC-12, AC-13 tree half, AC-14). Swift review "ship" (`docs/reviews/m4-progress-swift-review.md`; two of three non-blocking cleanups applied, the `MonthCalendar` negative-id item skipped as harmless). Every Step 0 base shot byte-identical. Deviations: prototype `progress` crop is 2340 × 2520 @ (2540, 1620) (the recorded 2330 width cuts Since start and Sep 14); `ProgramTabStatsEdgeTests.tieIgnoresStatus` updated to the shared day rule (completed wins, 7 not 3) and renamed `completedSessionWinsTheDay`; at phone width about 2.3 chips show, not 5; the task's two fetches fall back independently; weekday letters hidden from accessibility. Verified 2026-09-16 (plan-verifier PASS, round 3). For `docs/specs/m4-progress.md` (agreed; architecture B1–B5, NB1–NB10 and
 the researcher addendum folded in). Spec §2–6 and §8 are the contract (`AC-1`…`AC-25`); format follows `docs/plans/m4-missed-day.md`; `implementer`, one step per build.
 
 ## 1. Goal and scope

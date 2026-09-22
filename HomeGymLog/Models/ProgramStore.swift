@@ -109,6 +109,18 @@ enum ProgramStore {
         return true
     }
 
+    /// Archives a program: the single writer of `Program.archivedAt` (NB4; the `progress-history` seed now, restart in
+    /// m4-settings). Returns false and writes nothing when the program is already archived. One save; a failed save rolls
+    /// back and puts `archivedAt` back to nil before rethrowing (`StoreCommit.commit`). Once saved, the root's current-program
+    /// query no longer matches it, and its sessions and logs stay for Progress.
+    @discardableResult
+    static func archive(_ program: Program, at date: Date, in context: ModelContext) throws -> Bool {
+        guard program.archivedAt == nil else { return false }
+        program.archivedAt = date
+        try StoreCommit.commit(context) { program.archivedAt = nil }
+        return true
+    }
+
     /// Deletes a program with every session, log, exercise and set under it. Explicit because the
     /// iOS 17 runtime does not honor `.cascade`. Notes are independent and untouched. Does not save.
     static func delete(_ program: Program, in context: ModelContext) {

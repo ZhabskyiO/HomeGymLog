@@ -105,14 +105,25 @@ nonisolated enum HomeStats {
         }
     }
 
-    /// Seven entries, Monday first, for the calendar week containing `today`.
+    /// The one "which session is on this day" rule, shared by the week strip, the Program tab's day cells and the
+    /// Progress calendar: among sessions on `date`'s day, a completed one wins (lowest index among completed), else
+    /// the lowest index. nil when the day holds none.
+    static func session(on date: Date, in sessions: [SessionSummary], calendar: Calendar) -> SessionSummary? {
+        let onDay = sessions.filter { CalendarRules.isSameDay($0.scheduledDate, date, calendar: calendar) }
+        if let completed = onDay.filter({ $0.status == .completed }).min(by: { $0.index < $1.index }) {
+            return completed
+        }
+        return onDay.min { $0.index < $1.index }
+    }
+
+    /// Seven entries, Monday first, for the calendar week containing `today`. A day's session follows
+    /// `session(on:in:calendar:)`: completed wins, else lowest index.
     static func weekStrip(sessions: [SessionSummary], today: Date, calendar: Calendar) -> [WeekStripDay] {
         let monday = CalendarRules.monday(ofWeekContaining: today, calendar: calendar)
-        let sorted = ordered(sessions)
         return (0..<7).map { offset in
             let date = CalendarRules.day(monday, adding: offset, calendar: calendar)
             let isToday = CalendarRules.isSameDay(date, today, calendar: calendar)
-            let session = sorted.first { CalendarRules.isSameDay($0.scheduledDate, date, calendar: calendar) }
+            let session = self.session(on: date, in: sessions, calendar: calendar)
             let state = session.map { sessionState($0, today: today, calendar: calendar) } ?? .rest
             return WeekStripDay(date: date, isToday: isToday, state: state, dayNumber: calendar.component(.day, from: date))
         }

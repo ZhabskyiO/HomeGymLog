@@ -42,10 +42,10 @@ import Testing
     }
 
     /// m4-missed-day: the shift and skip writers save through the field-writer helper, so `rollbackOnlyInStoreCommit` above
-    /// fails if either calls `rollback()` itself.
-    @Test("Models/ProgramStore.swift has exactly two code lines calling StoreCommit.commit(: the shift and skipMissed writers")
+    /// fails if either calls `rollback()` itself. m4-progress adds `archive`.
+    @Test("Models/ProgramStore.swift has exactly three code lines calling StoreCommit.commit(: shift, skipMissed, archive")
     func programStoreWritersCommit() throws {
-        #expect(try Self.occurrences(of: "StoreCommit.commit(")["Models/ProgramStore.swift"] == 2)
+        #expect(try Self.occurrences(of: "StoreCommit.commit(")["Models/ProgramStore.swift"] == 3)
     }
 
     @Test("StoreCommit.commitInsert( is called once each by ExerciseNoteStore.swift and WorkoutLogStore.swift")

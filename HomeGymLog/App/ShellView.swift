@@ -39,6 +39,7 @@ struct ShellView: View {
         switch tab {
         case .home: HomeView(program: program, selectedTab: $selected).id(program.id)   // ≈ key={program.id}: resets @State with the program
         case .program: ProgramView(program: program, selectedTab: $selected).id(program.id)
+        case .progress: ProgressTabView(program: program, selectedTab: selected).id(program.id)
         default: PlaceholderScreen(tab: tab)
         }
     }
