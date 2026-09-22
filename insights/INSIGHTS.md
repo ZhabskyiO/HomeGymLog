@@ -8,6 +8,32 @@ session start, so nothing here depends on it.
 
 ## Architecture decisions
 
+### 2026-09-22 — M4 Settings decisions (from the m4-settings slice spec, user-answered)
+
+- **Appearance** = `@AppStorage("appearance")` (System / Dark / Light, default System) read in `RootView`, applied as
+  `overrideUserInterfaceStyle` on every window of the connected scenes in `onAppear` and `onChange`. `.preferredColorScheme`
+  is not used: on 17.5 alerts and confirmation dialogs ignore it, and open sheets keep their presentation-time scheme on
+  17.5 and 26.5 (researcher, `docs/reviews/m4-settings-researcher.md`).
+- **Units**: a segmented control like Appearance, on the existing `units` key. `bodyWeightUnits` stays onboarding-only.
+- **Daily reminder and Sound & haptics rows are present but disabled** (toggle off, "Coming soon", nothing stored) until
+  m4-reminder and M5. The user chose this over leaving the rows out.
+- **"Missed a day" is a real preference** (the user chose it over the prototype's static text): `@AppStorage("missedDayPolicy")`
+  Ask me each time / Always shift / Always skip, set with a trailing menu picker. With shift or skip, the prompt host applies
+  the action on its own through the existing `ProgramStore.shift` / `skipMissed`, then shows a **transient one-line banner on
+  Home** (the user chose it over no notice). Pure decision logic lives in `MissedDay.resolution` (Engine).
+- **Restart**: a confirmation dialog ("Archive and start over" / "Cancel"), then `ProgramStore.archive`, then the tab
+  resets to Home, then onboarding opens at A2 prefilled from the archived program, including its `startingWeightsLb`.
+  **A failed archive shows an alert** (the user chose it over the M4 silent pattern).
+- Equipment rows are read-only; dumbbells read **5–52.5 lb** (the real rack), not the prototype's 5–55.
+- **Architecture review (2026-09-22, approve with changes)**:
+  - **The automatic missed-day action** runs as one synchronous pass, keyed by an Equatable key struct, with a single
+    retry rule (B1).
+  - **The restart prefill** reads the newest archived program through a third root `@Query` (`archivedProgramPredicate`,
+    newest by `max(by:)`), never a fetch in `body`; the onboarding draft copies it once (B2).
+  - **The banner** is drawn by a full-size host root that owns its state; if the touch probe fails, the shell draws it (B3).
+  - Units and Appearance use a new `SegmentedPicker` style, not a new control. `MissedDayPolicy.storageKey` may live in
+    Engine. `AppearanceMode` stays UIKit-free, and the switch to the UIKit style is private to `RootView`.
+
 ### 2026-09-16 — M4 Progress decisions (from the m4-progress slice spec, user-answered)
 
 - **History spans every program**: chart points, Best, Since start and the calendar include archived programs' sessions and

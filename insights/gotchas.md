@@ -158,6 +158,9 @@ are kept as history.
 
 ## Swift language
 
+- 2026-09-22 — **A `.task` closure reads `@Environment` values captured at task start**: an env value logged after an `await`
+  was stale for the whole run (probe). Read it in `body` or via `onChange`, never after an `await` (≈ a stale closure in
+  `useEffect`).
 - 2026-09-14 — **A long nested-tuple literal in `@Test(arguments:)` fails to compile** ("unable to type-check this expression
   in reasonable time"; an 18-row `[(String, [String])]` in `SwapCandidatesEdgeTests`, Xcode 27). Fix: move it to a file-scope
   constant with an explicit type. Also, `try` inside `#expect(...)` within a closure fails with "errors thrown from here are
@@ -184,6 +187,21 @@ are kept as history.
 
 ## SwiftUI
 
+- 2026-09-22 — **`.task` and `onAppear` run in a different order per runtime**: on 26.5 the `.task` runs before `onAppear`,
+  on 17.5 after (probe, `docs/reviews/m4-settings-researcher.md` P2). A task must never read state that `onAppear` writes.
+- 2026-09-22 — **A transparent full-size view intercepts no touch**: a full-size `.frame` or a full-size `Color.clear` in an
+  overlay let taps through to the content and the tab pill on 17.5 and 26.5; only drawn content (or `contentShape`)
+  hit-tests. No `.allowsHitTesting(false)` needed for an overlay host that draws a banner.
+- 2026-09-22 — **`.preferredColorScheme` does not reach UIKit-backed presentations the way the doc implies**: on iOS 17.5
+  `.alert` and `.confirmationDialog` render in the system scheme while the app is overridden, and on 17.5 and 26.5 an open
+  sheet keeps the scheme it was presented with (repeating the modifier inside the sheet does not help). Appearance is set with
+  `overrideUserInterfaceStyle` on the scene's windows from `RootView` instead, which follows and reverts everywhere. Source:
+  `docs/reviews/m4-settings-researcher.md` Q1.
+- 2026-09-22 — **`UIColor(named:)` resolved outside a view body ignores the app's appearance override** (`.cgColor`,
+  `resolvedColor(with: .current)` stayed at the system value on 17.5 and 26.5). Use `Color("name")`; if a `UIColor` is ever
+  needed, resolve it against `window.traitCollection`.
+- 2026-09-22 — **`xcrun simctl ui appearance` is the system appearance, not the app's**: with Dark or Light stored the app
+  ignores it; only System follows it live. Screenshot recipes that toggle it assume the throwaway seed suite (System).
 - 2026-09-16 — **Swift Charts: `PointMark.accessibilityLabel/Value` are ignored while an unhidden `LineMark` shares the x
   value** (17.5 and 26.5, m4-progress researcher probe). Charts merges both into one "0 to 0.5, 40 to 40, 2 values" element.
   Fix: `.accessibilityHidden(true)` on the `LineMark` (and every `RuleMark`). Recognize it: VoiceOver or XCUITest reads
@@ -316,6 +334,8 @@ are kept as history.
 
 ## Xcode / build
 
+- 2026-09-22 — **`xcodebuild test` clones the simulator** and shuts the original down afterwards. When a probe needs to read
+  the app container, pass `-parallel-testing-enabled NO`, and re-boot the device before `simctl launch`.
 - 2026-09-16 — **`xcresulttool … summary` prints two different counts**: the top-level `totalTestCount` / `passedTests`
   (807 for m4-progress) and, inside `devicesAndConfigurations`, a per-device `passedTests` that counts parameterized
   cases and re-runs (1375 for the same bundle). Quote `totalTestCount`. Recognize it: a "passed" number far above the
