@@ -1,4 +1,4 @@
-# File layout (as of M4 missed-day slice, 2026-09-15)
+# File layout (as of M4 progress slice, 2026-09-16)
 
 The per-file roster, moved out of `CLAUDE.md` on 2026-09-16 so every session and agent stops paying for it. `CLAUDE.md` keeps
 the directory map; read this file when you need to know which file owns what. `doc-writer` updates it after each slice.
@@ -19,12 +19,15 @@ HomeGymLog/                app target (synchronized folder: every .swift under i
                            indexes are a parameter), FreshProgramSeed, WorkoutSeed (session 11 of midProgram written
                            through the workout and note stores; one Stage per row state, so wo-detail and wo-swap reuse
                            wo-start's), MissedDaySeed (missed-shifted / missed-skipped: session 7 of `missed` through the
-                           ProgramStore writers), DebugProgramSelection (-programWeek, -programDay, -tab parsers); all six
-                           files under #if DEBUG
+                           ProgramStore writers), DebugProgramSelection (-programWeek, -programDay, -tab parsers),
+                           DebugProgressExercise (-progressExercise parser), ProgressHistorySeed (the archived program half
+                           of `progress-history`: a completed 1-month program through the store functions, then
+                           ProgramStore.archive); all eight files under #if DEBUG
   Models/                  AppSchema, six @Model classes (Program, PlannedSession, WorkoutLog, LoggedExercise,
                            LoggedSet, ExerciseNote), write helpers ProgramStore (current, start, apply, skip, shift and
                            skipMissed (the missed-day field writers: one StoreCommit.commit each; a session no longer
-                           missed writes nothing), delete),
+                           missed writes nothing), archive (the single archivedAt writer, used by the progress-history
+                           seed and by restart in m4-settings), delete),
                            WorkoutLogStore (start, finish, guarded set writers that also start or clear the rest,
                            addRestTime, skipRest, swapExercise (the log and this session's plan element), discard,
                            delete), ExerciseNoteStore (one note per key, saved per keystroke), StoreCommit (the failed-save
@@ -32,7 +35,9 @@ HomeGymLog/                app target (synchronized folder: every .swift under i
                            scratch ModelContext; rules in INSIGHTS), HomeSnapshotBuilder (the session predicate + row →
                            Engine value mapping shared by Home and Program; maps, never validates), WorkoutSnapshotBuilder
                            (routing, exercise and set predicates, rows → workout values, lazy PR baseline, finishedTops
-                           for the pill's per-key read, swapContext)
+                           for the pill's per-key read, swapContext), ProgressSnapshotBuilder (sessions and tops across the
+                           current and archived programs; the only functions that hop to a row's program, off the render
+                           path inside the screen's task)
   Engine/                  pure logic, no SwiftData/SwiftUI: EngineTypes, Equipment, ExerciseLibrary, SplitPlans,
                            PhaseSplit, WeightFormula, CalendarRules, Reslot, ProgramGenerator, ProgramSummary (A6 numbers),
                            StartingWeights (A5 rows), WeightDisplay (lb/kg number text), HomeStatsTypes
@@ -43,7 +48,9 @@ HomeGymLog/                app target (synchronized folder: every .swift under i
                            RestTimer (remaining seconds and fraction, resting display, "Rest over" end rule,
                            RestNotificationPlan), SwapCandidates (same muscle, library order, target weights),
                            ProgressionPill (previous best and last top, delta), MissedDay (isMissed, firstMissed,
-                           shouldPrompt over a PromptSilence, total shiftMap built on Reslot, dayLabelStyle);
+                           shouldPrompt over a PromptSilence, total shiftMap built on Reslot, dayLabelStyle),
+                           ProgressStats (chip order across programs, chart point order, Best, Since start, the empty-history
+                           fallback, the month calendar, chart geometry from the prototype's SVG);
                            CalendarRules owns days(from:to:), the one day-difference helper
   Features/Onboarding/     OnboardingView (flow root), OnboardingDraft (@Observable answers + step), OnboardingChrome
                            (header, footer), StepTitle, one file per step: WelcomeStep, LengthStep, FrequencyStep,
@@ -71,7 +78,13 @@ HomeGymLog/                app target (synchronized folder: every .swift under i
                            WorkoutBottomBar ("Add note" / "Notes ·", "Next exercise ›"), RestOverlay (rest card: ring,
                            countdown, "Next: …", +30s, Skip), WorkoutSummaryView, SummaryCards (tiles, muscles, records,
                            no-records)
-  Features/<Screen>/       later slices: Progress, Settings
+  Features/Progress/       ProgressTabView (owns the current-program and archived-programs @Querys, `now`, the selected
+                           chip @State, the per-key tops task, held so a chip change never draws the previous exercise's
+                           line), ProgressContent (layout), ExerciseChipRow (chip row, scrolls the selected chip minimally
+                           into view), ProgressChartCard (Best, Since start, from/to captions, empty-state line),
+                           TopWeightChart (Swift Charts line over ProgressStats.chartGeometry, hidden axes and rules),
+                           MonthCalendar (+MonthDayCell; the month containing today, one accessibility element per cell)
+  Features/<Screen>/       later slice: Settings
   Shared/                  Theme, FloatingTabBar, TabIcon, PlaceholderScreen, SegmentedPicker, PhaseBar, StepperButton,
                            ProgramSummaryText, HomeText (dates, greeting, pill), VolumeText (kfmt), ProgramTabText
                            (+StatusTone), ExerciseInfoSheet (moved here from Features/Home; generic over a `notes` view
@@ -81,7 +94,9 @@ HomeGymLog/                app target (synchronized folder: every .swift under i
                            chips), RestText (m:ss, spoken countdown, "Next:" and notification text), ExerciseToolsText
                            (pill, note label and hints, swap title, empty state, candidate rows), MissedDayText (prompt
                            strings, "You skipped … on …" title), SecondaryActionButton (full-width sf2 button: the
-                           prompt's Skip and the Program card's shift and skip); all formatting lives here, never in Engine
+                           prompt's Skip and the Program card's shift and skip), ProgressText (chip labels, weight and delta
+                           text, month title, calendar cell values, chart point and container summaries); all formatting
+                           lives here, never in Engine
   Assets.xcassets/         theme color sets (bg, sf, sf2, bd, tx, mu, success, warning, phaseFoundation, phaseDeload)
 HomeGymLogTests/           Swift Testing target
   Support/                 TestCalendar (fixed calendar), TestContainer (makeTestStore, insertSampleGraph), TestInputs,
@@ -89,15 +104,18 @@ HomeGymLogTests/           Swift Testing target
                            (plain workout values typed from the spec), WorkoutStoreFixtures (a generated program's rows),
                            RestNotifierRecorder (fake notification center that can hold the authorization await),
                            MissedDayFixtures (the `missed` program's slots and shift maps typed from the date formula,
-                           never from Reslot)
+                           never from Reslot), ProgressFixtures (ProgressSession and ProgressTop values typed from the
+                           spec, never from a seed)
   App/                     RestNotifier(+Edge) suites: the notifier's rules over the recorder, never the system center
   Engine/                  one suite per Engine file plus StaticTableTests, the HomeStats suites
                            (HomeStats, HomeStatsEdge, HomeStatsInput, PersonalRecordsOrdering), the Program tab
                            suites (SessionState, SessionStateEdge, ProgramTabStats, ProgramTabStatsEdge), the workout
                            suites (WorkoutFlow, WorkoutFlowEdge, AdjustStepper, WorkoutSummary, WorkoutSummaryEdge), the
                            rest suites (RestTimer, RestTimerEdge, RestEndRule), the tools suites (SwapCandidates(+Edge),
-                           ProgressionPill(+Edge), WorkoutFlowTools(+Edge)) and the missed-day suites (MissedDay(+Edge),
-                           MissedDayShift(+Edge), MissedDayStats: Home and Program numbers over shifted schedules)
+                           ProgressionPill(+Edge), WorkoutFlowTools(+Edge)), the missed-day suites (MissedDay(+Edge),
+                           MissedDayShift(+Edge), MissedDayStats: Home and Program numbers over shifted schedules) and the
+                           Progress suites (ProgressStats(+Edge), ProgressMonth(+Edge), ChartGeometry(+Edge), SessionOnDay:
+                           the shared HomeStats.session(on:) rule both the Home strip and the Progress calendar follow)
   Persistence/             ModelRoundTrip, ProgramStore, ProgramStart, ProgramStartMidWeek, WorkoutLogStore,
                            WorkoutLogStoreSets, RoutingPredicate, ExerciseNoteStore, StatusInvariant, CascadeDelete,
                            HomeSnapshotBuilder, ProgramTabSnapshot (seed rows → ProgramTabStats, no validating step),
@@ -108,16 +126,21 @@ HomeGymLogTests/           Swift Testing target
                            RestCommitRollback, RestWriterRollback, SwapCommitRollback, FirstFetchRollback,
                            StoreCommit(+Edge), ExerciseNoteSave, MissedDayRollback(+Edge) (an on-disk store reopened with
                            allowsSave: false; the first read after the failure is a same-context fetch by id, and
-                           rollback() runs before the store file is deleted)
+                           rollback() runs before the store file is deleted), ProgramArchive(+Rollback) (the single
+                           archivedAt writer and its failed-save restore), ProgressSnapshotBuilder(+Edge) (cross-program
+                           sessions and tops, the fingerprint)
   Onboarding/              OnboardingDraft suites (steps, clamps, preview)
   Shared/                  HomeText, VolumeText (incl. kfmt boundaries), ProgramTabText(+Edge), WorkoutText(+Edge),
-                           RestText(+Edge), ExerciseToolsText(+Edge), MissedDayText(+Edge) suites
+                           RestText(+Edge), ExerciseToolsText(+Edge), MissedDayText(+Edge), ProgressText(+Edge) suites
   Seed/                    DebugSeed, MidProgramSeed, RestDaySeed, FreshProgramSeed, SeedHomeStats
                            (seed → Home numbers end to end), DebugProgramSelection(+Edge), WorkoutSeed(+Edge),
                            SummaryDoneHomeStats (Done on `summary` → Home numbers), RestSeedFlow (rest card actions on
                            the `wo-rest` rows), ToolsSeed (notes and swap candidates of the four tools seeds),
                            ToolsSeedPill (displayed exercise and pill delta per seed), MissedSeed(+Edge) (the missed-day
-                           seeds' rows, pending-date invariant, the prompt each seed shows) suites (Debug only)
+                           seeds' rows, pending-date invariant, the prompt each seed shows), DebugProgressExercise(+Edge)
+                           (the -progressExercise parser), SeedProgressHistoryMonth, SeedProgressStats (the progress-history
+                           seed's rows through ProgressStats: chip order, chart points, Best, Since start, the calendar)
+                           suites (Debug only)
   Static/                  source scans: ClockUsageTests (Date() / Calendar.current only in App/AppClock.swift),
                            SchemaSourceTests (rpeSkipped keeps its default, rest instants stay optional),
                            SeedNameScanTests (workout and missed-day seed names only in App/DebugSeed/; no
@@ -127,7 +150,9 @@ HomeGymLogTests/           Swift Testing target
                            FailedSavePolicySourceTests (rollback() only in StoreCommit; commitInsert only in the two
                            insert writers; ProgramStore's shift and skipMissed call StoreCommit.commit),
                            MissedPromptSourceTests (forcesMissedDayPrompt read only in the root's seed branch; the
-                           missedPromptEnabled @Entry nil by default and set on one line)
+                           missedPromptEnabled @Entry nil by default and set on one line), ProgressSourceTests (no
+                           session.program hop in any Progress view body; the -progressExercise parse line stays inside
+                           the root's #if DEBUG block)
 design/                    prototype export (read-only reference)
 docs/specs, docs/plans     specs from spec-creator, plans from implementation-planner (dated status when done)
 docs/reviews               saved agent reports per slice (researcher, architecture, verifier rounds, swift review)

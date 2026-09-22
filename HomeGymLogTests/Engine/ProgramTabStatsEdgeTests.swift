@@ -123,13 +123,14 @@ import Testing
         #expect(chips[23] == WeekChip(week: 24, phase: .deload))
     }
 
-    @Test("the lowest index wins a same-day tie whatever the two statuses are")
-    func tieIgnoresStatus() {
+    /// Changed in m4-progress (spec 4.3, NB1): the shared day rule lets a completed session win a same-day tie.
+    @Test("a completed session wins a same-day tie, else the lowest index")
+    func completedSessionWinsTheDay() {
         let day = TestCalendar.day(2026, 9, 15)
         let lowerCompleted = [session(7, on: day, status: .pending), session(3, on: day, status: .completed)]
         #expect(ProgramTabStats.dayCells(sessions: lowerCompleted, week: 1, calendar: cal)[1].session?.index == 3)
         let lowerPending = [session(7, on: day, status: .completed), session(3, on: day, status: .pending)]
-        #expect(ProgramTabStats.dayCells(sessions: lowerPending, week: 1, calendar: cal)[1].session?.index == 3)
+        #expect(ProgramTabStats.dayCells(sessions: lowerPending, week: 1, calendar: cal)[1].session?.index == 7)
     }
 
     // MARK: - selection and focus with raw negatives

@@ -8,6 +8,49 @@ session start, so nothing here depends on it.
 
 ## Architecture decisions
 
+### 2026-09-16 — M4 Progress decisions (from the m4-progress slice spec, user-answered)
+
+- **History spans every program**: chart points, Best, Since start and the calendar include archived programs' sessions and
+  logs, and chips append archived-only exercises. This refines the M2 "archived history is Progress-only" note. Home's stats
+  stay scoped to the current program. It ships with a `progress-history` seed, because restart (m4-settings) is the only way
+  in the app to archive a program.
+- **Chip selection is `@State` only**: it survives tab switches, and resets to the first chip on relaunch and after a workout
+  (shell remount).
+- **Calendar tones deviate from the prototype**: a missed day has a `warning` number and a skipped day a `mu` number, both on
+  `sf2`, matching the Home strip and the Program card. Completed days are green; today has the accent border.
+- **A finished log belongs to its session's `scheduledDate`** (chart order and calendar cell), consistent with Home's
+  records, volume and strip. Taken as the default without asking.
+- **Spoken strings**: the chart summary is "<Exercise>, N sessions, <lowest> to <highest> <unit>" (a range, not first → last;
+  with no points "<Exercise>, no sessions logged"), and a future session's calendar cell has the value "Scheduled".
+- Top weight = `HomeStats.topWeightLb` (done sets only). The screen is read-only, with no schema change. Home's
+  "Progress ›" link was already wired.
+- **Architecture review (2026-09-16, approve with changes)**:
+  - **Two session queries** (current program, archived programs) rather than one `||` predicate. This is the project's first
+    cross-program read; the predicate shape is settled by a researcher probe and AC-22.
+  - **Point identity is position**, never `sessionIndex`: indexes collide across programs. Points are ordered by
+    `(scheduledDate, programCreatedAt, index)`.
+  - **One async per-key read** is keyed on the effective key and held as `(key, tops)`. The chart draws only when the keys
+    match, and the held value is never cleared. Chips are derived in `body` like Home, with no `@State` copy.
+  - **`ProgressSession` wraps `SessionSummary`** plus program fields, so the planned-weight fallback has its target.
+  - **`ProgramStore.archive` becomes the single `archivedAt` writer** (used by the `progress-history` seed now, and by restart
+    in m4-settings).
+  - The screen is `ProgressTabView`, not `ProgressView`, which would shadow SwiftUI's `ProgressView` across the app target.
+  - DEBUG preselections (`-progressExercise`) are pure defaults applied in `body`, never copied into `@State` in `onAppear`.
+  - **Probes (researcher addendum)**: the session → program hop costs ~330 µs per row on 17.5, so Progress never hops in `body`.
+    It uses an archived-programs `@Query` and fetches those programs' sessions by id in the fingerprint task. `.task(id:)`
+    restarts on every return to a TabView tab (not on re-tapping the selected tab), and `@State` survives, on 17.5 and 26.5.
+- **Implemented 2026-09-16** (branch `m4-progress`): 807 tests green on iOS 17.5 and 26.5 (711 → 774 implementer → 807
+  test-writer, review cleanups kept 807), Release green, scratch-copy XCUITests 6/6, swift review "ship" (two of its
+  three non-blocking cleanups applied, the `MonthCalendar` negative-id item skipped as harmless). Deviations: `HomeStats.session(on:)`
+  now lets a completed session win a same-day tie (`tieIgnoresStatus` renamed `completedSessionWinsTheDay`); unreachable
+  within one program (a completed session is never re-dated onto a lower-index pending one), so it only changes the
+  Progress calendar's cross-program cells. `ProgressTabView.load` uses independent do/catch blocks per fetch, so a failed
+  archived-history read still leaves the chart working and vice versa. Weekday letters are hidden from accessibility (each
+  calendar cell is its own labelled element already). Known issue outside the slice: `WeightDisplay.text` would print
+  −0.5 lb as "0.5" (the whole part rounds toward zero and drops the sign); unreachable today because steps are 2.5 lb and
+  `ProgressText.delta` passes `abs`. Pending the user's MVP pass: AC-13 VoiceOver order on the iPhone 14 Pro Max (does
+  VoiceOver stop on the chart container before its dots) and a real finger scroll of the chip row.
+
 ### 2026-09-15 — M4 milestone-wide and missed-day decisions (from the m4-missed-day slice spec, user-answered)
 
 - **M4 is four slices**, each merged before the next: `m4-missed-day` → `m4-progress` (Swift Charts top-weight line, best /
@@ -607,6 +650,23 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
   does not break it.
 
 ## Patterns
+
+### 2026-09-16 — Reading rows of another parent: query the parents, fetch children per id in a task
+A screen that must include archived programs never hops `child.parent` in `body` (~330 µs per row, uncached, on 17.5).
+Instead it owns a `@Query` of the parent rows (`Program` with `archivedAt != nil`), which gives each id and its scalar
+fields directly, and fetches that parent's children inside a `.task(id: fingerprint)` with the existing
+`sessionPredicate(programID:)`, filtering the rest in Swift. The fingerprint includes the sorted parent ids so an added
+or removed parent re-runs the fetch. A static source test (`ProgressSourceTests`) keeps the hop out of the views.
+React analogy: the parent query is the subscription, the task is the effect that fetches by key.
+
+### 2026-09-16 — Swift Charts line with prototype geometry (m4-progress researcher, 17.5 and 26.5)
+Plot by session index with both axes hidden, so the plot equals the frame. Draw the baseline and the two dashed gridlines as
+`RuleMark`s, and compute padded x/y domains in the Engine as plain numbers (±5 lb → 10…110 of 120; a 10-of-320 x inset). Hollow
+markers use a custom `symbol { Circle().fill(surface).overlay(stroke) }`, and markers overflow unclipped, as in the prototype.
+Accessibility: `accessibilityHidden(true)` on every `LineMark` and `RuleMark`, labels on the `PointMark`s. A 200-point
+chart re-renders in about 3 ms, so re-rendering on every save is fine. There is no implicit animation on data change, and the
+chart needs no `.id`. Month grid: `LazyVGrid` with 7 × `.flexible()` columns and `.aspectRatio(1)` cells. Lead blanks come from
+`CalendarRules.appWeekday(of: monthStart)`. Some months need 6 rows.
 
 ### 2026-09-15 — A derived modal overlay on the tab shell
 A prompt that must dim everything, including the floating tab bar, is a host view in `ShellView`'s `.overlay` placed after

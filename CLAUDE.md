@@ -53,7 +53,7 @@ HomeGymLog/            app target; synchronized folder, so every .swift under it
                        StoreCommit (the failed-save policy's one home), the two snapshot builders (rows → Engine values)
   Engine/              pure logic, no SwiftData/SwiftUI: generator, weights, calendar, Reslot, and the stats behind every
                        screen (Home, Program tab, workout, rest, tools, missed day)
-  Features/<Screen>/   one folder per screen (Onboarding, Home, Program, Workout; later Progress, Settings); one screen per
+  Features/<Screen>/   one folder per screen (Onboarding, Home, Program, Workout, Progress; later Settings); one screen per
                        file, subviews extracted once a body passes ~80 lines
   Shared/              Theme, tab bar, reusable controls, and every *Text helper (all formatting lives here, never in Engine)
   Assets.xcassets/     theme color sets
@@ -77,11 +77,13 @@ Work happens in slices on branches `m<N>-<slice>` created by `/milestone`, merge
 `/pr-self-review`. UI slices are verified against the prototype with `/design-compare`, which renders the design
 with headless Chrome and launches the app in a `-seed` state per screen (DEBUG only, `App/DebugSeed/`: `onboarding`,
 `ob1`…`ob5`, `midProgram`, `missed`, the missed-day seeds `missed-several`, `missed-shifted`, `missed-skipped` (with `missed`,
-the only seeds that let the Home prompt show), `restDay`, `freshProgram`, and the workout seeds `wo-start`, `wo-swipe`, `wo-rpe`,
+the only seeds that let the Home prompt show), `restDay`, `freshProgram`, `progress-history` (an archived program plus
+`midProgram`, for the Progress tab's cross-program chart and calendar), and the workout seeds `wo-start`, `wo-swipe`, `wo-rpe`,
 `wo-adjust`, `wo-rest`, `summary`, `wo-detail`, `wo-swap`, `wo-swap-rdl`, `wo-notes`, which open at the root with no
 `-tab`; frozen clock, in-memory store, throwaway preferences).
-Two more DEBUG launch arguments target a screen without taps (taps are refused on this machine): `-programWeek <n>
--programDay <d>` preselects the Program tab's week and day, `-tab <name>` opens the shell on that tab.
+Three more DEBUG launch arguments target a screen without taps (taps are refused on this machine): `-programWeek <n>
+-programDay <d>` preselects the Program tab's week and day, `-tab <name>` opens the shell on that tab, `-progressExercise
+<key>` preselects the Progress tab's chip.
 
 Skills (`.claude/skills/README.md`): `/milestone <n> [slice]` runs that flow up to plan approval. `/build-and-run`,
 `/run-tests`, `/device-install` drive Xcode. `/ship-check` before a commit, `/pr-self-review` before a PR,
@@ -145,7 +147,12 @@ xcrun xcresulttool get test-results summary --path build/tests.xcresult   # tota
    tab's Missed card gains both; `ProgramStore.shift` / `skipMissed` through `StoreCommit.commit`, no schema change; card
    bottom padding 64 pt instead of the prototype's 44; seeds `missed-several`, `missed-shifted`, `missed-skipped`; 711 tests
    on iOS 17.5 and 26.5, Release green; VoiceOver (AC-17) on the iPhone 14 Pro Max, the card's spring-back and a real finger
-   drag from Skip pending the user's MVP pass). Next: `m4-progress`.
+   drag from Skip pending the user's MVP pass).
+   — progress slice done 2026-09-16 (branch `m4-progress`: `ProgressStats` engine (chip order, chart points, Best, Since
+   start, month calendar, chart geometry), `ProgressTabView` with exercise chips and a Swift Charts top-weight line
+   spanning the current and archived programs, `ProgramStore.archive` as the single `archivedAt` writer, `-progressExercise`
+   argument and `progress-history` seed; 807 tests on iOS 17.5 and 26.5, Release green, scratch-copy XCUITests 6/6, swift
+   review "ship"; VoiceOver order (AC-13) and a real finger chip scroll pending the user's MVP pass). Next: `m4-settings`.
 5. Polish: Live Activity rest timer, light theme audit, haptics, export, icon, App Store prep.
 
 ## Product decisions (settled 2026-09-09)

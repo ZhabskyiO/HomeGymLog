@@ -27,26 +27,35 @@ enum MidProgramSeed {
         }
         let sessions = program.sortedSessions
         for index in completedIndexes {
-            let session = sessions[index]
-            let startedAt = calendar.date(byAdding: .hour, value: 7, to: calendar.startOfDay(for: session.scheduledDate))!
-            let log = try WorkoutLogStore.start(session: session, at: startedAt, in: context)
-            var setNumber = 0
-            for exercise in log.sortedExercises {
-                let kind = ExerciseLibrary.exercise(for: exercise.exerciseKey)!.kind
-                let top = topWeightLb(target: exercise.targetWeightLb, kind: kind, sessionIndex: index)
-                for set in exercise.sortedSets {
-                    setNumber += 1
-                    set.weightLb = top
-                    set.reps = 12
-                    set.status = .done
-                    set.rpe = 7
-                    set.loggedAt = startedAt.addingTimeInterval(Double(90 * setNumber))
-                }
+            try complete(sessions[index], index: index, calendar: calendar, in: context) { target, kind in
+                topWeightLb(target: target, kind: kind, sessionIndex: index)
             }
-            let finishedAt = startedAt.addingTimeInterval(41 * 60 + Double(10 + 3 * index))
-            try WorkoutLogStore.finish(log, at: finishedAt, in: context)
         }
         return program
+    }
+
+    /// Completes one session through the workout store: started 07:00 on its day, every set done at `top(target, kind)`
+    /// × 12 reps with RPE 7 (set k logged at start + 90·k s), finished 41 min + 10 + 3·index s after the start. Shared with
+    /// `ProgressHistorySeed`.
+    static func complete(_ session: PlannedSession, index: Int, calendar: Calendar, in context: ModelContext,
+                         top: (_ targetLb: Double, _ kind: EquipmentKind) -> Double) throws {
+        let startedAt = calendar.date(byAdding: .hour, value: 7, to: calendar.startOfDay(for: session.scheduledDate))!
+        let log = try WorkoutLogStore.start(session: session, at: startedAt, in: context)
+        var setNumber = 0
+        for exercise in log.sortedExercises {
+            let kind = ExerciseLibrary.exercise(for: exercise.exerciseKey)!.kind
+            let weight = top(exercise.targetWeightLb, kind)
+            for set in exercise.sortedSets {
+                setNumber += 1
+                set.weightLb = weight
+                set.reps = 12
+                set.status = .done
+                set.rpe = 7
+                set.loggedAt = startedAt.addingTimeInterval(Double(90 * setNumber))
+            }
+        }
+        let finishedAt = startedAt.addingTimeInterval(41 * 60 + Double(10 + 3 * index))
+        try WorkoutLogStore.finish(log, at: finishedAt, in: context)
     }
 }
 #endif

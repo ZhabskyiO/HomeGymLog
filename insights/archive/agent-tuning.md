@@ -5,6 +5,20 @@ Moved out of `INSIGHTS.md` on 2026-09-16 to keep session and agent reads small. 
 
 ## Agent tuning
 
+- 2026-09-16 (m4-progress) — **spec-creator** wrote a solid 399-line spec, but the planner found eight defects it should
+  have caught itself: an AC contradicting its own rules table ("Sep 9 completed" vs s7 missed), a calendar example whose
+  dates could not coexist (Feb 1–5 "scheduled" with today in February), a named function with no input for a value it had
+  to return (`tops(key:in:)` needed `programCreatedAt`), a rule placed in the builder but AC-tested in the Engine, and a
+  screen type named `ProgressView`, which shadows SwiftUI's. Prompt edits applied: cross-check every AC against the rules
+  table it cites; every named function's inputs must suffice for its stated output; never name a type after a SwiftUI or
+  Foundation type.
+- 2026-09-16 (m4-progress) — **implementation-planner** called an unprobed `#Predicate` shape a "verified shape"
+  (`$0.program?.id == X && $0.statusRaw == Y`); the researcher had probed neither that combination nor any `statusRaw`
+  predicate, and plan-verifier F2 caught it. Its self-reported gaps and its iOS 17.4 `PredicateEvaluate` claim were both
+  correct and saved a round. Prompt edit: "verified" requires a citation (report section or file:line), else "unverified".
+- 2026-09-16 (m4-progress) — **researcher** was decisive twice: hidden `LineMark` accessibility (point labels are
+  swallowed otherwise) and the 322–347 µs/row uncached `session → program` hop on 17.5, which rewrote the screen's data
+  flow before any code existed. The architecture review asking for a scoped second probe round is now a repeatable move.
 - 2026-09-15 (m4-missed-day) — **researcher** was decisive three times: overlay over system sheet (dim 0.29 / 0.48 vs 0.55, a
   Home-level overlay cannot cover the bar), P1 (a `Group { if }` root skips `onAppear`) and P2 (a `Button` fires from a
   drag unless `.highPriorityGesture`; the architecture review's text-block fallback would have shipped that bug). Its miss:
@@ -203,6 +217,13 @@ Moved out of `INSIGHTS.md` on 2026-09-16 to keep session and agent reads small. 
   spec-creator in parallel at the start of `/milestone` saved a full round.
 
 ### Skill tuning
+
+- 2026-09-16 (m4-progress) — **/design-compare**: the `progress` crop was recorded in the skill from the spec's estimate
+  without rendering it, and it cut the right edge (2330 vs the correct 2520 wide). Rule added: record a crop only after
+  rendering and reading the cropped image.
+- 2026-09-16 (m4-progress) — **/milestone**: a main-session rename (`DebugProgressSelection` → `DebugProgressExercise`)
+  reached the plan but not the spec, costing a verifier round; so did two other fixes applied to one file only. Step 7's
+  grep rule now covers every mechanical fix, not only renamed artifacts, and names spec + plan + insights.
 - 2026-09-15 — **milestone**: rules say to check whether a rate-limited agent's output already landed and to resume with
   SendMessage before relaunching; step 6 says the main session fixes spec contradictions the planner reports before the
   verifier runs (m4-missed-day).

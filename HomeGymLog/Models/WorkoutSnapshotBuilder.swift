@@ -71,15 +71,21 @@ enum WorkoutSnapshotBuilder {
         return WorkoutSummary.bests(from: records)
     }
 
+    /// One key's exercise rows whose workout is finished, across every program (a one-hop `flatMap`; an in-progress log never
+    /// matches). Shared by the pill's `finishedTops` (which filters the program in Swift) and the Progress chart's tops.
+    static func finishedExercisePredicate(key: String) -> Predicate<LoggedExercise> {
+        #Predicate<LoggedExercise> { exercise in
+            exercise.exerciseKey == key && exercise.workout.flatMap { log in log.finishedAt != nil } == true
+        }
+    }
+
     /// The progression pill's baseline for one key (INSIGHTS Patterns "Per-key history reads"): the key's exercise rows whose
     /// workout is finished (a one-hop `flatMap` predicate; the in-progress log never matches), kept in Swift only when the
     /// workout's session belongs to `programID` (archived programs drop out). One entry per finished log: top = the heaviest
     /// done set over that log's rows for the key; a log with no done set for it is dropped. Sorted by `finishedAt`.
     /// ~55 ms at program end on 17.5, never the full `bestsBefore` traversal.
     static func finishedTops(key: String, programID: UUID, in context: ModelContext) throws -> [FinishedExerciseTop] {
-        let rows = try context.fetch(FetchDescriptor<LoggedExercise>(predicate: #Predicate { exercise in
-            exercise.exerciseKey == key && exercise.workout.flatMap { log in log.finishedAt != nil } == true
-        }))
+        let rows = try context.fetch(FetchDescriptor<LoggedExercise>(predicate: finishedExercisePredicate(key: key)))
         // Keyed by log id and merged by hand: a log holding the key twice must give one entry, never a duplicate-key trap.
         var topsByLog: [UUID: FinishedExerciseTop] = [:]
         for row in rows {

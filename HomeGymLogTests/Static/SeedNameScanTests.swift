@@ -7,7 +7,8 @@ import Testing
 @Suite struct SeedNameScanTests {
     private static let names = ["\"wo-start\"", "\"wo-swipe\"", "\"wo-rpe\"", "\"wo-adjust\"", "\"wo-rest\"", "\"summary\"",
                                 "\"wo-detail\"", "\"wo-swap\"", "\"wo-swap-rdl\"", "\"wo-notes\"",
-                                "\"missed-several\"", "\"missed-shifted\"", "\"missed-skipped\""]
+                                "\"missed-several\"", "\"missed-shifted\"", "\"missed-skipped\"",
+                                "\"progress-history\"", "\"-progressExercise\""]
 
     /// `<repo>/HomeGymLog`, derived from `<repo>/HomeGymLogTests/Static/…`.
     private static var appSourceRoot: URL {

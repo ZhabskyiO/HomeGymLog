@@ -46,7 +46,9 @@ simulator session), add an optional step that verifies them with XCUITest in a t
 same element in the same launch (otherwise it cannot fail), and every tap path is traced through the screen's state
 machine before it is written (a rating starts a rest whose card hides the bottom bar; a sheet covers the header). Static
 source tests anchor on stable tokens (a type or function name such as `DebugSeed.parse(`) and accept equivalent
-spellings (`Date?` with or without `= nil`), never on a whole literal line. Prefer the smallest plan that fully meets the spec. Do not write Swift code beyond signatures
+spellings (`Date?` with or without `= nil`), never on a whole literal line. Call a predicate, API or measurement "verified" only with a citation (a researcher-report section or `file:line`);
+anything else is written as unverified with the probe that would settle it, and a predicate shape nobody probed is not a
+substitute for one that was. Prefer the smallest plan that fully meets the spec. Do not write Swift code beyond signatures
 and short illustrative snippets. Do not edit any file other than the plan.
 
 Return the plan path and a five-line summary of the steps.
