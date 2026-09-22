@@ -44,8 +44,9 @@ multiple-choice question when the slicing is not obvious.
    not PASS, fix the plan and re-verify scoped to the finding ids by resuming the same verifier: apply mechanical
    should-fix items (one-line edits, typos, a missing command) directly in the main session; resume the planner
    only for design changes.
-   If the revision renamed or removed an artifact, grep the spec and `insights/INSIGHTS.md` for the old name
-   and fix them before re-verifying. Maximum three rounds; after that, show the user the remaining findings and ask how to proceed.
+   After any mechanical fix (a rename, a signature change, a reworded rule), grep the spec, the plan and
+   `insights/INSIGHTS.md` for the old wording and fix every copy before re-verifying; a fix applied to one file only
+   costs a whole round. Maximum three rounds; after that, show the user the remaining findings and ask how to proceed.
 8. Commit the spec, plan and reviews on the branch (`git add docs insights && git commit`).
 9. Stop. Present to the user: branch, spec path, plan path, the step list in five lines or fewer,
    definition of done, risks, and any question only they can answer. Ask for approval to implement. Do

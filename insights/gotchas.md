@@ -316,6 +316,10 @@ are kept as history.
 
 ## Xcode / build
 
+- 2026-09-16 — **`xcresulttool … summary` prints two different counts**: the top-level `totalTestCount` / `passedTests`
+  (807 for m4-progress) and, inside `devicesAndConfigurations`, a per-device `passedTests` that counts parameterized
+  cases and re-runs (1375 for the same bundle). Quote `totalTestCount`. Recognize it: a "passed" number far above the
+  number of `@Test` functions.
 - 2026-09-16 — **In the test target, a nested helper struct's method inside a `@MainActor` suite is not main-actor
   isolated** (the target has no default isolation). Calling app builders from it fails with `[#ActorIsolatedCall]`. Fix: mark
   the helper method `@MainActor`.

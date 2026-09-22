@@ -33,7 +33,12 @@ Write the spec to `docs/specs/<milestone-or-feature>.md` with these sections:
    launch argument that opens that tab (`-tab program`), since scripted taps are not available.
 9. **Open questions.** Only things the prototype and decisions do not settle. Propose a default for each.
 
-Rules: keep the spec under 400 lines unless numeric tables require more; prefer tables to prose. For any table
+Rules: every acceptance criterion must agree with the rules table it cites (cross-check each AC's numbers and states
+against that table before returning; an AC saying "Sep 9 completed" while the rules table has that session missed is the
+failure to avoid), and every worked example must be internally possible (dates relative to its own "today"). Every named
+function's input list must suffice for its stated output, and a rule tested by an AC lives in the component that AC names.
+Never name a type after a SwiftUI or Foundation type (`ProgressView`, `Text`, `Task`): it shadows the system one
+across the whole app target. Keep the spec under 400 lines unless numeric tables require more; prefer tables to prose. For any table
 derived from existing Engine code (row lists, schedules, weights), show the derivation per row (the intermediate
 walk or formula inputs) so a reviewer can check it without recomputing; derive by reading the code, never from memory.
 Describe behavior, not implementation. No SwiftUI view names, no code. Engine functions are

@@ -651,6 +651,14 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
 
 ## Patterns
 
+### 2026-09-16 — Reading rows of another parent: query the parents, fetch children per id in a task
+A screen that must include archived programs never hops `child.parent` in `body` (~330 µs per row, uncached, on 17.5).
+Instead it owns a `@Query` of the parent rows (`Program` with `archivedAt != nil`), which gives each id and its scalar
+fields directly, and fetches that parent's children inside a `.task(id: fingerprint)` with the existing
+`sessionPredicate(programID:)`, filtering the rest in Swift. The fingerprint includes the sorted parent ids so an added
+or removed parent re-runs the fetch. A static source test (`ProgressSourceTests`) keeps the hop out of the views.
+React analogy: the parent query is the subscription, the task is the effect that fetches by key.
+
 ### 2026-09-16 — Swift Charts line with prototype geometry (m4-progress researcher, 17.5 and 26.5)
 Plot by session index with both axes hidden, so the plot equals the frame. Draw the baseline and the two dashed gridlines as
 `RuleMark`s, and compute padded x/y domains in the Engine as plain numbers (±5 lb → 10…110 of 120; a 10-of-320 x inset). Hollow
