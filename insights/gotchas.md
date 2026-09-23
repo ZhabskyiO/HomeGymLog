@@ -347,6 +347,17 @@ are kept as history.
   `interval > 0` and cancel instead.
 - 2026-09-14 — `xcrun simctl privacy` has no notifications service: reset the permission by uninstalling the app. In
   XCUITest drive the prompt and banners through `XCUIApplication(bundleIdentifier: "com.apple.springboard")`.
+- 2026-09-23 — **The 64 pending-request cap evicts FIFO by insertion, not by fire date**: an early-added `rest-timer`
+  was dropped once 64 later requests existed, and a 65th add evicted the oldest-added. Keep reminders ≤ 63 total
+  (window 30) so `rest-timer` always fits (m4-reminder researcher, 17.5 and 26.5).
+- 2026-09-23 — **Past calendar triggers**: a non-repeating y/m/d/h/m trigger for a time already passed *today* is
+  accepted and silently dropped (no crash, never fires); one for a past *day* stays pending with `nextTriggerDate` on
+  the 1st of next month. Stale reminder ids must be removed, never left to expire.
+- 2026-09-23 — **Zone-less `DateComponents` in a calendar trigger resolve in the device zone** (the daemon's), not an
+  app-set zone. Re-resolution after a later device zone change is unverified.
+- 2026-09-23 — **A notification tap that launches a killed app carries no launch arguments**; `didReceive` reached the
+  delegate set in `App.init` ~0.4 s after init. `TEST_RUNNER_` environment did not reach the runner, and
+  `test-without-building` ran a stale binary after a silent build error: build first, check its exit.
 
 ## Xcode / build
 
