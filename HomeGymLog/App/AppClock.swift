@@ -39,6 +39,13 @@ extension EnvironmentValues {
     /// branch sets it (false for every seed outside the missed-day family, which share the `missed` data but match
     /// prototype snapshots with the prompt off). Nil in Release and in every unseeded launch.
     @Entry var missedPromptEnabled: Bool? = nil
+    /// Whether the Settings screen opens with its restart confirmation already presented (`-seed settings-restart`), so the
+    /// dialog can be screenshot without a tap. Nil in Release and in every other launch; only the root's `#if DEBUG` block
+    /// sets it (the `workoutSheetPreview` pattern).
+    @Entry var settingsRestartPreview: Bool? = nil
+    /// Keeps the Home missed-action banner up with no auto-dismiss (`-holdBanner`), so a frozen-clock screenshot can catch
+    /// it. Nil in Release and in every launch without the argument.
+    @Entry var missedBannerHold: Bool? = nil
     /// The exercise key the Progress tab shows before any chip tap (a DEBUG launch argument, `DebugProgressExercise`), read in `body` as
     /// `selectedKey ?? progressPreselection`. Nil in Release and in every launch without the argument; only the root's
     /// `#if DEBUG` block sets it. An unknown key falls back to the first chip.

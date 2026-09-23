@@ -53,7 +53,7 @@ HomeGymLog/            app target; synchronized folder, so every .swift under it
                        StoreCommit (the failed-save policy's one home), the two snapshot builders (rows → Engine values)
   Engine/              pure logic, no SwiftData/SwiftUI: generator, weights, calendar, Reslot, and the stats behind every
                        screen (Home, Program tab, workout, rest, tools, missed day)
-  Features/<Screen>/   one folder per screen (Onboarding, Home, Program, Workout, Progress; later Settings); one screen per
+  Features/<Screen>/   one folder per screen (Onboarding, Home, Program, Workout, Progress, Settings); one screen per
                        file, subviews extracted once a body passes ~80 lines
   Shared/              Theme, tab bar, reusable controls, and every *Text helper (all formatting lives here, never in Engine)
   Assets.xcassets/     theme color sets
@@ -78,12 +78,16 @@ Work happens in slices on branches `m<N>-<slice>` created by `/milestone`, merge
 with headless Chrome and launches the app in a `-seed` state per screen (DEBUG only, `App/DebugSeed/`: `onboarding`,
 `ob1`…`ob5`, `midProgram`, `missed`, the missed-day seeds `missed-several`, `missed-shifted`, `missed-skipped` (with `missed`,
 the only seeds that let the Home prompt show), `restDay`, `freshProgram`, `progress-history` (an archived program plus
-`midProgram`, for the Progress tab's cross-program chart and calendar), and the workout seeds `wo-start`, `wo-swipe`, `wo-rpe`,
+`midProgram`, for the Progress tab's cross-program chart and calendar), `settings-restart` (Settings with the restart
+confirmation dialog up) and `restarted` (no current program, one archived program, onboarding opens prefilled at A2),
+and the workout seeds `wo-start`, `wo-swipe`, `wo-rpe`,
 `wo-adjust`, `wo-rest`, `summary`, `wo-detail`, `wo-swap`, `wo-swap-rdl`, `wo-notes`, which open at the root with no
 `-tab`; frozen clock, in-memory store, throwaway preferences).
-Three more DEBUG launch arguments target a screen without taps (taps are refused on this machine): `-programWeek <n>
+Six more DEBUG launch arguments target a screen without taps (taps are refused on this machine): `-programWeek <n>
 -programDay <d>` preselects the Program tab's week and day, `-tab <name>` opens the shell on that tab, `-progressExercise
-<key>` preselects the Progress tab's chip.
+<key>` preselects the Progress tab's chip, `-appearance <system|dark|light>` and `-missedDayPolicy <ask|shift|skip>`
+override those `@AppStorage` preferences for a screenshot, and `-holdBanner` keeps the Settings missed-day automatic
+action's Home banner up with no auto-dismiss.
 
 Skills (`.claude/skills/README.md`): `/milestone <n> [slice]` runs that flow up to plan approval. `/build-and-run`,
 `/run-tests`, `/device-install` drive Xcode. `/ship-check` before a commit, `/pr-self-review` before a PR,
@@ -152,7 +156,20 @@ xcrun xcresulttool get test-results summary --path build/tests.xcresult   # tota
    start, month calendar, chart geometry), `ProgressTabView` with exercise chips and a Swift Charts top-weight line
    spanning the current and archived programs, `ProgramStore.archive` as the single `archivedAt` writer, `-progressExercise`
    argument and `progress-history` seed; 807 tests on iOS 17.5 and 26.5, Release green, scratch-copy XCUITests 6/6, swift
-   review "ship"; VoiceOver order (AC-13) and a real finger chip scroll pending the user's MVP pass). Next: `m4-settings`.
+   review "ship"; VoiceOver order (AC-13) and a real finger chip scroll pending the user's MVP pass).
+   — settings slice done 2026-09-22 (branch `m4-settings`: the last placeholder tab replaced; Appearance (System/Dark/Light)
+   applied window-wide via `overrideUserInterfaceStyle` from `RootView`, not `.preferredColorScheme`; Units as a second
+   segmented control; disabled "Coming soon" rows for Daily reminder and Sound & haptics; the Program card's new "Missed a
+   day" preference (`@AppStorage("missedDayPolicy")`: Ask each time / Always shift / Always skip) drives `MissedPromptHost`'s
+   existing shift/skip writers automatically, with a transient one-line Home banner naming what changed; "Build a new
+   program…" archives through `ProgramStore.archive`, resets the tab to Home, and reopens onboarding at A2 prefilled
+   from the archived program (`Engine/RestartPrefill`); read-only Equipment card; seeds `settings-restart`, `restarted`;
+   917 tests on iOS 17.5 and 26.5, Release green, scratch-copy XCUITests 7/7 on 17.5 plus AC-12 on 26.5, swift review
+   "ship". Known issue (unreachable in production, gotchas SwiftUI 2026-09-22): with the DEBUG arguments `-tab settings
+   -missedDayPolicy shift` on one launch, the banner's visible-time timer starts while the shell briefly mounts on Home,
+   so it is gone by the time a scripted tap reaches Home; no production path mounts the shell on a non-Home tab. Pending
+   the user's MVP pass: AC-9–AC-14 (live appearance/units taps, restart cancel/confirm, policy taps, banner timing) and
+   AC-15 VoiceOver order. Next: `m4-reminder`.
 5. Polish: Live Activity rest timer, light theme audit, haptics, export, icon, App Store prep.
 
 ## Product decisions (settled 2026-09-09)

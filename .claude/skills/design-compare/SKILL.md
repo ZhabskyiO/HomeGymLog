@@ -37,7 +37,12 @@ Compare one design state with the app. The output is a list of concrete differen
    `-seed progress-history -tab progress` (archived history); add `-progressExercise <key>` to preselect a chip, `-units kg` for kg. Row E: the 5600 window cuts the `missed` card; render a second shot with
    `--window-size=3000,6600 --screenshot=build/proto-all-6600.png` and crop missed 850×680 @ (4970, 44) from it (recorded by
    m4-missed-day). Missed-day seeds: `-seed missed` (the prompt, E1), `missed-several` (prompt on Thu Sep 17),
-   `missed-shifted` and `missed-skipped` (Home right after each action; add `-tab program` for the Program tab). Workout seeds (`wo-start`, `wo-swipe`, `wo-rpe`, `wo-adjust`, `wo-rest`, `summary`, `wo-detail`, `wo-swap`, `wo-swap-rdl`,
+   `missed-shifted` and `missed-skipped` (Home right after each action; add `-tab program` for the Program tab). Settings and light theme: on the `--window-size=5600,5600` render, crop settings 800×290 @ (2555, 4148) and home-light 850×680 @ (2555, 4456)
+   (measured by the m4-settings implementer; the plan it worked from had both pairs transposed, and a transposed `sips -c` returns a blank band —
+   always read the cropped image before trusting a crop). Settings seeds: `-seed midProgram -tab settings`, `-seed freshProgram -tab settings`,
+   `-seed settings-restart -tab settings` (the restart dialog), `-seed restarted` (onboarding A2 after a restart); `-appearance dark|light` forces the
+   app's own appearance (`simctl ui appearance` drives System only), `-missedDayPolicy ask|shift|skip` the missed-day preference, `-holdBanner` keeps
+   the Home banner up for a screenshot. Workout seeds (`wo-start`, `wo-swipe`, `wo-rpe`, `wo-adjust`, `wo-rest`, `summary`, `wo-detail`, `wo-swap`, `wo-swap-rdl`,
    `wo-notes`)
    need no `-tab`: the workout replaces the shell at the root. For other frames in rows B–D, view `sips -Z 1500 build/proto-all.png` first to locate the frame, then crop. Re-render only
    when the design export changes.

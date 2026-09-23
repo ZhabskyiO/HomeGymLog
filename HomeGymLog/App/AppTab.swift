@@ -14,12 +14,4 @@ enum AppTab: String, CaseIterable, Identifiable {
         case .settings: return "Settings"
         }
     }
-
-    /// Milestone that replaces this tab's placeholder with the real screen.
-    var placeholderMilestone: Int {
-        switch self {
-        case .home, .program: return 2
-        case .progress, .settings: return 4
-        }
-    }
 }

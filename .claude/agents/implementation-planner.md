@@ -29,6 +29,12 @@ Produce a plan at `docs/plans/<milestone-or-feature>.md` with these sections:
    mitigation for each.
 6. **Definition of done.** A checklist the user can verify on the simulator or device.
 
+Every number you copy into the plan — a screenshot crop, an exercise's default weight, a test literal — is copied
+from the source that owns it (the skill that recorded the crop, `ExerciseLibrary`, the fixture), never retyped from
+the spec's prose or reordered from memory. A spec number that disagrees with code is a finding to report, not a
+value to pass on (m4-settings: the spec's `lowRow 80` was a chart point, the library default is 90; and both
+`sips` crops reached the plan transposed, which silently yields a blank band).
+
 Constraints: no new dependencies or entitlements unless the spec approved them. Any step that adds or
 changes a SwiftData relationship, delete, or `#Predicate` must include a persistence test that runs on the
 iPhone 15 / iOS 17.5 simulator (runtime behavior differs from newer OS; see gotchas "SwiftData"). Any step

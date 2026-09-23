@@ -39,6 +39,22 @@ final class OnboardingDraft {
         self.days = SplitPlans.defaultWeekdays(frequency: frequency) ?? [0, 1, 3, 4]
     }
 
+    /// The draft a restart opens with (spec 5.2): every answer from the archived program, opened at A2 "How long?".
+    /// `bodyWeightUnitChosen` is set **last** on purpose (NB2): both `units.didSet` and `bodyWeightUnit.didSet` fire on every
+    /// assignment after `self.init`, so writing the flag earlier would be overwritten and a kg body weight chosen with lb
+    /// units would be lost on the first A1 toggle.
+    convenience init(answers: OnboardingAnswers, units: WeightUnit, bodyWeightUnit: WeightUnit) {
+        self.init(units: units, months: answers.months, frequency: answers.frequency)
+        days = answers.trainingWeekdays
+        sessionLengthMinutes = answers.sessionLengthMinutes
+        bodyWeightLb = answers.bodyWeightLb
+        experience = answers.experience
+        startingWeightsLb = answers.startingWeightsLb
+        self.bodyWeightUnit = bodyWeightUnit
+        step = 1
+        bodyWeightUnitChosen = (bodyWeightUnit != units)
+    }
+
     var ctaLabel: String { Self.ctaLabels[min(max(step, 0), Self.ctaLabels.count - 1)] }
 
     /// Only the frequency step can block: exactly `frequency` days must be picked.

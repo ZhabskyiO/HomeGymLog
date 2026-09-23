@@ -20,8 +20,14 @@ Verify the working tree is ready to commit. Report failures; do not hide them.
    snapshot the slice's spec names and attach the verdicts; a visible difference is a blocking finding
    unless the spec records it as a deviation.
 4. Launch `swift-reviewer` on the diff (`git diff main...HEAD` plus untracked files) and `test-writer` in
-   parallel (they are independent). Pass the reviewer the path `docs/reviews/<slug>-swift-review.md`; it writes the review there and returns a summary. Wait for
-   the test-writer before applying anything, then send the reviewer's findings to the `implementer` (resume it
+   parallel (they are independent). Pass the reviewer the path `docs/reviews/<slug>-swift-review.md`; it writes the review there and returns a summary.
+   Give the reviewer the implementer's deviation list **and** which acceptance criteria it machine-checked on which
+   runtimes, or the review spends findings asking what the implementer already answered (m4-settings F1).
+   **Wait for the test-writer to finish before resuming the `implementer` — never let both run at once.** They share
+   one checkout and one DerivedData, so the implementer compiles a mid-edit snapshot of the other's files and reports a
+   failure that does not match the code on disk (m4-settings: `TEST FAILED` at 888 on a test whose message contradicted
+   the file; recovery was to poll `ls -lT` until the mtimes were stable ~90 s, then re-run).
+   Then send the reviewer's findings to the `implementer` (resume it
    with SendMessage so it keeps the slice in context) with the exact fixes and the instruction to re-run the full
    suite on both runtimes and the Release build. Re-run the reviewer once only for blocking findings, or scoped to
    the change when a fix introduces a new design (another `ModelContext`, a new API semantic, a conflict with an

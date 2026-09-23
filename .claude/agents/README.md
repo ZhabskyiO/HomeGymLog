@@ -26,7 +26,9 @@ For a milestone or feature, the intended order is:
 5. `plan-verifier` — adversarially check the plan against the spec's acceptance criteria and the real code;
    returns an AC-to-step traceability matrix and a verdict. Fix, re-verify (max three rounds).
 6. `implementer` (model: opus) — write the plan's production Swift and per-step tests, building, testing and
-   screenshotting after every step; then `test-writer` — Swift Testing coverage for Engine and persistence.
+   screenshotting after every step; **then** `test-writer` — Swift Testing coverage for Engine and persistence.
+   The two are strictly sequential: they share one checkout and one DerivedData, so running them together makes
+   whichever builds first compile the other's half-written files (m4-settings).
 7. `swift-reviewer` — read-only review of the resulting code.
 8. `doc-writer` — update `CLAUDE.md`, `insights/`, and mark the spec and plan as implemented.
 

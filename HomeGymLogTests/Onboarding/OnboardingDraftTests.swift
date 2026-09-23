@@ -149,4 +149,37 @@ import Testing
         d.units = .lb
         #expect(d.bodyWeightLb == 180 && d.startingWeightsLb == ["dbBench": 42.5])
     }
+
+    /// AC-19 (draft half): the restart prefill of spec 5.2 opens at A2 with every answer restored.
+    private var midProgramAnswers: OnboardingAnswers {
+        RestartPrefill.answers(months: 6, frequency: 5, trainingWeekdays: [0, 1, 2, 3, 4], sessionLengthMinutes: 45,
+                               bodyWeightLb: 180, experience: "Intermediate", startingWeightsLb: [:])
+    }
+
+    @Test("a draft built from the midProgram answers opens at A2 with every field restored")
+    func draftFromAnswers() {
+        let d = OnboardingDraft(answers: midProgramAnswers, units: .lb, bodyWeightUnit: .lb)
+        #expect(d.step == 1)
+        #expect(d.months == 6 && d.frequency == 5 && d.days == [0, 1, 2, 3, 4])
+        #expect(d.sessionLengthMinutes == 45 && d.bodyWeightLb == 180 && d.experience == .intermediate)
+        #expect(d.units == .lb && d.bodyWeightUnit == .lb)
+        #expect(d.startingWeightRows.count == 17)
+    }
+
+    @Test("with matching units the body weight unit is not chosen, so it follows a later units change")
+    func bodyWeightUnitFollowsWhenNotChosen() {
+        let d = OnboardingDraft(answers: midProgramAnswers, units: .lb, bodyWeightUnit: .lb)
+        d.units = .kg
+        #expect(d.bodyWeightUnit == .kg)
+    }
+
+    @Test("a body weight unit that differs from the units is kept through later units changes (NB2)")
+    func differingBodyWeightUnitIsKept() {
+        let d = OnboardingDraft(answers: midProgramAnswers, units: .lb, bodyWeightUnit: .kg)
+        #expect(d.bodyWeightUnit == .kg)
+        d.units = .kg
+        #expect(d.bodyWeightUnit == .kg)
+        d.units = .lb
+        #expect(d.bodyWeightUnit == .kg)
+    }
 }

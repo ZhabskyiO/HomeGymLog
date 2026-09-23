@@ -8,6 +8,70 @@ session start, so nothing here depends on it.
 
 ## Architecture decisions
 
+### 2026-09-22 — M4 Settings decisions (from the m4-settings slice spec, user-answered)
+
+- **Appearance** = `@AppStorage("appearance")` (System / Dark / Light, default System) read in `RootView`, applied as
+  `overrideUserInterfaceStyle` on every window of the connected scenes in `onAppear` and `onChange`. `.preferredColorScheme`
+  is not used: on 17.5 alerts and confirmation dialogs ignore it, and open sheets keep their presentation-time scheme on
+  17.5 and 26.5 (researcher, `docs/reviews/m4-settings-researcher.md`).
+- **Units**: a segmented control like Appearance, on the existing `units` key. `bodyWeightUnits` stays onboarding-only.
+- **Daily reminder and Sound & haptics rows are present but disabled** (toggle off, "Coming soon", nothing stored) until
+  m4-reminder and M5. The user chose this over leaving the rows out.
+- **"Missed a day" is a real preference** (the user chose it over the prototype's static text): `@AppStorage("missedDayPolicy")`
+  Ask me each time / Always shift / Always skip, set with a trailing menu picker. With shift or skip, the prompt host applies
+  the action on its own through the existing `ProgramStore.shift` / `skipMissed`, then shows a **transient one-line banner on
+  Home** (the user chose it over no notice). Pure decision logic lives in `MissedDay.resolution` (Engine).
+- **Restart**: a confirmation dialog ("Archive and start over" / "Cancel"), then `ProgramStore.archive`, then the tab
+  resets to Home, then onboarding opens at A2 prefilled from the archived program, including its `startingWeightsLb`.
+  **A failed archive shows an alert** (the user chose it over the M4 silent pattern).
+- Equipment rows are read-only; dumbbells read **5–52.5 lb** (the real rack), not the prototype's 5–55.
+- **Architecture review (2026-09-22, approve with changes)**:
+  - **The automatic missed-day action** runs as one synchronous pass, keyed by an Equatable key struct, with a single
+    retry rule (B1).
+  - **The restart prefill** reads the newest archived program through a third root `@Query` (`archivedProgramPredicate`,
+    newest by `max(by:)`), never a fetch in `body`; the onboarding draft copies it once (B2).
+  - **The banner** is drawn by a full-size host root that owns its state; if the touch probe fails, the shell draws it (B3).
+  - Units and Appearance use a new `SegmentedPicker` style, not a new control. `MissedDayPolicy.storageKey` may live in
+    Engine. `AppearanceMode` stays UIKit-free, and the switch to the UIKit style is private to `RootView`.
+- **Spec §2.6 amended during implementation (2026-09-22): the automatic write path asserts on nothing.** The spec
+  originally read "Debug asserts" for a failed automatic shift or skip, matching the manual-tap policy; the implementer
+  found that under "Always shift" / "Always skip" the automatic pass re-runs at every shell mount with no user tap, so a
+  persistently failing store would trap a Debug build (the configuration `/device-install` puts on the user's phone) on
+  every relaunch. `MissedPromptHost.shift` / `skip` take an `assertOnFailure` parameter, `false` only from the automatic
+  path (`runAutomatic`); a manual card tap still passes the default `true` and asserts as before. Swift review flagged
+  the same risk independently (finding F2) before learning the spec had already been amended.
+- **Implemented 2026-09-22** (branch `m4-settings`): 917 tests green on iOS 17.5 and 26.5 (807 baseline → 917), Release
+  green, scratch-copy XCUITests 7/7 on 17.5 plus AC-12 re-run on 26.5, swift review "ship" (`docs/reviews/m4-settings-swift-review.md`,
+  three non-blocking findings, none applied: F1 the two-query restart-flip race is unverified but expected safe and the
+  scratch XCUITest already confirms the live transition; F2 is the assert now fixed by the spec amendment above; F3 a
+  redundant `_ =` on an already-`@discardableResult` call, cosmetic). Shipped mechanisms: **Appearance** via
+  `overrideUserInterfaceStyle` set on every window of every connected scene from `RootView`'s `onAppear` and
+  `onChange(of: appearanceRaw)` (`.preferredColorScheme` unused, confirmed absent from the app target by a static scan);
+  **the automatic missed-day action** as `MissedPromptHost`'s `.task(id: MissedDay.automaticActionKey(...))`, keyed on
+  `(policy, first-missed index, day)`, nil for `.none`/`.prompt`, running one synchronous pass (no `await`, so the query
+  cannot re-fetch mid-pass); **the visible-time banner** as a second `.task(id:)` keyed on `selected == .home ?
+  banner?.token : nil`, so leaving Home cancels the sleep and the `catch { return }` leaves the banner up, and returning
+  restarts the 3 s; **`RestartAction`** (`Features/Settings/RestartAction.swift`) isolates the one write behind the
+  restart confirmation into a function with no `assertionFailure` inside it, so its failure path is a unit test
+  (`RestartActionTests`) rather than a tap, and the screen asserts only when it handles `.failed`. Deviations from the
+  plan, all recorded in code and the swift review: the policy control ships as `Menu { Picker }` (not `Picker(.menu)`)
+  because `Picker(.menu)` ignores `.font` on its label on iOS 17.5 — the row's value rendered at the system body size
+  instead of 14 pt `mu` — so VoiceOver reads it as a "button", not a "pop-up button" (the one recorded AC-15 deviation);
+  `MissedActionBanner` has no `.accessibilityElement(children: .ignore)` because a `Button` with a text label is already
+  one accessibility element, and adding it produced a duplicate element XCUITest reported as "Multiple matching
+  elements found"; an extra file `Features/Settings/SettingsRows.swift` keeps `SettingsContent`'s body under the ~80-line
+  rule; the two disabled "Coming soon" rows are a `Toggle` with a two-line label (label + "Coming soon" subtitle), not a
+  bespoke row type; `ProgramStore.shift` / `skipMissed` return optionals (`[Int: Date]?` / `Bool?`) so a partial
+  automatic pass names only the sessions that actually landed; and spec §5.2's worked `lowRow 80` literal was wrong
+  against the library default of 90 — the **test literal was corrected**, production `StartingWeights` was already right.
+  Known issue, unreachable in production (gotchas SwiftUI 2026-09-22): the DEBUG arguments `-tab settings
+  -missedDayPolicy shift` on one launch start the banner's visible-time timer while the shell is briefly on Home before
+  the `-tab` flip lands, so a scripted tap back to Home finds it already gone on both runtimes; no production path
+  mounts the shell on a non-Home tab, and the same mechanism is expected (code-read, swift review) to survive a real
+  user's tab switch, which plan Step 12 traces but the scratch XCUITest did not independently re-verify beyond the
+  `-tab settings` case. Pending the user's MVP pass: AC-9–AC-14 (live appearance/units taps, restart cancel/confirm,
+  policy taps while a prompt is up, banner timing) and AC-15 VoiceOver order.
+
 ### 2026-09-16 — M4 Progress decisions (from the m4-progress slice spec, user-answered)
 
 - **History spans every program**: chart points, Best, Since start and the calendar include archived programs' sessions and
@@ -650,6 +714,18 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
   does not break it.
 
 ## Patterns
+
+### 2026-09-22 — A preference that writes by itself: one Equatable key, one synchronous pass
+When a stored preference makes the app write without a tap (m4-settings' Always shift / Always skip), the trigger is a
+task keyed on an `Equatable` struct of everything that should cause exactly one write — here
+`AutomaticActionKey(policy, firstMissedIndex, day)`, nil when there is nothing to do. `.task(id:)` then fires once per
+distinct situation: shell mount, a policy change, a new calendar day, a different first-missed session, and nothing
+else. The pass itself is synchronous with no `await`, so it cannot interleave with a second run, and the writers return
+optionals (`[Int: Date]?`, `Bool?`) so the follow-up UI names only what actually landed. Two rules learned here: such a
+path must **not** `assertionFailure` on a failed save (it runs at every launch with no user action, so a bad store would
+trap a Debug build repeatedly — the manual tap still asserts), and the key must not read anything `onAppear` writes,
+because on 26.5 the task runs first (gotchas 2026-09-22).
+React analogy: the key is the dependency array, and the effect body is deliberately sync.
 
 ### 2026-09-16 — Reading rows of another parent: query the parents, fetch children per id in a task
 A screen that must include archived programs never hops `child.parent` in `body` (~330 µs per row, uncached, on 17.5).

@@ -53,3 +53,8 @@ a point inside that band (m4-missed-day AC-15). If you start a local server to r
 edit any file other than the spec.
 
 Return the spec path, the list of open questions, and a three-line summary.
+
+Any constant you quote from code (a library default, a grid step, a stored key) is read from the file that defines it
+and cited with that file's name, never inferred from a screenshot, the prototype's rendered numbers, or another spec's
+derived value (m4-settings quoted `lowRow 80`, which was a chart point in an earlier slice's data; the real default
+is 90).

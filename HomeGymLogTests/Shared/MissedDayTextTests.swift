@@ -39,4 +39,23 @@ import Testing
         #expect(Array(MissedDayText.shift.unicodeScalars).map(\.value)[12] == 0x00B7)
         #expect(Array(MissedDayText.skip.unicodeScalars).map(\.value)[8] == 0x00B7)
     }
+
+    /// AC-16 (banner half), m4-settings spec 2.7.
+    @Test("shiftedBanner names today or the day the session landed on")
+    func shiftedBanner() {
+        #expect(MissedDayText.shiftedBanner(name: "Legs", style: .today, newDate: TestCalendar.day(2026, 9, 15), calendar: cal)
+                == "Shifted Legs to today")
+        #expect(MissedDayText.shiftedBanner(name: "Legs", style: .date, newDate: TestCalendar.day(2026, 9, 21), calendar: cal)
+                == "Shifted Legs to Mon, Sep 21")
+        #expect(MissedDayText.shiftedBanner(name: "Pull", style: .date, newDate: TestCalendar.day(2026, 9, 19), calendar: cal)
+                == "Shifted Pull to Sat, Sep 19")
+    }
+
+    @Test("skippedBanner names one session, counts several, and has no text for none")
+    func skippedBanner() {
+        #expect(MissedDayText.skippedBanner(names: ["Legs"]) == "Skipped Legs")
+        #expect(MissedDayText.skippedBanner(names: ["Legs", "Pull"]) == "Skipped 2 missed sessions")
+        #expect(MissedDayText.skippedBanner(names: ["Legs", "Pull", "Legs"]) == "Skipped 3 missed sessions")
+        #expect(MissedDayText.skippedBanner(names: []) == nil)
+    }
 }
