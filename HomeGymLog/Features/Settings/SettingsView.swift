@@ -1,7 +1,7 @@
 import SwiftUI
 import SwiftData
 
-/// The Settings tab: appearance and units, two rows reserved for later slices, the program card (current program, the
+/// The Settings tab: appearance and units, the daily reminder, one row reserved for a later slice, the program card (current program, the
 /// missed-day policy, "Build a new program…") and the read-only equipment card. The three preferences are `@AppStorage`
 /// (≈ localStorage read through a hook), so a tap is written at once and every other screen re-derives from it.
 /// The only write here is `ProgramStore.archive` behind the confirmation dialog.
@@ -13,6 +13,13 @@ struct SettingsView: View {
     @AppStorage(AppearanceMode.storageKey) private var appearanceRaw = AppearanceMode.system.rawValue
     @AppStorage("units") private var unitsRaw = WeightUnit.lb.rawValue
     @AppStorage(MissedDayPolicy.storageKey) private var policyRaw = MissedDayPolicy.ask.rawValue
+    @AppStorage(ReminderPlan.enabledKey) private var reminderEnabled = false
+    @AppStorage(ReminderPlan.minutesKey) private var reminderMinutes = ReminderPlan.defaultMinutes
+    /// The root's one permission owner (≈ a context store); the reminder host refreshes it on every scene-active.
+    @Environment(ReminderPermission.self) private var permission
+    @Environment(\.reminderNotifier) private var reminderNotifier
+    @Environment(\.openURL) private var openURL
+    @Environment(\.locale) private var locale
     @Environment(\.appClock) private var clock
     @Environment(\.modelContext) private var modelContext
     /// Nil outside a DEBUG seed; true only for `-seed settings-restart`, which opens with the dialog up.
@@ -25,6 +32,12 @@ struct SettingsView: View {
         ScrollView {
             SettingsContent(months: program.months, frequency: program.frequency,
                             appearance: appearance, units: units, policy: policy,
+                            reminderEnabled: reminderToggle, reminderTime: reminderTime,
+                            reminderSubtitle: ReminderText.rowSubtitle(state: reminderState, minutes: reminderMinutes,
+                                                                       calendar: clock.calendar, locale: locale),
+                            reminderState: reminderState,
+                            onAllowNotifications: { requestPermission() },
+                            onOpenNotificationSettings: { openURL(ReminderPermission.settingsURL) },
                             onRestart: { showsRestartConfirm = true })
         }
         .background(Theme.bg.ignoresSafeArea())
@@ -58,6 +71,29 @@ struct SettingsView: View {
         Binding(get: { MissedDayPolicy.from(raw: policyRaw) }, set: { policyRaw = $0.rawValue })
     }
 
+    /// Writes the preference at once; turning it on while the permission was never asked shows the system prompt now
+    /// (spec 2.1). The host schedules as soon as the answer lands in `permission`.
+    private var reminderToggle: Binding<Bool> {
+        Binding(get: { reminderEnabled }, set: { isOn in
+            reminderEnabled = isOn
+            if isOn && permission.status == .notDetermined { requestPermission() }
+        })
+    }
+
+    /// Minutes since midnight on one side, the picker's `Date` (today at that time) on the other.
+    private var reminderTime: Binding<Date> {
+        Binding(get: { ReminderPlan.time(minutes: reminderMinutes, on: clock.now(), calendar: clock.calendar) },
+                set: { reminderMinutes = ReminderPlan.minutes(of: $0, calendar: clock.calendar) })
+    }
+
+    private var reminderState: ReminderRowState {
+        ReminderPlan.rowState(enabled: reminderEnabled, status: permission.status)
+    }
+
+    private func requestPermission() {
+        Task { await permission.request(using: reminderNotifier) }
+    }
+
     /// One optional drives the alert, so there is never a stale flag beside a stale message.
     private var archiveAlert: Binding<Bool> {
         Binding(get: { archiveError != nil }, set: { if !$0 { archiveError = nil } })
@@ -83,5 +119,8 @@ struct SettingsView: View {
     return SettingsView(program: try! ProgramStore.current(in: container.mainContext)!, selectedTab: .constant(.settings))
         .modelContainer(container)
         .environment(\.appClock, DebugSeed.midProgram.clock(calendar: calendar))
+        // The root normally provides both; a preview must never reach the system notification center.
+        .environment(ReminderPermission())
+        .environment(\.reminderNotifier, .silent(status: .notDetermined))
 }
 #endif

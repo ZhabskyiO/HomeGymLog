@@ -1,5 +1,8 @@
 # M4 slice 4 — Daily reminder (local notification on training days, permission status in Settings): implementation plan
-**Status: draft 2026-09-23, for plan-verifier.** For `docs/specs/m4-reminder.md` (agreed; architecture B1–B3 and NB1–NB9
+**Status: done 2026-09-23, 1011 tests.** Steps 0–10 green: 917 → 1011 tests on iOS 17.5 and 26.5, Release green,
+`project.pbxproj` untouched. Step 11's scratch-copy XCUITest ran AC-8 (rest-timer coexistence) on 17.5. Swift review
+"ship after fixes" (`docs/reviews/m4-reminder-swift-review.md`), all three findings applied.
+For `docs/specs/m4-reminder.md` (agreed; architecture B1–B3 and NB1–NB9
 folded in). Spec §2–§6 and §8 are the contract (`AC-1`…`AC-19`) and are not restated. Format follows
 `docs/plans/m4-settings.md`. `implementer`: one step per build, nothing committed. Baseline: HEAD `02e3ff1`, 917 tests.
 
@@ -65,7 +68,7 @@ nonisolated enum ReminderPlan {
     static func validMinutes(_ minutes: Int) -> Int?                                        // 0…1439 else nil
 }
 ```
-`desired` applies spec 5.1 rules 1–6. The fire time is `calendar.date(byAdding: .minute, value:, to: day)`. A day is
+`desired` applies spec 5.1 rules 1–6. The fire time is wall-clock `time(minutes:on:calendar:)` (not `date(byAdding: .minute)`, which is off by an hour on DST Sundays; swift review F1). A day is
 kept only if that time is strictly after `now`.
 `HomeGymLogTests/Support/ReminderFixtures.swift` (new): `midProgramDays(completed:dates:)`: the pending days of
 `MissedDayFixtures.slots`. `freshProgramDays()`: the typed formula Mon 08-31 + 7·(i / 4) + [0, 1, 3, 4][i % 4], i < 16.
@@ -115,7 +118,7 @@ four states.
 `Shared/ReminderTextTests.swift` (`@MainActor`): en_US with `TestCalendar.calendar`: 420 → "7:00 AM on training days",
 1110 → "6:30 PM …", 0 → "12:00 AM …", 720 → "12:00 PM …". Each actual value is compared after `.replacingOccurrences(of:
 "\u{202F}", with: " ")` and then of `"\u{00A0}"` with `" "`. iOS 17+ may place U+202F before AM/PM; this is unverified, and this run settles it (F6). en_GB
-420 contains "07:00" and " on training days". 1440 and −1 give the 420 text. `rowSubtitle` is checked for all four
+420 contains "7:00" (no AM/PM) and " on training days" (implementation deviation 1: 17.5 formats "7:00"). 1440 and −1 give the 420 text. `rowSubtitle` is checked for all four
 states. Every fixed string is compared against a typed literal.
 Verify: `BUILD && ONLY ReminderTextTests SettingsTextTests ClockUsageTests`. **AC-12.**
 ### Step 4 — The notification seam, its recorder, the `@Entry`

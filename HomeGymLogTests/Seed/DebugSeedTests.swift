@@ -19,6 +19,7 @@ import Testing
         case .woDetail, .woSwap, .woSwapRDL, .woNotes: expectedDay = TestCalendar.day(2026, 9, 15)
         case .progressHistory: expectedDay = TestCalendar.day(2026, 9, 15)
         case .settingsRestart, .restarted: expectedDay = TestCalendar.day(2026, 9, 15)
+        case .reminderOn, .reminderDenied, .reminderUnasked: expectedDay = TestCalendar.day(2026, 9, 15)
         case .restDay: expectedDay = TestCalendar.day(2026, 9, 19)
         case .freshProgram: expectedDay = TestCalendar.day(2026, 8, 31)
         default: expectedDay = TestCalendar.day(2026, 8, 31)
@@ -77,7 +78,8 @@ import Testing
         #expect(DebugSeed.midProgram.initialDraft(calendar: cal) == nil)
         #expect(DebugSeed.restDay.initialDraft(calendar: cal) == nil && DebugSeed.freshProgram.initialDraft(calendar: cal) == nil)
         for seed in [DebugSeed.woStart, .woSwipe, .woRPE, .woAdjust, .woRest, .summary, .woDetail, .woSwap, .woSwapRDL, .woNotes,
-                     .missed, .missedSeveral, .missedShifted, .missedSkipped, .progressHistory, .settingsRestart, .restarted] {
+                     .missed, .missedSeveral, .missedShifted, .missedSkipped, .progressHistory, .settingsRestart, .restarted,
+                     .reminderOn, .reminderDenied, .reminderUnasked] {
             #expect(seed.initialDraft(calendar: cal) == nil, "\(seed.rawValue)")
         }
         let missedFamily: [DebugSeed] = [.missed, .missedSeveral, .missedShifted, .missedSkipped]

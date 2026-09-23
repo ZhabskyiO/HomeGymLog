@@ -31,6 +31,16 @@ session start, so nothing here depends on it.
     remounts per branch); "no program" queries on a null UUID; the root passes `workoutInProgress: Bool`, never
     `activeLogs.first?.session` in root `body` (26.5 delete trap) (B3).
   - Reconcile key = (enabled, minutes, status, activeTick, all pending days); two passes at cold launch are expected.
+- **Implemented 2026-09-23** (branch `m4-reminder`): 1011 tests on iOS 17.5 and 26.5, Release green, swift review "ship
+  after fixes" with all three applied (`docs/reviews/m4-reminder-swift-review.md`). Implementation notes: `en_GB`
+  formats the subtitle time as "7:00", not "07:00" (gotchas Swift language); the fire-time check must build a
+  wall-clock time (`ReminderPlan.time(minutes:on:calendar:)`), not add elapsed minutes to midnight, or it disagrees
+  with the request's own components by an hour on the two DST days (F1); `ReminderPermission`'s generation counter is
+  bumped both before a request's await and after its answer lands, so a refresh that started while the system prompt
+  was up cannot win with a stale read (F2); an `extension` of a `nonisolated` type does not inherit that
+  `nonisolated`, so its members need the keyword again under the target's default `MainActor` isolation
+  (`ReminderPlan`'s extension); the root-mounted, non-drawing host as a `.background` of the route `ZStack` was
+  verified live, not only by static analysis (architecture P2).
 
 ### 2026-09-22 — M4 Settings decisions (from the m4-settings slice spec, user-answered)
 

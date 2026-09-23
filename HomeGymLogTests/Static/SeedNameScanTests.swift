@@ -9,7 +9,8 @@ import Testing
                                 "\"wo-detail\"", "\"wo-swap\"", "\"wo-swap-rdl\"", "\"wo-notes\"",
                                 "\"missed-several\"", "\"missed-shifted\"", "\"missed-skipped\"",
                                 "\"progress-history\"", "\"-progressExercise\"",
-                                "\"settings-restart\"", "\"restarted\"", "\"-holdBanner\""]
+                                "\"settings-restart\"", "\"restarted\"", "\"-holdBanner\"",
+                                "\"reminder-on\"", "\"reminder-denied\"", "\"reminder-unasked\""]
 
     /// `<repo>/HomeGymLog`, derived from `<repo>/HomeGymLogTests/Static/…`.
     private static var appSourceRoot: URL {

@@ -23,6 +23,9 @@ extension EnvironmentValues {
     /// DEBUG seed branch and the workout `#Preview` override it with the silent notifier (seeds and previews must never
     /// touch the system center).
     @Entry var restNotifier: RestNotifier = .live()
+    /// Reads the notification permission and reconciles the daily reminders. Live by default; only the root's DEBUG seed
+    /// branch and the Settings and shell `#Preview`s override it with `.silent(status:)`.
+    @Entry var reminderNotifier: ReminderNotifier = .live()
     /// Nil in every Release build and in any launch without the debug arguments; only the root's `#if DEBUG`
     /// block ever sets it. Analogy: a context value a test harness may provide, undefined in production.
     @Entry var programTabPreselection: ProgramTabPreselection? = nil

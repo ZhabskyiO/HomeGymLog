@@ -1,6 +1,10 @@
 # M4 slice 4 — Daily reminder (local notification on training days, permission status in Settings)
 
-**Status: agreed 2026-09-23** (open questions Q1–Q5 all answered **A**, INSIGHTS "2026-09-23 — M4 reminder decisions"; architecture review
+**Status: done 2026-09-23, 1011 tests** (1011 tests on iOS 17.5 and 26.5, Release green; AC-8 rest-timer coexistence verified by a
+scratch-copy XCUITest on 17.5; swift review "ship after fixes" (`docs/reviews/m4-reminder-swift-review.md`), all three findings applied —
+F1 the fire-time check now uses the wall-clock helper the picker already used, F2 the permission generation is bumped again after a
+request's answer, F3 a closure constant became a nested function; pending the user's MVP pass: AC-5–AC-7 and AC-9 device/VoiceOver checks,
+AC-16–AC-19, AC-8(c) a real rest timer in the background). Agreed 2026-09-23 (open questions Q1–Q5 all answered **A**, INSIGHTS "2026-09-23 — M4 reminder decisions"; architecture review
 `docs/reviews/m4-reminder-architecture.md` applied: B1–B3 and NB1–NB9, marked inline). Branch `m4-reminder`. Depends on `m4-settings` (merged 2026-09-22), whose spec owns the Settings screen
 (`docs/specs/m4-settings.md`, not restated). Sources: prototype markup 247 (the Daily reminder row: label, subtitle `reminderDesc`,
 toggle) and script 568 (`reminder:true` default), 704 (`reminderDesc = reminder ? '7:00 AM on training days' : 'Off'`); the prototype has
@@ -170,7 +174,7 @@ braces, gotchas 2026-09-22). Only the three reminder seeds write the keys. No ne
 1. `minutes = validMinutes(minutes) ?? defaultMinutes` (total, B2). 2. `enabled == false` or `!status.canSchedule` → `[]`. 3. `today =
 startOfDay(now)`; keep each `startOfDay(sessionDay)` ≥ `today`, de-duplicated, ascending; **while `workoutInProgress`, drop `today`** (B3d:
 in v1 the open workout's session is always today's — startable = today's pending or a missed one, and a shifted one lands on today — so no
-banner fires over the workout). 4. For each day, `fire = day + minutes` (calendar minute arithmetic); drop it unless `fire > now`. 5. Take
+banner fires over the workout). 4. For each day, `fire` = wall-clock `minutes` on `day` (`ReminderPlan.time(minutes:on:calendar:)`, hour/minute set on the day, never `day + minutes` elapsed: on a DST Sunday elapsed minutes read 06:00 or 08:00 for 07:00, swift review 2026-09-23); drop it unless `fire > now`. 5. Take
 the first `window` (30). 6. Each → `ReminderRequest(identifier: "reminder-" + dayKey(day), dateComponents: calendar's year/month/day of `day` + hour `minutes / 60`, minute `minutes % 60`, no time zone)`.
 Total: any input order, any duplicates, empty input → `[]`; never throws, never traps.
 
@@ -215,7 +219,7 @@ in order: `guard !Task.isCancelled`; `add(request)` (same id replaces; never a f
 offsets) at `minutes`, formatted with `Date.FormatStyle(date: .omitted, time: .shortened, locale: locale, calendar: calendar, timeZone:
 calendar.timeZone)` (NB2: the style's default zone is the process zone, while `TestCalendar` is America/New_York, so the calendar and its zone
 are passed explicitly and the test is host-independent; researcher Q7 for the shortened style). en_US: 420 → "7:00 AM on training days"; 1110 → "6:30 PM on training days"; 0 → "12:00 AM …"; 720 → "12:00 PM …";
-en_GB: 420 → "07:00 on training days" (24-hour, locale-owned: the test pins en_US and asserts en_GB only contains "on training days"). On iOS 17+
+en_GB: 420 → "7:00 on training days" (24-hour, no leading zero, measured on 17.5 during implementation 2026-09-23; locale-owned: the test pins en_US and asserts en_GB only contains "on training days"). On iOS 17+
 the space before AM/PM may be U+202F (narrow no-break space); the test normalises U+202F and U+00A0 to a plain space before comparing (F6). Invalid
 minutes → formatted as 420 (`validMinutes` fallback; the text helper never throws).
 
@@ -308,7 +312,7 @@ the m4-settings recipe, 800×290 @ (2555, 4148) on the 5600 render; every launch
     await adds nothing (the recorder holds `pendingIdentifiers`, the test cancels, then releases: `added == []`); `reconcile` never calls
     `requestAuthorization`; `.silent(status: .denied).status()` returns denied and its `reconcile` records nothing.
 12. `ReminderText`: `subtitle` for 420 / 1110 / 0 / 720 in en_US with `TestCalendar.calendar` (5.3; host-independent because the style takes the
-    calendar and its zone; spaces normalised per 5.3 before comparing), en_GB 420 contains "07:00" and "on training days"; invalid minutes → the
+    calendar and its zone; spaces normalised per 5.3 before comparing), en_GB 420 contains "7:00" (no AM/PM; implementation measured "7:00", not "07:00") and "on training days"; invalid minutes → the
     420 text;
     every fixed string verbatim ("Off", "Notifications are off in iOS Settings", "Notifications not allowed yet", "Reminder time",
     "Open iOS Settings", "Allow notifications", "Training day", "Your workout is planned for today.").

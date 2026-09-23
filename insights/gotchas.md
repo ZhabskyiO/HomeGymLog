@@ -158,6 +158,23 @@ are kept as history.
 
 ## Swift language
 
+- 2026-09-23 — **Members declared in an `extension` of a `nonisolated` type do not inherit `nonisolated`**: under the
+  app target's MainActor default isolation they are main-actor, which surfaced as `[#ActorIsolatedCall]` once the type's
+  `nonisolated` `desired` called `time(minutes:on:calendar:)` from the extension (m4-reminder). Fix: mark each extension
+  member `nonisolated static func`. Recognize it: an Engine helper that warns only when called from another Engine member.
+- 2026-09-23 — **`calendar.date(byAdding: .minute, value: m, to: startOfDay)` is elapsed time, not a wall-clock time**: on a
+  DST day it lands an hour off (fall-back: 420 min after midnight is 06:00 local; spring-forward: 08:00), so
+  `ReminderPlan.desired` judged "today's 07:00 has passed" wrongly (swift review F1, caught by `ReminderPlanZoneTests`
+  in America/New_York). Fix: build wall-clock times with `calendar.date(bySettingHour:minute:second:of:)`
+  (`ReminderPlan.time(minutes:on:calendar:)`). Recognize it: a time-of-day rule that fails only on the two DST dates.
+
+- 2026-09-23 — **`Date.FormatStyle(date: .omitted, time: .shortened)` puts U+202F before AM/PM in en_US and gives "7:00", not
+  "07:00", in en_GB** (iOS 17.5 simulator test host, probed with a failing `#expect` listing the scalars: en_US
+  `37 3a 30 30 202f 41 4d`, en_GB `37 3a 30 30`; 26.5 passes the same assertions). The m4-reminder spec expected "07:00";
+  the compact `DatePicker` does show "07:00" in en_GB, so the picker and the style disagree. Fix (tests): normalise U+202F
+  and U+00A0 to a space, and assert en_GB by "7:00" plus no day period. Recognize it: a locale test that fails on a
+  literal that looks identical, or a 24-hour string with no leading zero.
+
 - 2026-09-22 — **A `.task` closure reads `@Environment` values captured at task start**: an env value logged after an `await`
   was stale for the whole run (probe). Read it in `body` or via `onChange`, never after an `await` (≈ a stale closure in
   `useEffect`).
@@ -332,6 +349,12 @@ are kept as history.
 
 ## User notifications
 
+- 2026-09-23 — **Verified live (scratch-copy XCUITest, 17.5): the root-mounted reminder host works as a `.background` of the
+  route `ZStack`**: at launch it scheduled 30 `reminder-*` requests beside a planted `rest-timer` (31 pending); the reminder
+  fired in the foreground as a SpringBoard banner "HOMEGYMLOG, now, Training day, Your workout is planned for today."; a
+  home-press + `activate()` reconcile removed the delivered reminder, refilled the window to 30 and left `rest-timer`
+  pending; a `rest-timer` firing in the foreground showed no banner. Seed launches never reach the center (silent notifier).
+
 - 2026-09-14 — **`UNUserNotificationCenter.add` before authorization is silently dropped**: no error, nothing pending,
   never delivered (17.5 and 26.5). Await `requestAuthorization` first and compute the trigger interval *after* that
   await; the permission prompt delayed one probe's notification by 2.5 s.
@@ -360,6 +383,12 @@ are kept as history.
   `test-without-building` ran a stale binary after a silent build error: build first, check its exit.
 
 ## Xcode / build
+
+- 2026-09-23 — **A `-only-testing` run whose test failed never exited once**: the Swift Testing summary ("Test run with 13
+  tests … failed") was printed, then `xcodebuild` sat for 10 minutes without "** TEST FAILED **" (17.5, parallel testing
+  off); a later identical failing run exited normally. Guard focused runs with a watchdog
+  (`(ONLY … & PID=$!; (sleep 500; kill $PID) & wait $PID)`) and read `build/last-test.log` for the result. Recognize it: a
+  run past its timeout whose log already ends with the Swift Testing summary line.
 
 - 2026-09-22 — **The throwaway `seed` preferences suite can survive a launch**: after a run with `-appearance light`, later
   seeded launches read `appearance = light` even though the root calls `removePersistentDomain(forName: "seed")` at start

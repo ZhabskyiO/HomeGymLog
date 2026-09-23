@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Lays out the Settings tab from plain values and three preference bindings (spec 2.1–2.4). Nothing here reads the store,
+/// Lays out the Settings tab from plain values and the preference bindings (spec 2.1–2.4). Nothing here reads the store,
 /// the clock or `UserDefaults`: a tap moves the binding the screen owns.
 struct SettingsContent: View {
     /// Immutable fields of the current program, for the Current row.
@@ -9,6 +9,14 @@ struct SettingsContent: View {
     @Binding var appearance: AppearanceMode
     @Binding var units: WeightUnit
     @Binding var policy: MissedDayPolicy
+    /// The Daily reminder rows' inputs (m4-reminder spec 2.1): the two preferences, the formatted subtitle, the row state
+    /// and the two permission actions.
+    @Binding var reminderEnabled: Bool
+    @Binding var reminderTime: Date
+    let reminderSubtitle: String
+    let reminderState: ReminderRowState
+    let onAllowNotifications: () -> Void
+    let onOpenNotificationSettings: () -> Void
     let onRestart: () -> Void
 
     var body: some View {
@@ -40,7 +48,8 @@ struct SettingsContent: View {
                                 selection: $units, style: .settings)
             }
             SettingsDivider()
-            SettingsComingSoonRow(label: SettingsText.reminder)
+            ReminderRows(enabled: $reminderEnabled, time: $reminderTime, subtitle: reminderSubtitle, state: reminderState,
+                         onAllow: onAllowNotifications, onOpenSettings: onOpenNotificationSettings)
             SettingsDivider()
             SettingsComingSoonRow(label: SettingsText.haptics)
         }
