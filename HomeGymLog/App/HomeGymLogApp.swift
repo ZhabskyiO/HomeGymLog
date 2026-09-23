@@ -1,11 +1,15 @@
 import SwiftUI
 import SwiftData
+import UserNotifications
 
 /// App entry point. Builds the SwiftData container once into a `Result` so a failure to open the store can be
 /// shown instead of trapping (debug builds still crash, loudly). A DEBUG `-seed` launch swaps in an in-memory
-/// container, a throwaway preferences suite, a frozen clock and a silent rest notifier; everything below the root is identical.
+/// container, a throwaway preferences suite, a frozen clock and silent rest and reminder notifiers; everything below the root is identical.
 @main
 struct HomeGymLogApp: App {
+    /// Retained here because the notification center holds its delegate weakly. Installed unconditionally, seeds included:
+    /// it only decides foreground presentation and never reads, prompts or schedules.
+    private let notificationDelegate = AppNotificationDelegate()
     private let containerResult: Result<ModelContainer, Error>
     private let clock: AppClock
     private let defaults: UserDefaults
@@ -22,12 +26,15 @@ struct HomeGymLogApp: App {
     /// Nil except a DEBUG `-seed` launch, which silences rest notifications; every other launch keeps the environment's
     /// live default.
     private let restNotifier: RestNotifier?
+    /// Nil except a DEBUG `-seed` launch, which fixes the permission status and never touches the notification center.
+    private let reminderNotifier: ReminderNotifier?
     /// Nil except `-seed settings-restart`, which opens Settings with its restart confirmation already up.
     private let settingsRestartPreview: Bool?
     /// Nil unless a DEBUG launch argument holds the missed-action banner up (`App/DebugSeed/DebugBannerHold.swift`).
     private let missedBannerHold: Bool?
 
     init() {
+        UNUserNotificationCenter.current().delegate = notificationDelegate   // before launch finishes, so a tap-launch reaches it
         let live = AppClock.live()   // the only place the real clock is read
         // Plain locals decided first; the seed branch below only exists in Debug builds.
         var makeContainer: () throws -> ModelContainer = { try AppSchema.makeContainer(inMemory: false) }
@@ -41,6 +48,7 @@ struct HomeGymLogApp: App {
         var missedPromptEnabled: Bool? = nil
         var progressPreselection: String? = nil
         var restNotifier: RestNotifier? = nil
+        var reminderNotifier: ReminderNotifier? = nil
         var settingsRestartPreview: Bool? = nil
         var missedBannerHold: Bool? = nil
         #if DEBUG
@@ -48,6 +56,10 @@ struct HomeGymLogApp: App {
             if let seed = try DebugSeed.parse(arguments: ProcessInfo.processInfo.arguments) {
                 let suite = UserDefaults(suiteName: "seed")!
                 suite.removePersistentDomain(forName: "seed")
+                if let reminder = seed.reminderPreferences {
+                    suite.set(reminder.enabled, forKey: ReminderPlan.enabledKey)
+                    suite.set(reminder.minutes, forKey: ReminderPlan.minutesKey)
+                }
                 defaults = suite
                 clock = seed.clock(calendar: live.calendar)
                 seedDraft = seed.initialDraft(calendar: live.calendar)
@@ -57,6 +69,7 @@ struct HomeGymLogApp: App {
                 missedPromptEnabled = seed.forcesMissedDayPrompt
                 settingsRestartPreview = seed.settingsRestartPreview
                 restNotifier = .silent()   // seeds freeze the clock: screenshot-only, never a real notification
+                reminderNotifier = .silent(status: seed.reminderStatus)
             }
             // Outside the seed branch: the selection arguments work on their own too.
             preselection = DebugProgramSelection.parse(arguments: ProcessInfo.processInfo.arguments)
@@ -78,6 +91,7 @@ struct HomeGymLogApp: App {
         self.missedPromptEnabled = missedPromptEnabled
         self.progressPreselection = progressPreselection
         self.restNotifier = restNotifier
+        self.reminderNotifier = reminderNotifier
         self.settingsRestartPreview = settingsRestartPreview
         self.missedBannerHold = missedBannerHold
         #if DEBUG
@@ -106,6 +120,9 @@ struct HomeGymLogApp: App {
                     // ≈ a provider that overrides a context value only when a prop is set; otherwise the live default stays.
                     .transformEnvironment(\.restNotifier) { value in
                         if let override = restNotifier { value = override }
+                    }
+                    .transformEnvironment(\.reminderNotifier) { value in
+                        if let override = reminderNotifier { value = override }
                     }
             case .failure(let error):
                 StoreErrorView(error: error)

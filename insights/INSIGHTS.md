@@ -8,6 +8,40 @@ session start, so nothing here depends on it.
 
 ## Architecture decisions
 
+### 2026-09-23 — M4 reminder decisions (from the m4-reminder slice spec, user-answered)
+
+- **Daily reminder is off on a fresh install**; turning the toggle on asks for notification permission in context
+  (no prompt at first launch). Prefs: `@AppStorage` `reminderEnabled` (Bool) and `reminderMinutes` (Int, default 420).
+- **The time is editable**: a "Reminder time" row with a compact `DatePicker(.hourAndMinute)` under the toggle (the one
+  deviation from the prototype's `settings` snapshot).
+- **Denied**: the toggle stays on; subtitle "Notifications are off in iOS Settings" plus an "Open iOS Settings" row
+  (`openNotificationSettingsURLString`); reminders resume without another tap once allowed.
+- **Wording is generic**: "Training day" / "Your workout is planned for today." No session name, nothing personal.
+- **Delivered reminders are cleared** from Notification Center on every reconcile (as the rest notifier clears "Rest over").
+- Shape (researcher): one non-repeating calendar trigger per pending session day, ids `reminder-YYYY-MM-DD`, window 30,
+  pure `ReminderPlan.desired` in Engine, reconciled from one root `.task(id:)`; `AppNotificationDelegate` installed and
+  retained in `App.init` shows `reminder-*` in the foreground and returns `[]` for `rest-timer`. Rest days never notify;
+  today's reminder drops once today's session is completed, skipped or in progress. No entitlement, plist key or schema change.
+- **Architecture review (2026-09-23, approve with changes)**:
+  - **One owner for notification permission status**: `@Observable ReminderPermission` created at the root and put in
+    the environment; the reconcile host keys on it, Settings calls `request(using:)` with its environment notifier; a generation rule drops a stale `refresh` (B1, plan F1). No reliance on the permission alert
+    cycling `scenePhase`.
+  - **Engine over stored preferences is total**: `ReminderPlan.desired` never throws; invalid minutes fall back to 420 (B2).
+  - **A root-mounted non-drawing host is a `.background` of a `ZStack` wrapping the route `Group`** (on the `Group` it
+    remounts per branch); "no program" queries on a null UUID; the root passes `workoutInProgress: Bool`, never
+    `activeLogs.first?.session` in root `body` (26.5 delete trap) (B3).
+  - Reconcile key = (enabled, minutes, status, activeTick, all pending days); two passes at cold launch are expected.
+- **Implemented 2026-09-23** (branch `m4-reminder`): 1011 tests on iOS 17.5 and 26.5, Release green, swift review "ship
+  after fixes" with all three applied (`docs/reviews/m4-reminder-swift-review.md`). Implementation notes: `en_GB`
+  formats the subtitle time as "7:00", not "07:00" (gotchas Swift language); the fire-time check must build a
+  wall-clock time (`ReminderPlan.time(minutes:on:calendar:)`), not add elapsed minutes to midnight, or it disagrees
+  with the request's own components by an hour on the two DST days (F1); `ReminderPermission`'s generation counter is
+  bumped both before a request's await and after its answer lands, so a refresh that started while the system prompt
+  was up cannot win with a stale read (F2); an `extension` of a `nonisolated` type does not inherit that
+  `nonisolated`, so its members need the keyword again under the target's default `MainActor` isolation
+  (`ReminderPlan`'s extension); the root-mounted, non-drawing host as a `.background` of the route `ZStack` was
+  verified live, not only by static analysis (architecture P2).
+
 ### 2026-09-22 — M4 Settings decisions (from the m4-settings slice spec, user-answered)
 
 - **Appearance** = `@AppStorage("appearance")` (System / Dark / Light, default System) read in `RootView`, applied as
@@ -714,6 +748,13 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
   does not break it.
 
 ## Patterns
+
+### 2026-09-23 — Derived notification schedule (m4-reminder researcher)
+A set of dated local notifications is a pure function of state (pending session days, enabled, time, permission,
+today): compute the desired `[id: DateComponents]` in Engine, then from one root `.task(id:)` keyed on those inputs
+remove pending ids with the feature's prefix that are not desired and add every desired one (same id replaces). ≈ a
+React effect that reconciles an external system to derived state. One delegate, installed and retained in `App.init`,
+decides foreground presentation by id prefix. Report: `docs/reviews/m4-reminder-researcher.md`.
 
 ### 2026-09-22 — A preference that writes by itself: one Equatable key, one synchronous pass
 When a stored preference makes the app write without a tap (m4-settings' Always shift / Always skip), the trigger is a

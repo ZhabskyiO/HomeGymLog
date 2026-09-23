@@ -52,5 +52,8 @@ struct ShellView: View {
     return ShellView(program: try! ProgramStore.current(in: container.mainContext)!, selected: .constant(.home))
         .modelContainer(container)
         .environment(\.appClock, DebugSeed.midProgram.clock(calendar: calendar))
+        // The root normally provides both; a preview must never reach the system notification center.
+        .environment(ReminderPermission())
+        .environment(\.reminderNotifier, .silent(status: .notDetermined))
 }
 #endif

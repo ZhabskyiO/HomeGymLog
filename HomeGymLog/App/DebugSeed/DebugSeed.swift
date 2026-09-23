@@ -6,6 +6,12 @@ enum DebugSeedError: Error, Equatable {
     case unknownSeed(String)
 }
 
+/// The daily-reminder preference pair a reminder seed stores (`reminderEnabled`, `reminderMinutes`).
+struct ReminderSeedPreferences: Equatable {
+    let enabled: Bool
+    let minutes: Int
+}
+
 /// Launch-argument seeds mirroring the prototype's Tweaks, so `/design-compare` can reach every screen.
 /// `xcrun simctl launch <udid> <bundle> -seed ob3`. Compiled out of Release (this whole file is `#if DEBUG`).
 /// A seeded run uses an in-memory store, a throwaway preferences suite, a frozen clock and a silent rest notifier.
@@ -55,6 +61,15 @@ enum DebugSeed: String, CaseIterable {
     /// `midProgram` data archived Tue 2026-09-15 11:59 with no current program: the root shows onboarding at A2, prefilled
     /// from the archived row.
     case restarted = "restarted"
+    /// `midProgram` data with the daily reminder on at 07:00 and notifications allowed: Settings shows "7:00 AM on training
+    /// days" and the Reminder time row.
+    case reminderOn = "reminder-on"
+    /// `midProgram` data with the reminder on and notifications denied: "Notifications are off in iOS Settings" and the
+    /// "Open iOS Settings" row.
+    case reminderDenied = "reminder-denied"
+    /// `midProgram` data with the reminder on and permission never asked: "Notifications not allowed yet" and the "Allow
+    /// notifications" row.
+    case reminderUnasked = "reminder-unasked"
 
     /// nil when no `-seed` is present; throws for an unknown name or a trailing `-seed` with no value.
     static func parse(arguments: [String]) throws -> DebugSeed? {
@@ -72,6 +87,7 @@ enum DebugSeed: String, CaseIterable {
              .woDetail, .woSwap, .woSwapRDL, .woNotes, .progressHistory:
             day = DateComponents(year: 2026, month: 9, day: 15, hour: 12)
         case .settingsRestart, .restarted: day = DateComponents(year: 2026, month: 9, day: 15, hour: 12)
+        case .reminderOn, .reminderDenied, .reminderUnasked: day = DateComponents(year: 2026, month: 9, day: 15, hour: 12)
         case .missedSeveral: day = DateComponents(year: 2026, month: 9, day: 17, hour: 12)
         case .restDay: day = DateComponents(year: 2026, month: 9, day: 19, hour: 12)
         case .freshProgram: day = DateComponents(year: 2026, month: 8, day: 31, hour: 12)
@@ -95,7 +111,7 @@ enum DebugSeed: String, CaseIterable {
             return draft
         case .midProgram, .missed, .missedSeveral, .missedShifted, .missedSkipped, .restDay, .freshProgram, .woStart, .woSwipe,
              .woRPE, .woAdjust, .woRest, .summary, .woDetail, .woSwap, .woSwapRDL, .woNotes, .progressHistory,
-             .settingsRestart, .restarted:
+             .settingsRestart, .restarted, .reminderOn, .reminderDenied, .reminderUnasked:
             return nil
         }
     }
@@ -104,7 +120,7 @@ enum DebugSeed: String, CaseIterable {
     func makeContainer(calendar: Calendar) throws -> ModelContainer {
         let container = try AppSchema.makeContainer(inMemory: true)
         switch self {
-        case .midProgram, .missed, .missedSeveral, .settingsRestart:
+        case .midProgram, .missed, .missedSeveral, .settingsRestart, .reminderOn, .reminderDenied, .reminderUnasked:
             try MidProgramSeed.populate(in: container.mainContext, calendar: calendar)
         case .restarted:
             try RestartSeed.populate(in: container.mainContext, calendar: calendar)
@@ -162,6 +178,28 @@ enum DebugSeed: String, CaseIterable {
         case .woDetail: return .detail
         case .woSwap, .woSwapRDL: return .swap
         default: return nil
+        }
+    }
+
+    /// The permission status the seed's silent reminder notifier reports (m4-reminder spec 4.4); not determined for every
+    /// seed outside the reminder family.
+    var reminderStatus: ReminderAuthorization {
+        switch self {
+        case .reminderOn: return .authorized
+        case .reminderDenied: return .denied
+        case .reminderUnasked: return .notDetermined
+        default: return .notDetermined
+        }
+    }
+
+    /// The two reminder preferences the root writes into the throwaway suite (on, 07:00) for the three reminder seeds; nil
+    /// for every other seed, which keeps the defaults (off, 07:00).
+    var reminderPreferences: ReminderSeedPreferences? {
+        switch self {
+        case .reminderOn, .reminderDenied, .reminderUnasked:
+            return ReminderSeedPreferences(enabled: true, minutes: ReminderPlan.defaultMinutes)
+        default:
+            return nil
         }
     }
 

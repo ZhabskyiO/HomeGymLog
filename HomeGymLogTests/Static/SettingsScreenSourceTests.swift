@@ -44,17 +44,41 @@ import Testing
         return members
     }
 
-    @Test("the four Settings files are scanned")
+    @Test("the five Settings files are scanned")
     func filesScanned() throws {
         let files = try Self.settingsFiles()
-        #expect(files.map(\.path) == ["RestartAction.swift", "SettingsContent.swift", "SettingsRows.swift", "SettingsView.swift"])
+        #expect(files.map(\.path) == ["ReminderRows.swift", "RestartAction.swift", "SettingsContent.swift", "SettingsRows.swift",
+                                      "SettingsView.swift"])
     }
 
-    @Test("the preferences card lists Appearance, Units, Daily reminder, Sound & haptics in that order")
+    @Test("the preferences card lists Appearance, Units, the Daily reminder rows, Sound & haptics in that order")
     func preferencesRowOrder() throws {
-        let members = Self.textMembers(in: try Self.codeLines("Features/Settings/SettingsContent.swift"))
-        let group = ["appearance", "units", "reminder", "haptics"]
-        #expect(members.filter { group.contains($0) } == group)
+        let lines = try Self.codeLines("Features/Settings/SettingsContent.swift")
+        let tokens = ["SettingsText.appearance", "SettingsText.units", "ReminderRows(", "SettingsText.haptics"]
+        let indexes = try tokens.map { token in try #require(lines.firstIndex { $0.contains(token) }, "\(token)") }
+        #expect(indexes == indexes.sorted())
+        #expect(Set(indexes).count == tokens.count)
+    }
+
+    @Test("the reminder rows read no stored value, store or clock, and draw toggle, divider, then the second row")
+    func reminderRowsShape() throws {
+        let lines = try Self.codeLines("Features/Settings/ReminderRows.swift")
+        let code = lines.joined(separator: "\n")
+        for forbidden in ["@AppStorage", "modelContext", "appClock"] {
+            #expect(code.contains(forbidden) == false, "\(forbidden)")
+        }
+        for required in ["SettingsText.reminder", "ReminderText.timeLabel", "ReminderText.openSettings", "ReminderText.allow",
+                         ".hourAndMinute", ".labelsHidden()"] {
+            #expect(code.contains(required), "\(required)")
+        }
+        #expect(lines.filter { $0.contains("SettingsDivider()") }.count == 1)
+        let toggle = try #require(lines.firstIndex { $0.contains("Toggle(") })
+        let divider = try #require(lines.firstIndex { $0.contains("SettingsDivider()") })
+        let secondRow = try #require(lines.firstIndex { line in
+            ["ReminderText.timeLabel", "ReminderText.openSettings", "ReminderText.allow"].contains { line.contains($0) }
+        })
+        #expect(toggle < divider)
+        #expect(divider < secondRow)
     }
 
     @Test("the program card lists Current, Missed a day, Build a new program… in that order")
@@ -82,7 +106,7 @@ import Testing
     func dividerCount() throws {
         let lines = try Self.codeLines("Features/Settings/SettingsContent.swift")
         let dividers = lines.filter { $0.contains("SettingsDivider()") }.count
-        #expect(dividers == 7, "4 preference rows + 3 program rows + 3 equipment rows = 7 gaps")
+        #expect(dividers == 7, "4 preference rows + 3 program rows + 3 equipment rows = 7 gaps (the reminder's own divider is in ReminderRows)")
     }
 
     @Test("no Settings file types a user-visible string: every one comes from SettingsText or an enum label")
@@ -93,8 +117,12 @@ import Testing
         }
     }
 
-    @Test("the two reserved rows are a switch that is off and disabled, never a stored preference")
+    @Test("the one reserved row (Sound & haptics) is a switch that is off and disabled, never a stored preference")
     func comingSoonRowsAreInert() throws {
+        let content = try Self.codeLines("Features/Settings/SettingsContent.swift")
+        let reserved = content.filter { $0.contains("SettingsComingSoonRow(") }
+        #expect(reserved.count == 1)
+        #expect(reserved.first?.contains("SettingsText.haptics") == true)
         let lines = try Self.codeLines("Features/Settings/SettingsRows.swift")
         let code = lines.joined(separator: "\n")
         #expect(code.contains("struct SettingsComingSoonRow"))

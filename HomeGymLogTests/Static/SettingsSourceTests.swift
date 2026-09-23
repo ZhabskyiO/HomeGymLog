@@ -77,4 +77,12 @@ import Testing
         #expect(root.lines.contains { $0.contains("FetchDescriptor") } == false)
         #expect(root.lines.contains { $0.contains("ProgressSnapshotBuilder.archivedProgramPredicate") })
     }
+
+    @Test("UIApplication is named only by RootView and ReminderPermission (App layer, NB3)")
+    func uiApplicationStaysInApp() throws {
+        let all = try Self.sources()
+        #expect(all.count > 40, "the whole app target was scanned")
+        let files = Array(Set(Self.hits("UIApplication.", in: all).map(\.path))).sorted()
+        #expect(files == ["App/ReminderPermission.swift", "App/RootView.swift"])
+    }
 }

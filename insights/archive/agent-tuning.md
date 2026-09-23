@@ -5,6 +5,16 @@ Moved out of `INSIGHTS.md` on 2026-09-16 to keep session and agent reads small. 
 
 ## Agent tuning
 
+- 2026-09-23 — **spec-creator**: m4-reminder's first spec left seven gaps the planner found (a root `@State` object
+  calling an environment notifier, a calendar-less seam building date components, a row formatting a time without a
+  calendar or locale, an AC count already false in current code), wrote the DST-wrong fire-time rule ("day + minutes")
+  that survived architecture review and two verifier rounds until the swift review and test-writer caught it, and
+  required "validation throws" that contradicted the stored-values-are-total decision. Edits: signatures checked from
+  their call site with those three examples; AC source counts grepped first; DST days in the edge-case list with
+  wall-clock vs elapsed stated; stored-value functions total, only caller arguments throw.
+- 2026-09-23 — **test-writer** (worked well): briefed with a concrete gap list (DST days, other zones, reconcile order,
+  cancellation, delegate by prefix), it found the DST bug independently of the swift review and flagged two tests that
+  could not fail. Keep briefing it with named gap candidates rather than "find gaps".
 - 2026-09-22 — **implementation-planner**: added a paragraph requiring every number copied into a plan (crop, library
   default, test literal) to come from the file that owns it, and a spec number that disagrees with code to be reported
   as a finding. Both m4-settings `sips` crops arrived transposed (a blank band) and the spec's `lowRow 80` was an
@@ -227,6 +237,9 @@ Moved out of `INSIGHTS.md` on 2026-09-16 to keep session and agent reads small. 
 
 ### Skill tuning
 
+- 2026-09-23 — **milestone** (no edit): the researcher returns suggested gotchas and INSIGHTS lines by design; the
+  m4-reminder brief asked it to append them itself, which it did not. Step 3's "Record findings that matter in
+  `insights/`" already puts that on the main session; briefs should not ask the researcher to write insights.
 - 2026-09-22 — **ship-check**: step 4 now (a) hands the reviewer the implementer's deviation list and which ACs it
   machine-checked on which runtimes — the m4-settings review spent a finding asking what the implementer's report had
   already answered — and (b) states in bold that the test-writer must finish before the implementer is resumed, with

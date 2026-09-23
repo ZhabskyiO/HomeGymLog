@@ -33,4 +33,10 @@ enum HomeSnapshotBuilder {
     static func fingerprint(of rows: [PlannedSession]) -> String {
         rows.map { "\($0.index)|\($0.statusRaw)|\($0.scheduledDate.timeIntervalSinceReferenceDate)" }.joined(separator: ",")
     }
+
+    /// The day of every pending row (scalar reads only), for the reminder host's reconcile key. Order follows the rows;
+    /// `ReminderPlan.reconcileKey` sorts.
+    static func pendingDays(from rows: [PlannedSession]) -> [Date] {
+        rows.filter { $0.status == .pending }.map { $0.scheduledDate }
+    }
 }

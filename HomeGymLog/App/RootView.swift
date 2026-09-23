@@ -22,6 +22,9 @@ struct RootView: View {
     /// Onboarding's separate body-weight unit; read here only to rebuild the draft after a restart.
     @AppStorage("bodyWeightUnits") private var bodyWeightUnitsRaw = WeightUnit.lb.rawValue
     @State private var selectedTab: AppTab = .home
+    /// The one owner of the notification permission status (≈ a store created at the root and provided through
+    /// context): the reminder host refreshes it, Settings requests it, both read it.
+    @State private var permission = ReminderPermission()
     /// Set once the debug `initialTab` has been applied, so a later route switch cannot re-apply it.
     @State private var appliedInitialTab = false
     /// Nil outside a debug launch that asked for a starting tab; no `#if` in the view.
@@ -31,33 +34,43 @@ struct RootView: View {
     let seedDraft: OnboardingDraft?
 
     var body: some View {
-        // if/else, not a ternary: a ternary needs one View type; @ViewBuilder wraps every branch.
-        Group {
-            if let log = activeLogs.first {
-                // Replaces the shell rather than covering it, so a launch into a workout shows no shell frame.
-                // `.id` ≈ key={log.id}: a different log gets fresh screen state.
-                WorkoutView(log: log, onDone: { finish(log, at: $0) }).id(log.id)
-            } else if let program = currentPrograms.first {
-                ShellView(program: program, selected: $selectedTab)
-            } else {
-                // No `.id` here: `OnboardingView` copies the draft once with `State(initialValue:)`, so a later root render
-                // rebuilds this value and SwiftUI ignores it (≈ useState(initialProp) ignoring later props).
-                OnboardingView(initialDraft: seedDraft ?? prefillDraft() ?? OnboardingDraft(units: units))
+        // A concrete container around the routes, so the reminder host below mounts once and survives a route switch
+        // (a modifier on the `Group` would re-apply to each branch).
+        ZStack {
+            // if/else, not a ternary: a ternary needs one View type; @ViewBuilder wraps every branch.
+            Group {
+                if let log = activeLogs.first {
+                    // Replaces the shell rather than covering it, so a launch into a workout shows no shell frame.
+                    // `.id` ≈ key={log.id}: a different log gets fresh screen state.
+                    WorkoutView(log: log, onDone: { finish(log, at: $0) }).id(log.id)
+                } else if let program = currentPrograms.first {
+                    ShellView(program: program, selected: $selectedTab)
+                } else {
+                    // No `.id` here: `OnboardingView` copies the draft once with `State(initialValue:)`, so a later root render
+                    // rebuilds this value and SwiftUI ignores it (≈ useState(initialProp) ignoring later props).
+                    OnboardingView(initialDraft: seedDraft ?? prefillDraft() ?? OnboardingDraft(units: units))
+                }
+            }
+            .onAppear {
+                // A Group applies this to whichever branch appears, so it re-runs on every route switch; the flag makes
+                // it run once (≈ a useRef "has run" flag).
+                if !appliedInitialTab {
+                    appliedInitialTab = true
+                    if let initialTab { selectedTab = initialTab }
+                }
+                applyAppearance(AppearanceMode.from(raw: appearanceRaw))
+            }
+            // ≈ useEffect(applyAppearance, [appearance]): the whole window restyles, including sheets, alerts and dialogs.
+            .onChange(of: appearanceRaw) { _, raw in
+                applyAppearance(AppearanceMode.from(raw: raw))
             }
         }
-        .onAppear {
-            // A Group applies this to whichever branch appears, so it re-runs on every route switch; the flag makes
-            // it run once (≈ a useRef "has run" flag).
-            if !appliedInitialTab {
-                appliedInitialTab = true
-                if let initialTab { selectedTab = initialTab }
-            }
-            applyAppearance(AppearanceMode.from(raw: appearanceRaw))
+        // Draws nothing. `.id` ≈ key={programID}: a new or archived program rebuilds its query; a workout does not remount it.
+        // `workoutInProgress` is the scalar, never the log's session (a hop on a log being discarded traps on 26.5).
+        .background {
+            ReminderHost(programID: currentPrograms.first?.id, workoutInProgress: activeLogs.first != nil).id(currentPrograms.first?.id)
         }
-        // ≈ useEffect(applyAppearance, [appearance]): the whole window restyles, including sheets, alerts and dialogs.
-        .onChange(of: appearanceRaw) { _, raw in
-            applyAppearance(AppearanceMode.from(raw: raw))
-        }
+        .environment(permission)
     }
 
     private var units: WeightUnit { WeightUnit(rawValue: unitsRaw) ?? .lb }

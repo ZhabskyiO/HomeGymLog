@@ -79,8 +79,9 @@ with headless Chrome and launches the app in a `-seed` state per screen (DEBUG o
 `ob1`…`ob5`, `midProgram`, `missed`, the missed-day seeds `missed-several`, `missed-shifted`, `missed-skipped` (with `missed`,
 the only seeds that let the Home prompt show), `restDay`, `freshProgram`, `progress-history` (an archived program plus
 `midProgram`, for the Progress tab's cross-program chart and calendar), `settings-restart` (Settings with the restart
-confirmation dialog up) and `restarted` (no current program, one archived program, onboarding opens prefilled at A2),
-and the workout seeds `wo-start`, `wo-swipe`, `wo-rpe`,
+confirmation dialog up), `restarted` (no current program, one archived program, onboarding opens prefilled at A2), and
+the reminder seeds `reminder-on`, `reminder-denied`, `reminder-unasked` (Settings with the Daily reminder on and each
+permission state), and the workout seeds `wo-start`, `wo-swipe`, `wo-rpe`,
 `wo-adjust`, `wo-rest`, `summary`, `wo-detail`, `wo-swap`, `wo-swap-rdl`, `wo-notes`, which open at the root with no
 `-tab`; frozen clock, in-memory store, throwaway preferences).
 Six more DEBUG launch arguments target a screen without taps (taps are refused on this machine): `-programWeek <n>
@@ -159,7 +160,8 @@ xcrun xcresulttool get test-results summary --path build/tests.xcresult   # tota
    review "ship"; VoiceOver order (AC-13) and a real finger chip scroll pending the user's MVP pass).
    — settings slice done 2026-09-22 (branch `m4-settings`: the last placeholder tab replaced; Appearance (System/Dark/Light)
    applied window-wide via `overrideUserInterfaceStyle` from `RootView`, not `.preferredColorScheme`; Units as a second
-   segmented control; disabled "Coming soon" rows for Daily reminder and Sound & haptics; the Program card's new "Missed a
+   segmented control; disabled "Coming soon" rows for Daily reminder (built next, by `m4-reminder` below) and Sound &
+   haptics (M5); the Program card's new "Missed a
    day" preference (`@AppStorage("missedDayPolicy")`: Ask each time / Always shift / Always skip) drives `MissedPromptHost`'s
    existing shift/skip writers automatically, with a transient one-line Home banner naming what changed; "Build a new
    program…" archives through `ProgramStore.archive`, resets the tab to Home, and reopens onboarding at A2 prefilled
@@ -169,7 +171,22 @@ xcrun xcresulttool get test-results summary --path build/tests.xcresult   # tota
    -missedDayPolicy shift` on one launch, the banner's visible-time timer starts while the shell briefly mounts on Home,
    so it is gone by the time a scripted tap reaches Home; no production path mounts the shell on a non-Home tab. Pending
    the user's MVP pass: AC-9–AC-14 (live appearance/units taps, restart cancel/confirm, policy taps, banner timing) and
-   AC-15 VoiceOver order. Next: `m4-reminder`.
+   AC-15 VoiceOver order.
+   — reminder slice done 2026-09-23 (branch `m4-reminder`: Settings Daily reminder toggle off by default, permission
+   asked in context only when turned on (no prompt at first launch); a "Reminder time" row with a compact hour-and-minute
+   picker under the toggle; denied and not-yet-asked rows ("Open iOS Settings" / "Allow notifications"); one
+   non-repeating calendar notification per pending session day for the next 30, reconciled from a root-mounted
+   `ReminderHost` (mounted once as a `.background` of a `ZStack` around the routes, keyed `.id(programID)`) whenever an
+   `Equatable` key (enabled, minutes, permission status, a scene-active tick, pending days, workout-in-progress) changes;
+   `AppNotificationDelegate` installed and retained as the first statement of `App.init` shows a reminder as a banner in
+   the foreground and keeps the rest timer silent, matching the M3 delegate rule; seeds `reminder-on`, `reminder-denied`,
+   `reminder-unasked`; 1011 tests on iOS 17.5 and 26.5, Release green, AC-8 rest-timer coexistence verified by a
+   scratch-copy XCUITest on 17.5, swift review "ship after fixes" with all three fixes applied (`docs/reviews/m4-reminder-swift-review.md`:
+   the fire-time check now uses the same wall-clock helper as the picker instead of elapsed minutes, which disagreed by an
+   hour on the two DST days; the permission generation counter is bumped again after a request's answer lands, not only
+   before it starts; a closure constant reads as a nested function). Pending the user's MVP pass: AC-5–AC-7 and AC-9
+   (device taps and VoiceOver), AC-16–AC-19, and AC-8(c) a real rest timer in the background. M4 is complete except the
+   user's manual checks.
 5. Polish: Live Activity rest timer, light theme audit, haptics, export, icon, App Store prep.
 
 ## Product decisions (settled 2026-09-09)

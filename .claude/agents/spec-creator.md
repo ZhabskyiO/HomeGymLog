@@ -23,7 +23,8 @@ Write the spec to `docs/specs/<milestone-or-feature>.md` with these sections:
    Distinguish stored from derived values.
 5. **Rules and formulas.** Any computation, quoted from `insights/INSIGHTS.md` or extracted from the
    prototype script, with worked examples using real numbers.
-6. **Edge cases.** Dates across week and month boundaries, caps, rounding, skipped sets, swapped
+6. **Edge cases.** Dates across week and month boundaries, the two DST days for any time of day (say whether a time is
+   wall-clock or elapsed; `day + minutes` is elapsed and off by an hour on DST days, m4-reminder), caps, rounding, skipped sets, swapped
    exercises, missed sessions, unit switching, app backgrounded or killed.
 7. **Out of scope.** What this spec deliberately excludes.
 8. **Acceptance criteria.** Numbered, each verifiable on a simulator or by a unit test. For a screen,
@@ -37,13 +38,19 @@ Rules: every acceptance criterion must agree with the rules table it cites (cros
 against that table before returning; an AC saying "Sep 9 completed" while the rules table has that session missed is the
 failure to avoid), and every worked example must be internally possible (dates relative to its own "today"). Every named
 function's input list must suffice for its stated output, and a rule tested by an AC lives in the component that AC names.
+Check each signature from its call site: what the owner can actually reach (a root `@State` object cannot read
+`@Environment`, so it takes the service as a parameter; a row that shows a time needs the calendar and locale or a
+preformatted string; a seam with no calendar cannot build date components). m4-reminder's first spec failed three
+signatures this way (planner F1, F3, F4). Any count an AC asserts about existing source ("`.silent(` on one line") is
+grepped in the current code first.
 Never name a type after a SwiftUI or Foundation type (`ProgressView`, `Text`, `Task`): it shadows the system one
 across the whole app target. Keep the spec under 400 lines unless numeric tables require more; prefer tables to prose. For any table
 derived from existing Engine code (row lists, schedules, weights), show the derivation per row (the intermediate
 walk or formula inputs) so a reviewer can check it without recomputing; derive by reading the code, never from memory.
 Describe behavior, not implementation. No SwiftUI view names, no code. Engine functions are
 specified over plain values with an explicit calendar and reference date, never as mutations on stored
-rows; input validation throws a typed error, never traps. Where the prototype is
+rows; an argument the caller passes that can be invalid throws a typed error, never traps; a function over
+stored preferences or rows is total and falls back to the default (INSIGHTS 2026-09-23, m4-reminder B2). Where the prototype is
 ambiguous or does nothing (the missed-day shift button, for example), say so and apply the recorded
 decision. Do not invent features the prototype does not show. Accessibility labels equal the visible text or a wording
 the user decided (Voice Control matches the label); never introduce a third string, and list every spoken string in the
