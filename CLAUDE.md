@@ -187,7 +187,9 @@ xcrun xcresulttool get test-results summary --path build/tests.xcresult   # tota
    before it starts; a closure constant reads as a nested function). Pending the user's MVP pass: AC-5–AC-7 and AC-9
    (device taps and VoiceOver), AC-16–AC-19, and AC-8(c) a real rest timer in the background. M4 is complete except the
    user's manual checks.
-5. Polish: Live Activity rest timer, light theme audit, haptics, export, icon, App Store prep.
+5. Polish: Live Activity rest timer, light theme audit, haptics, export, icon, App Store prep. Five slices, each merged
+   before the next: `m5-haptics` → `m5-light-theme` → `m5-export` (JSON backup + import, with `AppSchemaV1`) →
+   `m5-live-activity` → `m5-release` (scope in INSIGHTS 2026-09-24).
 
 ## Product decisions (settled 2026-09-09)
 
