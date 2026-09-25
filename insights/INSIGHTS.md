@@ -8,6 +8,27 @@ session start, so nothing here depends on it.
 
 ## Architecture decisions
 
+### 2026-09-25 — M5 light-theme decisions (from the m5-light-theme slice spec, user-answered)
+
+- **Audit result**: the 11 colorsets match the prototype's light and dark tokens exactly; the hard-coded black
+  scrims/shadows and white-on-fill text are the prototype's own in both themes, so they stay.
+- **Success/warning in Light: darken the fills themselves** (user chose this over separate text tokens): light
+  entries are added to the `success` and `warning` colorsets and dark stays unchanged. Every green/amber fill and text
+  in Light darkens, which is a named deviation from `home-light`.
+- **Light `mu` → `68646A`** (4.77 on `sf2`; the prototype's value was 4.36).
+- **Pairs that fail in both themes and in the prototype are accepted as brand** (white ✓ on fills, accent text, 0.45
+  waiting rows), recorded in the spec rather than fixed.
+- **A Static test `ColorsetContrastTests`** reads the colorset JSON through a test-only `ContrastRatio` helper and
+  asserts ≥ 4.5 on bg/sf plus a 4.0 regression floor on the three recorded shortfalls, so a future token edit cannot
+  silently regress them. Asset-catalog JSON is tested from the source tree via `#filePath`, never `Bundle.main`.
+- A token may carry an appearance-specific value where the prototype holds it constant: `Theme.phaseColor(.peak)`
+  (= `warning`) darkens in Light too.
+- **Architecture review (2026-09-25, approve with changes, `docs/reviews/m5-light-theme-architecture.md`)**: Dark
+  baselines are captured before any colorset edit (clock 9:41, both runtimes) so the "Dark unchanged" check means
+  something; Light references for screens with no light snapshot are rendered from a scratch copy of the prototype
+  patched to `theme:'light'`.
+- The rest card keeps its black 0.4 shadow in Light. No new seed: every screen is its existing seed plus `-appearance light`.
+
 ### 2026-09-24 — M5 haptics decisions (from the m5-haptics slice spec, user-answered)
 
 - **Two Settings rows, not the prototype's one**: "Haptics" (`hapticsEnabled`, "Set logged, rest finished, workout done")
