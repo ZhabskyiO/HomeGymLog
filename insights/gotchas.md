@@ -358,6 +358,9 @@ are kept as history.
 
 ## User notifications
 
+- 2026-09-24 — **`UNNotificationContent.sound == UNNotificationSound.default` compares reliably** (m5-haptics,
+  `RestNotificationContentTests` / `ReminderNotificationContentTests`, hosted unit tests): no need for the `!= nil`
+  fallback the risk register expected. Recognize it: a test asserting notification content by exact sound equality.
 - 2026-09-23 — **Verified live (scratch-copy XCUITest, 17.5): the root-mounted reminder host works as a `.background` of the
   route `ZStack`**: at launch it scheduled 30 `reminder-*` requests beside a planted `rest-timer` (31 pending); the reminder
   fired in the foreground as a SpringBoard banner "HOMEGYMLOG, now, Training day, Your workout is planned for today."; a
@@ -399,6 +402,10 @@ are kept as history.
 
 ## Xcode / build
 
+- 2026-09-24 — **Confirmed at runtime: the hosted unit test target's `Bundle.main` is the app bundle**, not the test
+  bundle (`TEST_HOST`, `project.pbxproj:427`; m5-haptics `RestChimeAssetTests` resolves `rest-over.caf` through
+  `Bundle.main.url(forResource:withExtension:)` and reads it with `AVAudioFile`). Recognize it: a test that needs an
+  app-bundled resource can read it via `Bundle.main` with no fallback.
 - 2026-09-24 — **Non-Swift files under the synchronized `HomeGymLog/` folder become bundle resources** in Debug and
   Release with no project edit (a `.caf` at the folder root was found by `Bundle.main.url(forResource:withExtension:)` on
   17.5 and 26.5; researcher m5-haptics addendum).

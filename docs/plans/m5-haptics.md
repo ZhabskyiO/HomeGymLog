@@ -1,5 +1,5 @@
 # M5 slice 1 — Haptics and Sound (two Settings toggles, set / rest / workout-done haptics, rest chime, notification sounds): implementation plan
-**Status: draft 2026-09-24, for plan-verifier.** For `docs/specs/m5-haptics.md` (approved draft; architecture B1, B2, NB1–NB9
+**Status: done 2026-09-24, 1080 tests** (1011 → 1080 on iOS 17.5 and 26.5, Release green, swift review "ship"; device ACs 5–10 pending the MVP pass). Previously: Status: draft 2026-09-24, for plan-verifier. For `docs/specs/m5-haptics.md` (approved draft; architecture B1, B2, NB1–NB9
 and researcher U4/U5 folded in). Spec §2–§6 and §8 are the contract (`AC-1`…`AC-19`) and are not restated. Format follows
 `docs/plans/m4-reminder.md`. `implementer`: one step per build, nothing committed. Baseline: HEAD `49faa75`, 1011 tests.
 

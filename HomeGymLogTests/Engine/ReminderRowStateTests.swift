@@ -23,9 +23,9 @@ import Testing
 
     private func key(enabled: Bool = true, minutes: Int = 420, status: ReminderAuthorization? = .authorized, tick: Int = 0,
                      days: [Date] = [TestCalendar.day(2026, 9, 16), TestCalendar.day(2026, 9, 17)],
-                     workout: Bool = false) -> ReminderPlan.ReconcileKey? {
+                     workout: Bool = false, sound: Bool = true) -> ReminderPlan.ReconcileKey? {
         ReminderPlan.reconcileKey(enabled: enabled, minutes: minutes, status: status, activeTick: tick, pendingDays: days,
-                                  workoutInProgress: workout)
+                                  workoutInProgress: workout, sound: sound)
     }
 
     @Test("the key is nil until the status has been read")
@@ -44,6 +44,20 @@ import Testing
         #expect(key(days: [TestCalendar.day(2026, 9, 16)]) != base)
         #expect(key(workout: true) != base)
         #expect(key() == base)
+    }
+
+    @Test("m5-haptics AC-13: two keys equal in every m4 field but sound are unequal")
+    func soundCounts() throws {
+        let loud = try #require(key(sound: true))
+        let quiet = try #require(key(sound: false))
+        #expect(loud != quiet)
+        #expect(loud.sound == true)
+        #expect(quiet.sound == false)
+    }
+
+    @Test("m5-haptics AC-13: a nil status gives a nil key with either sound", arguments: [true, false])
+    func nilStatusEitherSound(sound: Bool) {
+        #expect(key(status: nil, sound: sound) == nil)
     }
 
     @Test("pending days in another order give an equal key, stored sorted")

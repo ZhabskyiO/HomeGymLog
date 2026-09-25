@@ -28,6 +28,20 @@ session start, so nothing here depends on it.
   content (`withSound` through both notifier seams, `decide`/`desired` unchanged, the delegate never reads a
   preference); the preference keys live in Engine `FeedbackCues`, read by SettingsView, WorkoutView and ReminderHost;
   DEBUG Bool preferences are written to the seed suite by a parser inside `-seed` launches only.
+- **Implemented 2026-09-24** (branch `m5-haptics`): 1080 tests on iOS 17.5 and 26.5, Release green (bundle contains
+  `rest-over.caf`, `project.pbxproj` untouched), swift review "ship" with three optional low notes left as follow-ups,
+  none applied (`docs/reviews/m5-haptics-swift-review.md`): a repeated `if wrote, cue?.haptic != nil { … }` one-liner in
+  `logSet` and `saveAndLog` could become a shared `setLoggedSaved()` helper; `WorkoutFeedback`'s `sound` parameter is
+  unused by any haptic (`FeedbackCue.haptic` depends only on `haptics`) and could use a doc line saying so; a
+  `mediaServicesWereResetNotification` could revive a dead `RestChime` player, unverified and device-only. Notable
+  implementation facts: `UNNotificationSound.default == .default` compares reliably in a hosted test, so
+  `content(withSound:)` is asserted directly rather than falling back to `!= nil`; the hosted unit test target's
+  `Bundle.main` **is** the app bundle (`TEST_HOST`), confirmed at runtime by `RestChimeAssetTests` resolving
+  `rest-over.caf` through it; `UNMutableNotificationContent.content(withSound:)` must be called fully qualified
+  (`RestNotificationCenter.content(withSound:)` / `ReminderNotificationCenter.content(withSound:)`) inside a `let
+  content = …` closure, or the compiler resolves the wrong overload; `DebugFeedbackPreferences.parse` reads only the
+  first occurrence of a repeated `-haptics` or `-sound` argument (a later bad value is never reached), which the test
+  suite records as deliberate rather than fixing.
 
 ### 2026-09-24 — M5 slicing (user-answered)
 
@@ -779,6 +793,17 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
   does not break it.
 
 ## Patterns
+
+### 2026-09-24 — Haptic/chime cue: Int counters on a long-lived view, decided in Engine (m5-haptics)
+`.sensoryFeedback(trigger:)` needs a value that changes, never fires on first appearance, and is swallowed by a change
+made in `.onAppear`; an `Int` counter bumped in the write handler (never a `Bool`, which drops a same-turn double
+toggle) survives all of that. The counters (`setLoggedCount`, `restFinishedCount`, `workoutDoneCount`) live on the
+long-lived screen (`WorkoutView`), bumped only in the handler whose store write returned true, and are read by one
+modifier group (`WorkoutFeedback`) applied to the screen's outermost, always-mounted view — never the card, a row or
+the summary, which mount and unmount. Each modifier's closure re-asks a pure Engine table (`FeedbackCues.cue(for:
+haptics:sound:)`) for the current preference at playback time, so a toggle flipped mid-workout gates the very next
+cue with no extra plumbing. React analogy: a ref-like counter bumped inside the same handler that dispatched a
+successful write, read by an effect that maps it to a side effect, never a `useState` toggled twice in one render.
 
 ### 2026-09-23 — Derived notification schedule (m4-reminder researcher)
 A set of dated local notifications is a pure function of state (pending session days, enabled, time, permission,

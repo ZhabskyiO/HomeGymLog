@@ -77,3 +77,10 @@ nonisolated enum RestNotificationPlan: Equatable, Sendable {
         return .schedule(restEndsAt)
     }
 }
+
+/// The rest reconcile task's id (m5-haptics NB2): the stored end instant plus whether the notification carries a sound,
+/// so flipping Sound re-schedules a pending "Rest over". React analogy: a `useEffect` dependency array as one value.
+nonisolated struct RestReconcileKey: Equatable, Sendable {
+    let restEndsAt: Date?
+    let withSound: Bool
+}

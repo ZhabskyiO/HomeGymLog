@@ -41,21 +41,24 @@ struct SettingsControlRow<Control: View>: View {
     }
 }
 
-/// A row reserved for a later slice: a two-line label and a switch that is off and disabled, so the system dims it
-/// (spec 2.1). A `Toggle` with its own label is already one element to VoiceOver — no `.accessibilityElement` needed.
-struct SettingsComingSoonRow: View {
+/// A preference switch with a two-line label (m5-haptics 2.1; the `ReminderRows` toggle shape). The label and subtitle sit
+/// inside the `Toggle`'s label, so VoiceOver reads one switch: "Haptics, Set logged, rest finished, workout done, switch
+/// button, on". `@Binding` ≈ a controlled input's `value` + `onChange` pair passed down as one prop.
+struct SettingsToggleRow: View {
     let label: String
+    let subtitle: String
+    @Binding var isOn: Bool
 
     var body: some View {
-        Toggle(isOn: .constant(false)) {
+        Toggle(isOn: $isOn) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(label)
                     .font(.system(size: 15)).foregroundStyle(Theme.tx)
-                Text(SettingsText.comingSoon)
+                Text(subtitle)
                     .font(.system(size: 12)).foregroundStyle(Theme.mu)
             }
         }
-        .disabled(true)
+        .tint(Theme.accent)
         .padding(.horizontal, 16)
         .padding(.vertical, 13)
     }

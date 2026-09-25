@@ -43,7 +43,8 @@ none fits, and (b) verify with `/design-compare <snapshot>` against the prototyp
 not by eye. Keep the plan under 400 lines; put long tables in the spec and reference them. Code sketches must be compilable in
 principle (an `if/else` inside `body`, never a ternary between different View types). Every planned test must be
 able to fail when the rule is wrong: assert against an independently built value, never against the same function
-the refactor made both sides depend on. Every helper, fixture,
+the refactor made both sides depend on. Never weaken an AC's assertion for an unverified risk (`!= nil` for `== .default`):
+plan the spec's assertion with a named fallback if it proves unreliable (m5-haptics verifier F1). Every helper, fixture,
 file, or artifact a step uses must be declared in that step or an earlier one, and every verify command
 may read only files an earlier command writes. Pure Engine code, views
 separate. When the spec has tap- or time-dependent acceptance criteria (scripted taps are refused in the repo's

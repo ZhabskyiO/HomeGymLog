@@ -41,7 +41,7 @@ private let reminderStatusTable: [(UNAuthorizationStatus, ReminderAuthorization)
     func rowOne() async {
         #expect(rowAPrime.count == 30 && rowA.count == 30)
         let recorder = ReminderNotifierRecorder(pending: ["rest-timer"] + rowAPrime)
-        await ReminderNotifier.recording(into: recorder).reconcile(requests(rowA))
+        await ReminderNotifier.recording(into: recorder).reconcile(requests(rowA), true)
         #expect(recorder.events.first == .pendingRead)
         #expect(Array(recorder.events.prefix(4)) == [.pendingRead, .removePending(["reminder-2026-09-15"]), .deliveredRead,
                                                     .removeDelivered([])])
@@ -55,7 +55,7 @@ private let reminderStatusTable: [(UNAuthorizationStatus, ReminderAuthorization)
     @Test("row 2 and 3: toggle off or an archive (nothing desired) removes all 30 and adds none")
     func rowTwoThree() async {
         let recorder = ReminderNotifierRecorder(pending: rowA)
-        await ReminderNotifier.recording(into: recorder).reconcile([])
+        await ReminderNotifier.recording(into: recorder).reconcile([], true)
         #expect(recorder.events == [.pendingRead, .removePending(rowA), .deliveredRead, .removeDelivered([])])
         #expect(recorder.pending == [])
         #expect(recorder.added == [])
@@ -64,7 +64,7 @@ private let reminderStatusTable: [(UNAuthorizationStatus, ReminderAuthorization)
     @Test("row 4: nothing pending, nothing desired → empty removals, no adds")
     func rowFour() async {
         let recorder = ReminderNotifierRecorder(status: .denied)
-        await ReminderNotifier.recording(into: recorder).reconcile([])
+        await ReminderNotifier.recording(into: recorder).reconcile([], true)
         #expect(recorder.events == [.pendingRead, .removePending([]), .deliveredRead, .removeDelivered([])])
         #expect(recorder.added == [])
     }
@@ -72,7 +72,7 @@ private let reminderStatusTable: [(UNAuthorizationStatus, ReminderAuthorization)
     @Test("a delivered reminder for a day no longer desired is removed; a delivered rest-timer is not")
     func delivered() async {
         let recorder = ReminderNotifierRecorder(delivered: ["reminder-2026-09-15", "rest-timer", "reminder-2026-09-16"])
-        await ReminderNotifier.recording(into: recorder).reconcile(requests(rowA))
+        await ReminderNotifier.recording(into: recorder).reconcile(requests(rowA), true)
         #expect(recorder.events.contains(.removeDelivered(["reminder-2026-09-15"])))
         #expect(recorder.delivered == ["rest-timer", "reminder-2026-09-16"])
     }
@@ -83,7 +83,7 @@ private let reminderStatusTable: [(UNAuthorizationStatus, ReminderAuthorization)
         recorder.holdsPendingRead = true
         let notifier = ReminderNotifier.recording(into: recorder)
         let desired = requests(rowA)
-        let run = Task { await notifier.reconcile(desired) }
+        let run = Task { await notifier.reconcile(desired, true) }
         try await waitUntil { recorder.waitingCount == 1 }
         run.cancel()
         recorder.release(0)
@@ -96,7 +96,7 @@ private let reminderStatusTable: [(UNAuthorizationStatus, ReminderAuthorization)
     @Test("reconcile never asks for permission, even when not determined")
     func neverRequests() async {
         let recorder = ReminderNotifierRecorder(status: .notDetermined)
-        await ReminderNotifier.recording(into: recorder).reconcile(requests(rowA))
+        await ReminderNotifier.recording(into: recorder).reconcile(requests(rowA), true)
         #expect(recorder.events.contains(.requestAuthorization) == false)
         #expect(recorder.events.contains(.status) == false)
         #expect(recorder.added.count == 30)
@@ -118,8 +118,9 @@ private let reminderStatusTable: [(UNAuthorizationStatus, ReminderAuthorization)
         let notifier = ReminderNotifier.silent(status: status)
         #expect(await notifier.status() == status)
         #expect(await notifier.requestAuthorization() == status)
-        await notifier.reconcile(requests(rowA))
-        await notifier.reconcile([])
+        await notifier.reconcile(requests(rowA), true)
+        await notifier.reconcile(requests(rowA), false)
+        await notifier.reconcile([], true)
         #expect(await notifier.status() == status, "a pass leaves the fixed status alone")
         #expect(await notifier.requestAuthorization() == status, "a request never grants in a seed")
     }

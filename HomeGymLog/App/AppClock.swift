@@ -26,6 +26,9 @@ extension EnvironmentValues {
     /// Reads the notification permission and reconciles the daily reminders. Live by default; only the root's DEBUG seed
     /// branch and the Settings and shell `#Preview`s override it with `.silent(status:)`.
     @Entry var reminderNotifier: ReminderNotifier = .live()
+    /// Plays the rest-finished chime. Live by default; only the root's DEBUG seed branch and the workout `#Preview`
+    /// override it with `.silent()`. The default is re-built on every read, so `.live()` holds no state (`RestChime`).
+    @Entry var restChime: RestChime = .live()
     /// Nil in every Release build and in any launch without the debug arguments; only the root's `#if DEBUG`
     /// block ever sets it. Analogy: a context value a test harness may provide, undefined in production.
     @Entry var programTabPreselection: ProgramTabPreselection? = nil

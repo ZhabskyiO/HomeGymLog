@@ -23,7 +23,7 @@ import Testing
     func reconcileFuture() async {
         let recorder = RestNotifierRecorder(now: noon)
         let notifier = RestNotifier.recording(into: recorder)
-        await notifier.reconcile(restEndsAt: at(62), clock: recorder.clock)
+        await notifier.reconcile(restEndsAt: at(62), clock: recorder.clock, withSound: true)
         #expect(recorder.added.map(\.endsAt) == [at(62)])
         #expect(recorder.added.map(\.interval) == [62])
         #expect(recorder.pending == at(62))
@@ -35,7 +35,7 @@ import Testing
     func reconcileCancels(offset: Double?) async {
         let recorder = RestNotifierRecorder(now: noon)
         let notifier = RestNotifier.recording(into: recorder)
-        await notifier.reconcile(restEndsAt: offset.map(at), clock: recorder.clock)
+        await notifier.reconcile(restEndsAt: offset.map(at), clock: recorder.clock, withSound: true)
         #expect(recorder.added.isEmpty)
         #expect(recorder.cancels == 1)
         #expect(recorder.deliveredRemovals == 1)
@@ -47,10 +47,10 @@ import Testing
         recorder.holdsAuthorization = true
         let notifier = RestNotifier.recording(into: recorder)
         let clock = recorder.clock
-        let first = Task { await notifier.schedule(at(92), clock) }       // 12:01:32
+        let first = Task { await notifier.schedule(at(92), clock, true) }       // 12:01:32
         try await waitUntil { recorder.waitingCount == 1 }
         first.cancel()
-        let second = Task { await notifier.schedule(at(122), clock) }     // 12:02:02
+        let second = Task { await notifier.schedule(at(122), clock, true) }     // 12:02:02
         try await waitUntil { recorder.waitingCount == 2 }
         recorder.release(1)
         await second.value
@@ -66,7 +66,7 @@ import Testing
         let recorder = RestNotifierRecorder(now: noon)
         recorder.holdsAuthorization = true
         let notifier = RestNotifier.recording(into: recorder)
-        let run = Task { await notifier.schedule(at(62), recorder.clock) }
+        let run = Task { await notifier.schedule(at(62), recorder.clock, true) }
         try await waitUntil { recorder.waitingCount == 1 }
         run.cancel()
         recorder.release(0)
@@ -83,7 +83,7 @@ import Testing
         let recorder = RestNotifierRecorder(now: noon)
         recorder.holdsAuthorization = true
         let notifier = RestNotifier.recording(into: recorder)
-        let run = Task { await notifier.schedule(at(75), recorder.clock) }
+        let run = Task { await notifier.schedule(at(75), recorder.clock, true) }
         try await waitUntil { recorder.waitingCount == 1 }
         recorder.now = at(2.5)
         recorder.release(0)
@@ -97,7 +97,7 @@ import Testing
         let recorder = RestNotifierRecorder(now: noon)
         recorder.holdsAuthorization = true
         let notifier = RestNotifier.recording(into: recorder)
-        let run = Task { await notifier.schedule(at(5), recorder.clock) }
+        let run = Task { await notifier.schedule(at(5), recorder.clock, true) }
         try await waitUntil { recorder.waitingCount == 1 }
         recorder.now = at(6)
         recorder.release(0)

@@ -1,4 +1,4 @@
-# File layout (as of M4 reminder slice, 2026-09-23)
+# File layout (as of M5 haptics slice, 2026-09-24)
 
 The per-file roster, moved out of `CLAUDE.md` on 2026-09-16 so every session and agent stops paying for it. `CLAUDE.md` keeps
 the directory map; read this file when you need to know which file owns what. `doc-writer` updates it after each slice.
@@ -21,9 +21,13 @@ HomeGymLog/                app target (synchronized folder: every .swift under i
                            Date()/Calendar.current in the app; an environment value, and the file holding the
                            restNotifier and reminderNotifier @Entry values (default .live()) and the nil-by-default debug @Entry values:
                            programTabPreselection, initialTab, workoutDragPreview, workoutSheetPreview,
-                           missedPromptEnabled, settingsRestartPreview, missedBannerHold), RestNotifier (rest-end local
+                           missedPromptEnabled, settingsRestartPreview, missedBannerHold, and restChime, default
+                           .live()), RestNotifier (rest-end local
                            notification: a struct of closures over RestNotificationCenter, .live() / .silent(),
-                           reconcile), ReminderHost (the non-drawing daily-reminder reconcile host, mounted once at the
+                           reconcile), RestChime (the foreground rest-finished chime: a struct of closures like
+                           RestNotifier over a process-wide static player box, .live() / .silent(); .ambient set once,
+                           a failed setCategory or missing rest-over.caf leaves the box a permanent no-op; the only file
+                           importing AVFAudio), ReminderHost (the non-drawing daily-reminder reconcile host, mounted once at the
                            root: its own @Query on the current program's pending sessions, a scene-active tick, one
                            .task(id:) keyed on ReminderPlan.ReconcileKey that diffs the notification center), ReminderNotifier
                            (+ReminderNotificationCenter: the daily-reminder seam over UNUserNotificationCenter, read
@@ -46,7 +50,9 @@ HomeGymLog/                app target (synchronized folder: every .swift under i
                            parsers), DebugProgressExercise (-progressExercise parser), DebugBannerHold (-holdBanner
                            parser: keeps the Settings missed-day automatic action's Home banner up with no auto-dismiss),
                            ProgressHistorySeed (the archived program half of `progress-history`: a completed 1-month
-                           program through the store functions, then ProgramStore.archive); all ten files under #if DEBUG
+                           program through the store functions, then ProgramStore.archive), DebugFeedbackPreferences
+                           (the -haptics/-sound on|off parser: writes each given value into the throwaway seed suite,
+                           honoured only inside a -seed launch); all eleven files under #if DEBUG
   Models/                  AppSchema, six @Model classes (Program, PlannedSession, WorkoutLog, LoggedExercise,
                            LoggedSet, ExerciseNote), write helpers ProgramStore (current, start, apply, skip, shift and
                            skipMissed (the missed-day field writers: one StoreCommit.commit each; a session no longer
@@ -82,7 +88,12 @@ HomeGymLog/                app target (synchronized folder: every .swift under i
                            fields into onboarding defaults, per-field fallback, never throws),
                            ReminderPlan (ReminderAuthorization, ReminderRequest, ReminderRowState; desired(...) the total
                            daily-reminder schedule over pending session days — spec 5.1, wall-clock fire time not elapsed
-                           minutes; rowState, reconcileKey, the picker's time(minutes:) / minutes(of:) conversions);
+                           minutes; rowState, reconcileKey (now carrying sound), the picker's time(minutes:) / minutes(of:) conversions),
+                           FeedbackCues (FeedbackEvent, HapticKind, FeedbackCue; cue(for:haptics:sound:) the Haptics/Sound
+                           table of spec 5.1, restEndCue and restSkipCue its one-line wrappers over RestTimer's
+                           observation and RestNotificationPlan.decide; the hapticsKey/soundKey/defaultEnabled constants;
+                           pure, no SwiftUI); RestTimer also declares RestReconcileKey (restEndsAt, withSound), the rest
+                           reconcile task's key;
                            CalendarRules owns days(from:to:), the one day-difference helper
   Features/Onboarding/     OnboardingView (flow root), OnboardingDraft (@Observable answers + step), OnboardingChrome
                            (header, footer), StepTitle, one file per step: WelcomeStep, LengthStep, FrequencyStep,
@@ -105,7 +116,9 @@ HomeGymLog/                app target (synchronized folder: every .swift under i
   Features/Workout/        WorkoutView (owns the log's exercise, set and note @Querys, sheet/exit/isDiscarding state, the
                            lazy PR baseline task, the per-key pill baseline task, openPreview, every write handler, the
                            1 Hz rest TimelineView and the rest effects: end announcement, notification .task(id:), scene
-                           phase), WorkoutLoggingContent (layout, +ExerciseBlock; the bottom inset shows the bar or the
+                           phase; also the three setLogged/restFinished/workoutDone counters read by WorkoutFeedback, the
+                           hapticsEnabled/soundEnabled @AppStorage reads and the restChime.play() calls),
+                           WorkoutLoggingContent (layout, +ExerciseBlock; the bottom inset shows the bar or the
                            rest card), WorkoutHeader (+WorkoutElapsedClock, ProgressSegments; Swap dims unless every set
                            is pending), SetRow, SetSwipeRow (drag + VoiceOver actions), RPECard, WorkoutSheet (enum with
                            string ids, +AdjustDraft, SwapDraft, WorkoutSheetPreview, WorkoutSheetContent: each case's
@@ -113,7 +126,9 @@ HomeGymLog/                app target (synchronized folder: every .swift under i
                            (candidate rows or the empty-state line; height 101.0 or 77.33 + 64.33·n), ProgressionPillView,
                            WorkoutBottomBar ("Add note" / "Notes ·", "Next exercise ›"), RestOverlay (rest card: ring,
                            countdown, "Next: …", +30s, Skip), WorkoutSummaryView, SummaryCards (tiles, muscles, records,
-                           no-records)
+                           no-records), WorkoutFeedback (the three .sensoryFeedback(trigger:) haptics plus the summary
+                           .onChange handler, applied once to the screen's outer Group; reads no @AppStorage, store or
+                           clock, so WorkoutView owns every counter bump and the chime call)
   Features/Progress/       ProgressTabView (owns the current-program and archived-programs @Querys, `now`, the selected
                            chip @State, the per-key tops task, held so a chip change never draws the previous exercise's
                            line), ProgressContent (layout), ExerciseChipRow (chip row, scrolls the selected chip minimally
@@ -148,6 +163,9 @@ HomeGymLog/                app target (synchronized folder: every .swift under i
                            notification itself show or speak; subtitle(minutes:calendar:locale:) formats the stored
                            time on a fixed reference day so the text never depends on the process zone); all formatting lives here, never in Engine
   Assets.xcassets/         theme color sets (bg, sf, sf2, bd, tx, mu, success, warning, phaseFoundation, phaseDeload)
+  rest-over.caf            the bundled rest-finished chime (IMA4 CAF, mono, 44.1 kHz, ≈ 0.2 s, ≈ 8.8 KB); a non-Swift file
+                           at the synchronized folder's root, bundled with no project edit; generated by
+                           docs/tools/make-rest-chime.py, checked in as provenance, not a build step
 HomeGymLogTests/           Swift Testing target
   Support/                 TestCalendar (fixed calendar), TestContainer (makeTestStore, insertSampleGraph), TestInputs,
                            HomeFixtures (Home inputs built from the generator, never from a seed), WorkoutFixtures
@@ -164,7 +182,13 @@ HomeGymLogTests/           Swift Testing target
                            AppNotificationDelegateTests (foreground presentation options per identifier prefix),
                            ReminderNotifierTests(+ReminderReconcileEdgeTests) (ReminderNotifier.using(_:).reconcile's
                            spec 5.2 rows, event order, cancellation, the five-status mapping), ReminderPermissionTests
-                           (refresh/request over the recorder, including the generation-rule race)
+                           (refresh/request over the recorder, including the generation-rule race),
+                           RestNotificationContentTests / ReminderNotificationContentTests (content(withSound:) title,
+                           body, .default vs nil sound, spec 5.5), RestNotifierSoundTests / ReminderNotifierSoundTests
+                           (reconcile threading withSound into every add, over the recorders), RestChimeTests (the
+                           seam's shape over a counting play closure; .silent()/.live() smoke only, no audio session
+                           touched), RestChimeAssetTests (Bundle.main resolves rest-over.caf in the hosted test; its
+                           duration and channel count via AVAudioFile)
   Engine/                  one suite per Engine file plus StaticTableTests, the HomeStats suites
                            (HomeStats, HomeStatsEdge, HomeStatsInput, PersonalRecordsOrdering), the Program tab
                            suites (SessionState, SessionStateEdge, ProgramTabStats, ProgramTabStatsEdge), the workout
@@ -178,8 +202,12 @@ HomeGymLogTests/           Swift Testing target
                            (rows A–D of the spec's policy table, automaticActionKey, bannerDayStyle), RestartPrefill(+Edge)
                            (the midProgram worked row and every hand fallback case), ReminderPlanTests(+Edge),
                            ReminderPlanZoneTests (spec 5.1's rows A–K plus DST: the wall-clock fire time on the two 2026
-                           US transition days), ReminderRowStateTests (rowState's ten pairs, reconcileKey, the picker's
-                           minutes ↔ Date conversion)
+                           US transition days), ReminderRowStateTests (rowState's ten pairs, reconcileKey (now including
+                           sound), the picker's
+                           minutes ↔ Date conversion), FeedbackCuesTests(+FeedbackCueEdgeTests) (spec 5.1's twelve
+                           (event, Haptics, Sound) rows, each appearing exactly once; the three key/default constants),
+                           FeedbackRestCueTests (restEndCue and restSkipCue over RestTimer.observeEnd on the `wo-rest`
+                           instants, re-declared from RestEndRuleTests; RestReconcileKey equality)
   Persistence/             ModelRoundTrip, ProgramStore, ProgramStart, ProgramStartMidWeek, WorkoutLogStore,
                            WorkoutLogStoreSets, RoutingPredicate, ExerciseNoteStore, StatusInvariant, CascadeDelete,
                            HomeSnapshotBuilder, ProgramTabSnapshot (seed rows → ProgramTabStats, no validating step),
@@ -218,17 +246,21 @@ HomeGymLogTests/           Swift Testing target
                            missed-several rows), DebugBannerHold (the -holdBanner parser),
                            ReminderSeedTests (the three reminder seeds carry midProgram's rows, keep the missed-day
                            prompt off, store the (true, 420) preference pair and report the spec 4.4 status;
-                           reminder-on's rows through ReminderPlan.desired give spec 5.1 row A)
+                           reminder-on's rows through ReminderPlan.desired give spec 5.1 row A),
+                           DebugFeedbackPreferencesTests(+Edge) (the -haptics/-sound parser: AC-18's six rows, a
+                           repeated argument keeps its first occurrence, unknownValue's argument/value)
                            suites (Debug only)
   Static/                  source scans: ClockUsageTests (Date() / Calendar.current only in App/AppClock.swift),
                            SchemaSourceTests (rpeSkipped keeps its default, rest instants stay optional),
                            SeedNameScanTests (workout, missed-day, settings and reminder seed names — including
-                           settings-restart, restarted, -holdBanner, reminder-on, reminder-denied, reminder-unasked —
+                           settings-restart, restarted, -holdBanner, reminder-on, reminder-denied, reminder-unasked,
+                           -haptics, -sound —
                            only in App/DebugSeed/; no workoutAdjustPreview left;
                            settingsRestartPreview and missedBannerHold declared nil-by-default on one @Entry line each
                            in AppClock.swift and provided once each, outside #if DEBUG, in HomeGymLogApp.swift),
-                           RestNotifierSourceTests (.silent() only in the root's seed branch,
-                           .live() only as the @Entry default), StoreCommitSourceTests (ModelContext( in Models/ only in
+                           RestNotifierSourceTests (.silent() on exactly two lines of HomeGymLogApp.swift, one naming
+                           restNotifier and one restChime, both inside the seed branch;
+                           .live() only as each @Entry default), StoreCommitSourceTests (ModelContext( in Models/ only in
                            StoreCommit.swift; the note store rehearses after its update branch),
                            FailedSavePolicySourceTests (rollback() only in StoreCommit; commitInsert only in the two
                            insert writers; ProgramStore's shift and skipMissed call StoreCommit.commit),
@@ -244,15 +276,25 @@ HomeGymLogTests/           Swift Testing target
                            ReminderPermission.swift, NB3), SettingsScreenSourceTests (Features/Settings/'s five files
                            scanned, row order matches spec 2.1-2.4 plus the reminder rows' line order (toggle, one
                            divider, the second row), every visible string comes from SettingsText or ReminderText, the
-                           one remaining reserved row (Sound & haptics) stays off and disabled, ReminderRows reads no
+                           Haptics and Sound rows are the two live SettingsToggleRow( lines closing the card (no
+                           .disabled(, no SettingsComingSoonRow left), ReminderRows reads no
                            @AppStorage/store/clock, the screen's one write goes through RestartAction),
                            ReminderSourceTests (seeded runs and previews never reach the system notification center
                            through the reminder notifier; the reconcile host's shape — .background, ReminderHost(,
                            .id(, no activeLogs.first?.session hop; the two @AppStorage keys read in exactly SettingsView
                            and ReminderHost; notificationSettings( only in ReminderNotifier.swift; the @unknown default
-                           status falls back to denied)
+                           status falls back to denied), FeedbackSourceTests (FeedbackCues.swift is pure Foundation with
+                           no Error/throws; RestReconcileKey declared only in RestTimer.swift; AVFAudio/AVAudioSession/
+                           AVAudioPlayer named only in RestChime.swift, whose setCategory( line precedes the first
+                           AVAudioPlayer( line and sits behind a catch/guard so a failure never falls through to a play;
+                           .sensoryFeedback( on exactly three lines, all in WorkoutFeedback.swift; the Skip path's
+                           restSkipCue( / WorkoutLogStore.skipRest( / restFinishedCount += 1 line order (B1);
+                           hapticsEnabled/soundEnabled @AppStorage readers; SettingsComingSoonRow and
+                           SettingsText.comingSoon gone)
 design/                    prototype export (read-only reference)
 docs/specs, docs/plans     specs from spec-creator, plans from implementation-planner (dated status when done)
+docs/tools                 make-rest-chime.py: generates HomeGymLog/rest-over.caf (880 Hz, 0.2 s, IMA4 CAF via
+                           afconvert); provenance only, never run by a build
 docs/reviews               saved agent reports per slice (researcher, architecture, verifier rounds, swift review)
 docs/learning              per-slice Swift study notes for the user (/learning-notes)
 insights/                  INSIGHTS.md, gotchas.md

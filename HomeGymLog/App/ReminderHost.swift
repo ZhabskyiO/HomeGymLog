@@ -21,6 +21,8 @@ struct ReminderHost: View {
     @State private var activeTick = 0
     @AppStorage(ReminderPlan.enabledKey) private var enabled = false
     @AppStorage(ReminderPlan.minutesKey) private var minutes = ReminderPlan.defaultMinutes
+    /// Settings' Sound preference: whether each reminder carries the default sound.
+    @AppStorage(FeedbackCues.soundKey) private var sound = FeedbackCues.defaultEnabled
     @Environment(ReminderPermission.self) private var permission
     @Environment(\.reminderNotifier) private var notifier
     @Environment(\.appClock) private var clock
@@ -37,7 +39,7 @@ struct ReminderHost: View {
         let key = ReminderPlan.reconcileKey(enabled: enabled, minutes: minutes, status: permission.status,
                                             activeTick: activeTick,
                                             pendingDays: HomeSnapshotBuilder.pendingDays(from: sessions),
-                                            workoutInProgress: workoutInProgress)
+                                            workoutInProgress: workoutInProgress, sound: sound)
         // An empty concrete root: its handlers run while it draws nothing and it intercepts no touch (gotchas SwiftUI
         // 2026-09-15). Never a `Group { if }`, whose handlers skip the mount.
         ZStack {}
@@ -59,6 +61,6 @@ struct ReminderHost: View {
         let desired = ReminderPlan.desired(sessionDays: key.pendingDays, enabled: key.enabled, status: key.status,
                                            minutes: key.minutes, now: clock.now(), calendar: clock.calendar,
                                            workoutInProgress: key.workoutInProgress)
-        await notifier.reconcile(desired)
+        await notifier.reconcile(desired, key.sound)
     }
 }

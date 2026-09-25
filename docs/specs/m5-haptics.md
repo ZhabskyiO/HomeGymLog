@@ -1,6 +1,6 @@
 # M5 slice 1 — Haptics and Sound (two Settings toggles, set / rest / workout-done haptics, rest chime, notification sounds)
 
-**Status: approved draft 2026-09-24, architecture review applied** (open questions Q1–Q6 answered by the user, §9; review
+**Status: done 2026-09-24, 1080 tests** (1011 → 1080 on iOS 17.5 and 26.5, Release green, swift review "ship"; device ACs 5–10 pending the MVP pass). Previously: Status: approved draft 2026-09-24, architecture review applied (open questions Q1–Q6 answered by the user, §9; review
 `docs/reviews/m5-haptics-architecture.md` "approve with changes": B1, B2 and NB1–NB9 folded in and marked inline; U4 and U5 verified by the researcher's addendum of 2026-09-24,
 folded in). Branch `m5-haptics`. Depends on `m4-reminder` (merged 2026-09-23). The Settings screen is owned by
 `docs/specs/m4-settings.md` (§2 geometry, AC-1 deviations), the rest timer by `docs/specs/m3-rest-timer.md` (§2.5 notification, §2.6

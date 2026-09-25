@@ -17,6 +17,9 @@ struct SettingsContent: View {
     let reminderState: ReminderRowState
     let onAllowNotifications: () -> Void
     let onOpenNotificationSettings: () -> Void
+    /// The Haptics and Sound preferences (m5-haptics 2.1).
+    @Binding var hapticsEnabled: Bool
+    @Binding var soundEnabled: Bool
     let onRestart: () -> Void
 
     var body: some View {
@@ -51,7 +54,9 @@ struct SettingsContent: View {
             ReminderRows(enabled: $reminderEnabled, time: $reminderTime, subtitle: reminderSubtitle, state: reminderState,
                          onAllow: onAllowNotifications, onOpenSettings: onOpenNotificationSettings)
             SettingsDivider()
-            SettingsComingSoonRow(label: SettingsText.haptics)
+            SettingsToggleRow(label: SettingsText.haptics, subtitle: SettingsText.hapticsSubtitle, isOn: $hapticsEnabled)
+            SettingsDivider()
+            SettingsToggleRow(label: SettingsText.sound, subtitle: SettingsText.soundSubtitle, isOn: $soundEnabled)
         }
     }
 

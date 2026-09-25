@@ -41,7 +41,7 @@ import Testing
         let context = ModelContext(container)
         let restEndsAt = try screen(context).log.restEndsAt
         let recorder = RestNotifierRecorder(now: noon)
-        await RestNotifier.recording(into: recorder).reconcile(restEndsAt: restEndsAt, clock: seed.clock(calendar: cal))
+        await RestNotifier.recording(into: recorder).reconcile(restEndsAt: restEndsAt, clock: seed.clock(calendar: cal), withSound: true)
         if schedules {
             #expect(recorder.events == [.authorize, .add(endsAt: noon.addingTimeInterval(62))])
             #expect(recorder.added.map(\.interval) == [62])

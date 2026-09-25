@@ -29,6 +29,8 @@ final class ReminderNotifierRecorder {
     var holdsRequest = false
     private(set) var events: [Event] = []
     private(set) var added: [ReminderRequest] = []
+    /// The `withSound` flag of each add, in the same order as `added`.
+    private(set) var addedWithSound: [Bool] = []
     private var held: [CheckedContinuation<Void, Never>?] = []
 
     init(status: ReminderAuthorization = .authorized, pending: [String] = [], delivered: [String] = []) {
@@ -86,9 +88,10 @@ final class ReminderNotifierRecorder {
         delivered.removeAll { ids.contains($0) }
     }
 
-    fileprivate func add(_ request: ReminderRequest) {
+    fileprivate func add(_ request: ReminderRequest, _ withSound: Bool) {
         events.append(.add(request.identifier))
         added.append(request)
+        addedWithSound.append(withSound)
         if !pending.contains(request.identifier) { pending.append(request.identifier) }
     }
 }
@@ -102,7 +105,7 @@ extension ReminderNotifier {
             requestAuthorization: { await recorder.request() },
             pendingIdentifiers: { await recorder.readPending() },
             deliveredIdentifiers: { await recorder.readDelivered() },
-            add: { recorder.add($0) },
+            add: { recorder.add($0, $1) },
             removePending: { recorder.removePending($0) },
             removeDelivered: { recorder.removeDelivered($0) }))
     }

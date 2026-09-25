@@ -8,7 +8,8 @@ struct RestNotificationCenter {
     var authorize: () async -> Void
     /// Adds a request under `identifier` that fires after `interval` seconds; the same identifier replaces the pending
     /// one. `endsAt` is the instant the interval was measured toward (recorders read it; the system does not).
-    var add: (_ identifier: String, _ endsAt: Date, _ interval: TimeInterval) async -> Void
+    /// `withSound` is the Sound preference at reconcile time: the notification plays the default sound or none.
+    var add: (_ identifier: String, _ endsAt: Date, _ interval: TimeInterval, _ withSound: Bool) async -> Void
     var removePending: (_ identifier: String) -> Void
     var removeDelivered: (_ identifier: String) -> Void
 
@@ -19,11 +20,8 @@ struct RestNotificationCenter {
             authorize: {
                 _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
             },
-            add: { identifier, _, interval in
-                let content = UNMutableNotificationContent()
-                content.title = RestText.restOver
-                content.body = RestText.notificationBody
-                content.sound = .default
+            add: { identifier, _, interval, withSound in
+                let content = RestNotificationCenter.content(withSound: withSound)
                 let trigger = UNTimeIntervalNotificationTrigger(timeInterval: interval, repeats: false)
                 let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
                 try? await UNUserNotificationCenter.current().add(request)
@@ -35,14 +33,24 @@ struct RestNotificationCenter {
                 UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [identifier])
             })
     }
+
+    /// The "Rest over" content (m5-haptics 5.5). Sound is content, not scheduling: with Sound off the banner still shows,
+    /// silently (`sound = nil`).
+    static func content(withSound: Bool) -> UNMutableNotificationContent {
+        let content = UNMutableNotificationContent()
+        content.title = RestText.restOver
+        content.body = RestText.notificationBody
+        content.sound = withSound ? .default : nil
+        return content
+    }
 }
 
 /// The rest-end notification seam (≈ a service provided through context; `UNUserNotificationCenter` ≈ the browser
 /// Notification API with a scheduled, server-less delivery). A struct of closures like `AppClock`: `.live()` in the app,
 /// `.silent()` in seeds and previews, a recording double in tests. Reads time only through `AppClock`.
 struct RestNotifier {
-    /// Schedules the one rest notification for `endsAt` (replacing any pending one).
-    var schedule: (_ endsAt: Date, _ clock: AppClock) async -> Void
+    /// Schedules the one rest notification for `endsAt` (replacing any pending one), with or without its sound.
+    var schedule: (_ endsAt: Date, _ clock: AppClock, _ withSound: Bool) async -> Void
     /// Removes the pending and the delivered rest notification.
     var cancel: () -> Void
     /// Removes a delivered "Rest over" from Notification Center (every return to the foreground).
@@ -56,7 +64,7 @@ struct RestNotifier {
 
     /// Does nothing: seeds are screenshot-only and previews never start rests.
     static func silent() -> RestNotifier {
-        RestNotifier(schedule: { _, _ in }, cancel: {}, removeDelivered: {})
+        RestNotifier(schedule: { _, _, _ in }, cancel: {}, removeDelivered: {})
     }
 
     /// The notifier's rules over any center.
@@ -67,7 +75,7 @@ struct RestNotifier {
     /// - `cancel` removes pending and delivered. Scheduling never removes first: the same identifier replaces.
     static func using(_ center: RestNotificationCenter) -> RestNotifier {
         RestNotifier(
-            schedule: { endsAt, clock in
+            schedule: { endsAt, clock, withSound in
                 await center.authorize()
                 guard !Task.isCancelled else { return }
                 let interval = endsAt.timeIntervalSince(clock.now())
@@ -76,7 +84,7 @@ struct RestNotifier {
                     center.removeDelivered(identifier)
                     return
                 }
-                await center.add(identifier, endsAt, interval)
+                await center.add(identifier, endsAt, interval, withSound)
             },
             cancel: {
                 center.removePending(identifier)
@@ -88,10 +96,10 @@ struct RestNotifier {
     }
 
     /// Applies `RestNotificationPlan.decide` to the stored end instant: schedule while it is ahead, cancel otherwise.
-    /// The workout screen's `.task(id:)` calls only this.
-    func reconcile(restEndsAt: Date?, clock: AppClock) async {
+    /// The workout screen's `.task(id:)` calls only this; `withSound` comes from its captured `RestReconcileKey`.
+    func reconcile(restEndsAt: Date?, clock: AppClock, withSound: Bool) async {
         switch RestNotificationPlan.decide(restEndsAt: restEndsAt, now: clock.now()) {
-        case .schedule(let endsAt): await schedule(endsAt, clock)
+        case .schedule(let endsAt): await schedule(endsAt, clock, withSound)
         case .cancel: cancel()
         }
     }

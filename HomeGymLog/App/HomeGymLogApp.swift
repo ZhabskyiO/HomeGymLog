@@ -4,7 +4,7 @@ import UserNotifications
 
 /// App entry point. Builds the SwiftData container once into a `Result` so a failure to open the store can be
 /// shown instead of trapping (debug builds still crash, loudly). A DEBUG `-seed` launch swaps in an in-memory
-/// container, a throwaway preferences suite, a frozen clock and silent rest and reminder notifiers; everything below the root is identical.
+/// container, a throwaway preferences suite, a frozen clock, silent rest and reminder notifiers and a silent chime; everything below the root is identical.
 @main
 struct HomeGymLogApp: App {
     /// Retained here because the notification center holds its delegate weakly. Installed unconditionally, seeds included:
@@ -26,6 +26,8 @@ struct HomeGymLogApp: App {
     /// Nil except a DEBUG `-seed` launch, which silences rest notifications; every other launch keeps the environment's
     /// live default.
     private let restNotifier: RestNotifier?
+    /// Nil except a DEBUG `-seed` launch, which silences the rest chime; every other launch keeps the live default.
+    private let restChime: RestChime?
     /// Nil except a DEBUG `-seed` launch, which fixes the permission status and never touches the notification center.
     private let reminderNotifier: ReminderNotifier?
     /// Nil except `-seed settings-restart`, which opens Settings with its restart confirmation already up.
@@ -48,6 +50,7 @@ struct HomeGymLogApp: App {
         var missedPromptEnabled: Bool? = nil
         var progressPreselection: String? = nil
         var restNotifier: RestNotifier? = nil
+        var restChime: RestChime? = nil
         var reminderNotifier: ReminderNotifier? = nil
         var settingsRestartPreview: Bool? = nil
         var missedBannerHold: Bool? = nil
@@ -60,6 +63,9 @@ struct HomeGymLogApp: App {
                     suite.set(reminder.enabled, forKey: ReminderPlan.enabledKey)
                     suite.set(reminder.minutes, forKey: ReminderPlan.minutesKey)
                 }
+                let feedback = try DebugFeedbackPreferences.parse(arguments: ProcessInfo.processInfo.arguments)
+                if let haptics = feedback.haptics { suite.set(haptics, forKey: FeedbackCues.hapticsKey) }
+                if let sound = feedback.sound { suite.set(sound, forKey: FeedbackCues.soundKey) }
                 defaults = suite
                 clock = seed.clock(calendar: live.calendar)
                 seedDraft = seed.initialDraft(calendar: live.calendar)
@@ -69,6 +75,7 @@ struct HomeGymLogApp: App {
                 missedPromptEnabled = seed.forcesMissedDayPrompt
                 settingsRestartPreview = seed.settingsRestartPreview
                 restNotifier = .silent()   // seeds freeze the clock: screenshot-only, never a real notification
+                restChime = .silent()   // and never a sound
                 reminderNotifier = .silent(status: seed.reminderStatus)
             }
             // Outside the seed branch: the selection arguments work on their own too.
@@ -76,6 +83,11 @@ struct HomeGymLogApp: App {
             initialTab = DebugInitialTab.parse(arguments: ProcessInfo.processInfo.arguments)
             progressPreselection = DebugProgressExercise.parse(arguments: ProcessInfo.processInfo.arguments)
             missedBannerHold = DebugBannerHold.parse(arguments: ProcessInfo.processInfo.arguments)
+        } catch let error as DebugFeedbackError {
+            switch error {
+            case .unknownValue(let argument, let value):
+                fatalError("Unknown \(argument) value: \"\(value)\". Valid: on, off")
+            }
         } catch {
             fatalError("Unknown -seed argument: \(error). Valid: \(DebugSeed.allCases.map(\.rawValue).joined(separator: ", "))")
         }
@@ -91,6 +103,7 @@ struct HomeGymLogApp: App {
         self.missedPromptEnabled = missedPromptEnabled
         self.progressPreselection = progressPreselection
         self.restNotifier = restNotifier
+        self.restChime = restChime
         self.reminderNotifier = reminderNotifier
         self.settingsRestartPreview = settingsRestartPreview
         self.missedBannerHold = missedBannerHold
@@ -123,6 +136,9 @@ struct HomeGymLogApp: App {
                     }
                     .transformEnvironment(\.reminderNotifier) { value in
                         if let override = reminderNotifier { value = override }
+                    }
+                    .transformEnvironment(\.restChime) { value in
+                        if let override = restChime { value = override }
                     }
             case .failure(let error):
                 StoreErrorView(error: error)

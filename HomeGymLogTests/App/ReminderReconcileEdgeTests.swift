@@ -66,7 +66,7 @@ private let delegateTable: [(String, UNNotificationPresentationOptions)] = [
                     }
                     return self.delivered
                 },
-                add: { request in
+                add: { request, _ in
                     self.events.append(.add(request.identifier))
                     self.onAdd()
                 },
@@ -99,7 +99,7 @@ private let delegateTable: [(String, UNNotificationPresentationOptions)] = [
         center.holdsDeliveredRead = true
         let notifier = center.notifier()
         let desired = requests(rowA)
-        let run = Task { await notifier.reconcile(desired) }
+        let run = Task { await notifier.reconcile(desired, true) }
         try await waitUntil { center.waiting != nil }
         run.cancel()
         center.release()
@@ -113,7 +113,7 @@ private let delegateTable: [(String, UNNotificationPresentationOptions)] = [
         center.onAdd = { withUnsafeCurrentTask { $0?.cancel() } }
         let notifier = center.notifier()
         let desired = requests(rowA)
-        let run = Task { await notifier.reconcile(desired) }
+        let run = Task { await notifier.reconcile(desired, true) }
         await run.value
         #expect(center.events.filter { if case .add = $0 { return true } else { return false } } == [.add("reminder-2026-09-16")])
     }
@@ -127,7 +127,7 @@ private let delegateTable: [(String, UNNotificationPresentationOptions)] = [
         #expect(desired == [])
         let recorder = ReminderNotifierRecorder(status: status, pending: ["rest-timer"] + rowA,
                                                 delivered: ["reminder-2026-09-15", "rest-timer"])
-        await ReminderNotifier.recording(into: recorder).reconcile(desired)
+        await ReminderNotifier.recording(into: recorder).reconcile(desired, true)
         #expect(recorder.pending == ["rest-timer"])
         #expect(recorder.delivered == ["rest-timer"])
         #expect(recorder.added == [])
@@ -138,7 +138,7 @@ private let delegateTable: [(String, UNNotificationPresentationOptions)] = [
     func prefixRule() async {
         let lookAlikes = ["Reminder-2026-09-16", "daily-reminder-2026-09-16", "rest-timer"]
         let recorder = ReminderNotifierRecorder(pending: lookAlikes + ["reminder-legacy", "reminder-2026-09-16"])
-        await ReminderNotifier.recording(into: recorder).reconcile(requests(["reminder-2026-09-16"]))
+        await ReminderNotifier.recording(into: recorder).reconcile(requests(["reminder-2026-09-16"]), true)
         #expect(recorder.events.first(where: { if case .removePending = $0 { return true } else { return false } })
                 == .removePending(["reminder-legacy"]))
         #expect(Set(recorder.pending) == Set(lookAlikes + ["reminder-2026-09-16"]))
@@ -148,9 +148,9 @@ private let delegateTable: [(String, UNNotificationPresentationOptions)] = [
     func idempotent() async {
         let recorder = ReminderNotifierRecorder(pending: ["rest-timer"])
         let notifier = ReminderNotifier.recording(into: recorder)
-        await notifier.reconcile(requests(rowA))
+        await notifier.reconcile(requests(rowA), true)
         let afterFirst = Set(recorder.pending)
-        await notifier.reconcile(requests(rowA))
+        await notifier.reconcile(requests(rowA), true)
         #expect(Set(recorder.pending) == afterFirst)
         #expect(recorder.events.filter { $0 == .removePending([]) }.count == 2)
         #expect(recorder.added.map(\.identifier) == rowA + rowA)
