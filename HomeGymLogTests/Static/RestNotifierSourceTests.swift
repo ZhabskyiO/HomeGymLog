@@ -2,7 +2,7 @@ import Foundation
 import Testing
 
 /// AC-30 (static half): seeded runs never reach the system notification center and production never overrides the live
-/// notifier. `.silent()` is set once, inside the root's DEBUG seed branch; a `.live()` on a line that names the rest
+/// notifier or chime. `.silent()` is set once per seam, inside the root's DEBUG seed branch; a `.live()` on a line that names the rest
 /// notifier appears only as the `restNotifier` environment default. Reads the checked-in sources via `#filePath`, comments
 /// stripped.
 @Suite struct RestNotifierSourceTests {
@@ -21,16 +21,19 @@ import Testing
         }
     }
 
-    @Test("HomeGymLogApp sets .silent() on exactly one line, inside the -seed branch and before its #endif")
+    @Test("HomeGymLogApp sets .silent() on exactly two lines (rest notifier, rest chime), inside the -seed branch before its #endif")
     func silentOnlyInSeedBranch() throws {
         let lines = try Self.codeLines(Self.appSourceRoot.appendingPathComponent("App/HomeGymLogApp.swift"))
         let silentLines = lines.indices.filter { lines[$0].contains(".silent()") }
-        #expect(silentLines.count == 1)
+        #expect(silentLines.count == 2)
+        #expect(silentLines.filter { lines[$0].contains("restNotifier") }.count == 1)
+        #expect(silentLines.filter { lines[$0].contains("restChime") }.count == 1)
         let seedBranch = try #require(lines.firstIndex { $0.contains("DebugSeed.parse(") })
         let endif = try #require(lines.indices.first { $0 > seedBranch && lines[$0].trimmingCharacters(in: .whitespaces).hasPrefix("#endif") })
-        let silent = try #require(silentLines.first)
-        #expect(silent > seedBranch)
-        #expect(silent < endif)
+        for silent in silentLines {
+            #expect(silent > seedBranch)
+            #expect(silent < endif)
+        }
     }
 
     @Test("a .live() on a line naming the rest notifier appears once in the app target: the restNotifier @Entry default")

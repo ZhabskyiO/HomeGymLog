@@ -42,7 +42,9 @@ Check each signature from its call site: what the owner can actually reach (a ro
 `@Environment`, so it takes the service as a parameter; a row that shows a time needs the calendar and locale or a
 preformatted string; a seam with no calendar cannot build date components). m4-reminder's first spec failed three
 signatures this way (planner F1, F3, F4). Any count an AC asserts about existing source ("`.silent(` on one line") is
-grepped in the current code first.
+grepped in the current code first. A call on an existing stored-closure property (`var reconcile: (…) -> Void`) takes no
+argument labels at the call site; a fixture or test an AC names is checked for visibility (a suite's `private` members are
+not shared) and every existing test the change breaks is listed (m5-haptics planner S1, S3, S6).
 Never name a type after a SwiftUI or Foundation type (`ProgressView`, `Text`, `Task`): it shadows the system one
 across the whole app target. Keep the spec under 400 lines unless numeric tables require more; prefer tables to prose. For any table
 derived from existing Engine code (row lists, schedules, weights), show the derivation per row (the intermediate

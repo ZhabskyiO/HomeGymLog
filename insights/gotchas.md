@@ -204,6 +204,15 @@ are kept as history.
 
 ## SwiftUI
 
+- 2026-09-24 — **An `@Entry` default is a computed getter, evaluated on every environment read** (macro expansion,
+  iOS 27.0 SDK; architecture review m5-haptics). A `.live()` default that builds a lazy player or cache rebuilds it
+  each read; keep that state in a process-wide static.
+- 2026-09-24 — **`.sensoryFeedback` trigger semantics** (researcher m5-haptics, probed on 17.5 and 26.5): no fire on
+  appear; a trigger change made in `.onAppear` is swallowed (one made in a `.task` at mount fires); a `Bool` toggled twice
+  in one turn fires nothing, an `Int` bumped twice fires once, so use `Int` counters; an offscreen lazy `List` row or a
+  view inserted in the same turn never fires, so attach the modifier to the long-lived screen view; a trigger bumped while
+  suspended fires late on resume. The simulator runs the closure but never buzzes: log inside it to probe.
+
 - 2026-09-22 — **A `.task(id:)` started during the first frames of launch is not reliably cancelled by the `-tab <name>`
   flip that follows**: `MissedPromptHost`'s 3 s banner timer keys on `selected == .home ? banner?.token : nil`, and a real
   tab tap does cancel it (probe: banner survives 5 s on Program and returns), but with `-seed missed -missedDayPolicy shift
@@ -349,6 +358,9 @@ are kept as history.
 
 ## User notifications
 
+- 2026-09-24 — **`UNNotificationContent.sound == UNNotificationSound.default` compares reliably** (m5-haptics,
+  `RestNotificationContentTests` / `ReminderNotificationContentTests`, hosted unit tests): no need for the `!= nil`
+  fallback the risk register expected. Recognize it: a test asserting notification content by exact sound equality.
 - 2026-09-23 — **Verified live (scratch-copy XCUITest, 17.5): the root-mounted reminder host works as a `.background` of the
   route `ZStack`**: at launch it scheduled 30 `reminder-*` requests beside a planted `rest-timer` (31 pending); the reminder
   fired in the foreground as a SpringBoard banner "HOMEGYMLOG, now, Training day, Your workout is planned for today."; a
@@ -382,8 +394,21 @@ are kept as history.
   delegate set in `App.init` ~0.4 s after init. `TEST_RUNNER_` environment did not reach the runner, and
   `test-without-building` ran a stale binary after a silent build error: build first, check its exit.
 
+## Audio
+
+- 2026-09-24 — **The default audio session category `soloAmbient` stops the user's music.** Set `.ambient` before playing
+  (mixes, obeys the silent switch, no ducking). `AudioServicesPlaySystemSound` does not use audio routing, so it misses
+  AirPods (researcher m5-haptics).
+
 ## Xcode / build
 
+- 2026-09-24 — **Confirmed at runtime: the hosted unit test target's `Bundle.main` is the app bundle**, not the test
+  bundle (`TEST_HOST`, `project.pbxproj:427`; m5-haptics `RestChimeAssetTests` resolves `rest-over.caf` through
+  `Bundle.main.url(forResource:withExtension:)` and reads it with `AVAudioFile`). Recognize it: a test that needs an
+  app-bundled resource can read it via `Bundle.main` with no fallback.
+- 2026-09-24 — **Non-Swift files under the synchronized `HomeGymLog/` folder become bundle resources** in Debug and
+  Release with no project edit (a `.caf` at the folder root was found by `Bundle.main.url(forResource:withExtension:)` on
+  17.5 and 26.5; researcher m5-haptics addendum).
 - 2026-09-23 — **A `-only-testing` run whose test failed never exited once**: the Swift Testing summary ("Test run with 13
   tests … failed") was printed, then `xcodebuild` sat for 10 minutes without "** TEST FAILED **" (17.5, parallel testing
   off); a later identical failing run exited normally. Guard focused runs with a watchdog

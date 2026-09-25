@@ -21,6 +21,8 @@ final class RestNotifierRecorder {
     /// Every center call in order, so tests can assert sequencing (schedule then cancel, never remove before add).
     private(set) var events: [Event] = []
     private(set) var added: [(endsAt: Date, interval: TimeInterval)] = []
+    /// The `withSound` flag of each add, in the same order as `added`.
+    private(set) var addedWithSound: [Bool] = []
     /// The instant of the pending request, nil when none.
     private(set) var pending: Date?
     /// Pending-request removals (every notifier cancel removes pending once).
@@ -53,9 +55,10 @@ final class RestNotifierRecorder {
         await withCheckedContinuation { continuation in held.append(continuation) }
     }
 
-    fileprivate func recordAdd(endsAt: Date, interval: TimeInterval) {
+    fileprivate func recordAdd(endsAt: Date, interval: TimeInterval, withSound: Bool) {
         events.append(.add(endsAt: endsAt))
         added.append((endsAt, interval))
+        addedWithSound.append(withSound)
         pending = endsAt
     }
 
@@ -77,7 +80,7 @@ extension RestNotifier {
     static func recording(into recorder: RestNotifierRecorder) -> RestNotifier {
         .using(RestNotificationCenter(
             authorize: { await recorder.authorize() },
-            add: { _, endsAt, interval in recorder.recordAdd(endsAt: endsAt, interval: interval) },
+            add: { _, endsAt, interval, withSound in recorder.recordAdd(endsAt: endsAt, interval: interval, withSound: withSound) },
             removePending: { _ in recorder.recordRemovePending() },
             removeDelivered: { _ in recorder.recordRemoveDelivered() }))
     }

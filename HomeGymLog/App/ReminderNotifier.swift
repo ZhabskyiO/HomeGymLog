@@ -11,8 +11,8 @@ struct ReminderNotificationCenter {
     var requestAuthorization: () async -> ReminderAuthorization
     var pendingIdentifiers: () async -> [String]
     var deliveredIdentifiers: () async -> [String]
-    /// Adds one non-repeating calendar request; the same identifier replaces the pending one.
-    var add: (_ request: ReminderRequest) async -> Void
+    /// Adds one non-repeating calendar request, with the default sound or none; the same identifier replaces the pending one.
+    var add: (_ request: ReminderRequest, _ withSound: Bool) async -> Void
     var removePending: (_ ids: [String]) -> Void
     var removeDelivered: (_ ids: [String]) -> Void
 
@@ -31,11 +31,8 @@ struct ReminderNotificationCenter {
             deliveredIdentifiers: {
                 await UNUserNotificationCenter.current().deliveredNotifications().map(\.request.identifier)
             },
-            add: { request in
-                let content = UNMutableNotificationContent()
-                content.title = ReminderText.notificationTitle
-                content.body = ReminderText.notificationBody
-                content.sound = .default
+            add: { request, withSound in
+                let content = ReminderNotificationCenter.content(withSound: withSound)
                 let trigger = UNCalendarNotificationTrigger(dateMatching: request.dateComponents, repeats: false)
                 try? await UNUserNotificationCenter.current().add(
                     UNNotificationRequest(identifier: request.identifier, content: content, trigger: trigger))
@@ -46,6 +43,15 @@ struct ReminderNotificationCenter {
             removeDelivered: { ids in
                 UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ids)
             })
+    }
+
+    /// The reminder content (m5-haptics 5.5): Sound off keeps the banner and drops only the sound (`sound = nil`).
+    static func content(withSound: Bool) -> UNMutableNotificationContent {
+        let content = UNMutableNotificationContent()
+        content.title = ReminderText.notificationTitle
+        content.body = ReminderText.notificationBody
+        content.sound = withSound ? .default : nil
+        return content
     }
 
     /// `.ephemeral` (App Clips only) counts as authorized; a status a later iOS adds counts as denied, so nothing is
@@ -68,8 +74,9 @@ struct ReminderNotificationCenter {
 struct ReminderNotifier {
     var status: () async -> ReminderAuthorization
     var requestAuthorization: () async -> ReminderAuthorization
-    /// Makes the pending `reminder-*` requests equal `desired` (spec 5.2).
-    var reconcile: (_ desired: [ReminderRequest]) async -> Void
+    /// Makes the pending `reminder-*` requests equal `desired` (spec 5.2), each added with the sound or without. A stored
+    /// closure takes no argument labels at the call site: `reconcile(desired, key.sound)`.
+    var reconcile: (_ desired: [ReminderRequest], _ withSound: Bool) async -> Void
 
     static func live() -> ReminderNotifier {
         .using(.system())
@@ -77,7 +84,7 @@ struct ReminderNotifier {
 
     /// A fixed status and nothing else: seeds freeze the clock and previews must never touch the system center.
     static func silent(status: ReminderAuthorization) -> ReminderNotifier {
-        ReminderNotifier(status: { status }, requestAuthorization: { status }, reconcile: { _ in })
+        ReminderNotifier(status: { status }, requestAuthorization: { status }, reconcile: { _, _ in })
     }
 
     /// The reconcile rules over any center (spec 5.2). Never asks for permission and asserts on nothing (it runs with no
@@ -88,7 +95,7 @@ struct ReminderNotifier {
         ReminderNotifier(
             status: { await center.status() },
             requestAuthorization: { await center.requestAuthorization() },
-            reconcile: { desired in
+            reconcile: { desired, withSound in
                 let wanted = Set(desired.map(\.identifier))
                 /// Reminder ids that are no longer wanted; ids without the prefix (`rest-timer`) are never touched.
                 func stale(_ ids: [String]) -> [String] {
@@ -102,7 +109,7 @@ struct ReminderNotifier {
                 center.removeDelivered(stale(delivered))
                 for request in desired {
                     guard !Task.isCancelled else { return }
-                    await center.add(request)
+                    await center.add(request, withSound)
                 }
             })
     }

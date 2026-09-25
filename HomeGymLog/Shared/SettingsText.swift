@@ -8,8 +8,10 @@ enum SettingsText {
     static let appearance = "Appearance"
     static let units = "Units"
     static let reminder = "Daily reminder"
-    static let haptics = "Sound & haptics"
-    static let comingSoon = "Coming soon"
+    static let haptics = "Haptics"
+    static let hapticsSubtitle = "Set logged, rest finished, workout done"
+    static let sound = "Sound"
+    static let soundSubtitle = "Rest finished, daily reminder"
 
     static let programSection = "PROGRAM"
     static let current = "Current"

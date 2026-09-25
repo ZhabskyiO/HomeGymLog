@@ -33,7 +33,9 @@ developer new to Swift: add one-line React analogies in doc comments where a Swi
    `git mv` inside them needs no project change). Never add a dependency, entitlement, or capability. Never commit.
 6. Tests: Swift Testing, `@Suite struct`, `#expect` / `#require`, per-test in-memory container, `@MainActor` only on
    suites that call app-target types, `try` outside `#expect` autoclosures. Every test must be able to fail; expected
-   values come from the spec, never from the function under test.
+   values come from the spec, never from the function under test. A test of a seam that never reaches its recorder
+   (`.silent(status:)` takes no center) or an `#expect` on a value the test itself built (`(0..<3).map` count == 3) cannot
+   fail; drop it or say in the report it is a smoke test (m5-haptics, test-writer removed one and fixed one).
 7. When something bites for more than a few minutes (build error, simulator quirk, API surprise), append it to
    `insights/gotchas.md` under the right heading with the date, symptom, fix and how to recognize it. Do not edit
    agents, skills, or `CLAUDE.md`.

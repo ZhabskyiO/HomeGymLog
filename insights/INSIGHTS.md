@@ -8,6 +8,51 @@ session start, so nothing here depends on it.
 
 ## Architecture decisions
 
+### 2026-09-24 — M5 haptics decisions (from the m5-haptics slice spec, user-answered)
+
+- **Two Settings rows, not the prototype's one**: "Haptics" (`hapticsEnabled`, "Set logged, rest finished, workout done")
+  and "Sound" (`soundEnabled`, "Rest finished, daily reminder"), both default on, independent.
+- **Haptics**: `.impact` on every set-logging path; `.success` when rest ends in the foreground, **including Skip** (the
+  "Rest over" VoiceOver announcement stays time-based only); one `.success` when the summary first appears. Nothing on a
+  relaunch past the rest end. VoiceOver users get announcement, haptic and chime.
+- **Sound**: a synthesized sub-second `.caf` chime (our own, no license) at the same rest ends, played through
+  `AVAudioPlayer` in the `.ambient` category so the user's music keeps playing; Sound off also sets `sound = nil` on the
+  background rest notification **and on the daily reminders** (`soundEnabled` joins both reconcile keys).
+- Shape (researcher `docs/reviews/m5-haptics-researcher.md`): `.sensoryFeedback(trigger:_:)` on Int counters on a
+  long-lived view, bumped in the handler whose write succeeded, preference read inside the closure; pure cue decisions
+  in Engine. No dependency, entitlement, capability, plist key or privacy-label change.
+- **Architecture review (2026-09-24, approve with changes, `docs/reviews/m5-haptics-architecture.md`)**: a cue is
+  decided before the store call and applied only after it returns true (B1); `RestChime.live()` keeps its player in a
+  process-wide static because an `@Entry` default is computed on every read, sets `.ambient` once, and is a no-op if
+  that fails, never playing in `soloAmbient` (B2); `AVFAudio` only in `App/RestChime.swift`; notification sound is
+  content (`withSound` through both notifier seams, `decide`/`desired` unchanged, the delegate never reads a
+  preference); the preference keys live in Engine `FeedbackCues`, read by SettingsView, WorkoutView and ReminderHost;
+  DEBUG Bool preferences are written to the seed suite by a parser inside `-seed` launches only.
+- **Implemented 2026-09-24** (branch `m5-haptics`): 1080 tests on iOS 17.5 and 26.5, Release green (bundle contains
+  `rest-over.caf`, `project.pbxproj` untouched), swift review "ship" with three optional low notes left as follow-ups,
+  none applied (`docs/reviews/m5-haptics-swift-review.md`): a repeated `if wrote, cue?.haptic != nil { … }` one-liner in
+  `logSet` and `saveAndLog` could become a shared `setLoggedSaved()` helper; `WorkoutFeedback`'s `sound` parameter is
+  unused by any haptic (`FeedbackCue.haptic` depends only on `haptics`) and could use a doc line saying so; a
+  `mediaServicesWereResetNotification` could revive a dead `RestChime` player, unverified and device-only. Notable
+  implementation facts: `UNNotificationSound.default == .default` compares reliably in a hosted test, so
+  `content(withSound:)` is asserted directly rather than falling back to `!= nil`; the hosted unit test target's
+  `Bundle.main` **is** the app bundle (`TEST_HOST`), confirmed at runtime by `RestChimeAssetTests` resolving
+  `rest-over.caf` through it; `UNMutableNotificationContent.content(withSound:)` must be called fully qualified
+  (`RestNotificationCenter.content(withSound:)` / `ReminderNotificationCenter.content(withSound:)`) inside a `let
+  content = …` closure, or the compiler resolves the wrong overload; `DebugFeedbackPreferences.parse` reads only the
+  first occurrence of a repeated `-haptics` or `-sound` argument (a later bad value is never reached), which the test
+  suite records as deliberate rather than fixing.
+
+### 2026-09-24 — M5 slicing (user-answered)
+
+- **Five slices, each merged before the next**: `m5-haptics` → `m5-light-theme` → `m5-export` → `m5-live-activity` →
+  `m5-release`. The small slices go first; the Live Activity (a widget extension target, Xcode GUI steps, an entitlement)
+  comes late. `m5-release` = icon (replacing the "H" welcome tile), copy audit (the A4 subtitle), privacy manifest,
+  App Store metadata.
+- **Export is a JSON backup with import** (the user chose it over CSV only and over CSV plus a JSON that nothing reads).
+  Import needs a stable schema, so **the frozen `AppSchemaV1` and its `SchemaMigrationPlan` move from "open for M5"
+  into `m5-export`**, landing before or with the backup format.
+
 ### 2026-09-23 — M4 reminder decisions (from the m4-reminder slice spec, user-answered)
 
 - **Daily reminder is off on a fresh install**; turning the toggle on asks for notification permission in context
@@ -748,6 +793,17 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
   does not break it.
 
 ## Patterns
+
+### 2026-09-24 — Haptic/chime cue: Int counters on a long-lived view, decided in Engine (m5-haptics)
+`.sensoryFeedback(trigger:)` needs a value that changes, never fires on first appearance, and is swallowed by a change
+made in `.onAppear`; an `Int` counter bumped in the write handler (never a `Bool`, which drops a same-turn double
+toggle) survives all of that. The counters (`setLoggedCount`, `restFinishedCount`, `workoutDoneCount`) live on the
+long-lived screen (`WorkoutView`), bumped only in the handler whose store write returned true, and are read by one
+modifier group (`WorkoutFeedback`) applied to the screen's outermost, always-mounted view — never the card, a row or
+the summary, which mount and unmount. Each modifier's closure re-asks a pure Engine table (`FeedbackCues.cue(for:
+haptics:sound:)`) for the current preference at playback time, so a toggle flipped mid-workout gates the very next
+cue with no extra plumbing. React analogy: a ref-like counter bumped inside the same handler that dispatched a
+successful write, read by an effect that maps it to a side effect, never a `useState` toggled twice in one render.
 
 ### 2026-09-23 — Derived notification schedule (m4-reminder researcher)
 A set of dated local notifications is a pure function of state (pending session days, enabled, time, permission,

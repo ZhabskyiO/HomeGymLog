@@ -84,11 +84,12 @@ the reminder seeds `reminder-on`, `reminder-denied`, `reminder-unasked` (Setting
 permission state), and the workout seeds `wo-start`, `wo-swipe`, `wo-rpe`,
 `wo-adjust`, `wo-rest`, `summary`, `wo-detail`, `wo-swap`, `wo-swap-rdl`, `wo-notes`, which open at the root with no
 `-tab`; frozen clock, in-memory store, throwaway preferences).
-Six more DEBUG launch arguments target a screen without taps (taps are refused on this machine): `-programWeek <n>
+Eight more DEBUG launch arguments target a screen without taps (taps are refused on this machine): `-programWeek <n>
 -programDay <d>` preselects the Program tab's week and day, `-tab <name>` opens the shell on that tab, `-progressExercise
 <key>` preselects the Progress tab's chip, `-appearance <system|dark|light>` and `-missedDayPolicy <ask|shift|skip>`
-override those `@AppStorage` preferences for a screenshot, and `-holdBanner` keeps the Settings missed-day automatic
-action's Home banner up with no auto-dismiss.
+override those `@AppStorage` preferences for a screenshot, `-holdBanner` keeps the Settings missed-day automatic
+action's Home banner up with no auto-dismiss, and `-haptics <on|off>` / `-sound <on|off>` override the Haptics and
+Sound preferences for a screenshot (honoured only inside a `-seed` launch).
 
 Skills (`.claude/skills/README.md`): `/milestone <n> [slice]` runs that flow up to plan approval. `/build-and-run`,
 `/run-tests`, `/device-install` drive Xcode. `/ship-check` before a commit, `/pr-self-review` before a PR,
@@ -161,7 +162,7 @@ xcrun xcresulttool get test-results summary --path build/tests.xcresult   # tota
    — settings slice done 2026-09-22 (branch `m4-settings`: the last placeholder tab replaced; Appearance (System/Dark/Light)
    applied window-wide via `overrideUserInterfaceStyle` from `RootView`, not `.preferredColorScheme`; Units as a second
    segmented control; disabled "Coming soon" rows for Daily reminder (built next, by `m4-reminder` below) and Sound &
-   haptics (M5); the Program card's new "Missed a
+   haptics (built by `m5-haptics` below, as two live rows); the Program card's new "Missed a
    day" preference (`@AppStorage("missedDayPolicy")`: Ask each time / Always shift / Always skip) drives `MissedPromptHost`'s
    existing shift/skip writers automatically, with a transient one-line Home banner naming what changed; "Build a new
    program…" archives through `ProgramStore.archive`, resets the tab to Home, and reopens onboarding at A2 prefilled
@@ -187,7 +188,20 @@ xcrun xcresulttool get test-results summary --path build/tests.xcresult   # tota
    before it starts; a closure constant reads as a nested function). Pending the user's MVP pass: AC-5–AC-7 and AC-9
    (device taps and VoiceOver), AC-16–AC-19, and AC-8(c) a real rest timer in the background. M4 is complete except the
    user's manual checks.
-5. Polish: Live Activity rest timer, light theme audit, haptics, export, icon, App Store prep.
+5. Polish: Live Activity rest timer, light theme audit, haptics, export, icon, App Store prep. Five slices, each merged
+   before the next: `m5-haptics` → `m5-light-theme` → `m5-export` (JSON backup + import, with `AppSchemaV1`) →
+   `m5-live-activity` → `m5-release` (scope in INSIGHTS 2026-09-24).
+   — haptics slice done 2026-09-24 (branch `m5-haptics`: Settings' last "Coming soon" row replaced by two live rows,
+   Haptics and Sound (a deviation from the prototype's one row), both default on; `WorkoutFeedback` applies three
+   `.sensoryFeedback` `Int` counters to the workout screen's outer view — an `.impact` when a set save lands, a
+   `.success` when a rest ends in the foreground (including Skip, decided before the store call and applied only
+   after it returns true) and once when the summary first appears; Sound also plays a synthesized `rest-over.caf`
+   through `AVAudioPlayer` in `.ambient` (a process-wide player box behind `RestChime`, since an `@Entry` default is
+   rebuilt on every read) and mutes the background "Rest over" notification and the daily reminders (`withSound`
+   joins both reconcile keys); DEBUG `-haptics on|off` / `-sound on|off`; 1080 tests on iOS 17.5 and 26.5, Release
+   green, swift review "ship" (three optional low notes, none applied: `docs/reviews/m5-haptics-swift-review.md`).
+   Pending the user's MVP pass: AC-5–AC-10 on device (haptic feel, chime over AirPods music, Ring/Silent, locked-phone
+   sound, VoiceOver).
 
 ## Product decisions (settled 2026-09-09)
 

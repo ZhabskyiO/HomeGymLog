@@ -25,8 +25,8 @@ import Testing
     func scheduleThenCancel() async {
         let recorder = RestNotifierRecorder(now: noon)
         let notifier = RestNotifier.recording(into: recorder)
-        await notifier.reconcile(restEndsAt: at(62), clock: recorder.clock)
-        await notifier.reconcile(restEndsAt: nil, clock: recorder.clock)
+        await notifier.reconcile(restEndsAt: at(62), clock: recorder.clock, withSound: true)
+        await notifier.reconcile(restEndsAt: nil, clock: recorder.clock, withSound: true)
         #expect(recorder.events == [.authorize, .add(endsAt: at(62)), .removePending, .removeDelivered])
         #expect(recorder.pending == nil)
     }
@@ -35,8 +35,8 @@ import Testing
     func cancelThenSchedule() async {
         let recorder = RestNotifierRecorder(now: noon)
         let notifier = RestNotifier.recording(into: recorder)
-        await notifier.reconcile(restEndsAt: nil, clock: recorder.clock)
-        await notifier.reconcile(restEndsAt: at(75), clock: recorder.clock)
+        await notifier.reconcile(restEndsAt: nil, clock: recorder.clock, withSound: true)
+        await notifier.reconcile(restEndsAt: at(75), clock: recorder.clock, withSound: true)
         #expect(recorder.events == [.removePending, .removeDelivered, .authorize, .add(endsAt: at(75))])
         #expect(recorder.pending == at(75))
     }
@@ -47,7 +47,7 @@ import Testing
     func cancelNeverAuthorizes(offset: Double?) async {
         let recorder = RestNotifierRecorder(now: noon)
         let notifier = RestNotifier.recording(into: recorder)
-        await notifier.reconcile(restEndsAt: offset.map(at), clock: recorder.clock)
+        await notifier.reconcile(restEndsAt: offset.map(at), clock: recorder.clock, withSound: true)
         notifier.cancel()
         #expect(!recorder.events.contains(.authorize))
     }
@@ -56,9 +56,9 @@ import Testing
     func extendReplacesWithoutRemoving() async {
         let recorder = RestNotifierRecorder(now: noon)
         let notifier = RestNotifier.recording(into: recorder)
-        await notifier.reconcile(restEndsAt: at(62), clock: recorder.clock)
+        await notifier.reconcile(restEndsAt: at(62), clock: recorder.clock, withSound: true)
         recorder.now = at(13)
-        await notifier.reconcile(restEndsAt: at(92), clock: recorder.clock)
+        await notifier.reconcile(restEndsAt: at(92), clock: recorder.clock, withSound: true)
         #expect(recorder.events == [.authorize, .add(endsAt: at(62)), .authorize, .add(endsAt: at(92))])
         #expect(recorder.added.map(\.interval) == [62, 79])
         #expect(recorder.pending == at(92))
@@ -68,7 +68,7 @@ import Testing
     func removeDeliveredKeepsPending() async {
         let recorder = RestNotifierRecorder(now: noon)
         let notifier = RestNotifier.recording(into: recorder)
-        await notifier.reconcile(restEndsAt: at(62), clock: recorder.clock)
+        await notifier.reconcile(restEndsAt: at(62), clock: recorder.clock, withSound: true)
         notifier.removeDelivered()
         #expect(recorder.pending == at(62))
         #expect(recorder.events == [.authorize, .add(endsAt: at(62)), .removeDelivered])
@@ -85,7 +85,7 @@ import Testing
         var runs: [Task<Void, Never>] = []
         for (k, end) in ends.enumerated() {
             if let previous = runs.last { previous.cancel() }   // ≈ `.task(id:)` cancelling the older run when the id changes
-            runs.append(Task { await notifier.schedule(end, clock) })
+            runs.append(Task { await notifier.schedule(end, clock, true) })
             try await waitUntil { recorder.waitingCount == k + 1 }
         }
         for index in releaseOrder {
@@ -105,10 +105,10 @@ import Testing
         recorder.holdsAuthorization = true
         let notifier = RestNotifier.recording(into: recorder)
         let clock = recorder.clock
-        let first = Task { await notifier.schedule(at(62), clock) }
+        let first = Task { await notifier.schedule(at(62), clock, true) }
         try await waitUntil { recorder.waitingCount == 1 }
         first.cancel()
-        let second = Task { await notifier.schedule(at(92), clock) }
+        let second = Task { await notifier.schedule(at(92), clock, true) }
         try await waitUntil { recorder.waitingCount == 2 }
         recorder.release(1)
         await second.value
@@ -126,7 +126,7 @@ import Testing
         let recorder = RestNotifierRecorder(now: noon)
         recorder.holdsAuthorization = true
         let notifier = RestNotifier.recording(into: recorder)
-        let run = Task { await notifier.schedule(at(5), recorder.clock) }
+        let run = Task { await notifier.schedule(at(5), recorder.clock, true) }
         try await waitUntil { recorder.waitingCount == 1 }
         recorder.now = at(4.999)
         recorder.release(0)
@@ -144,7 +144,7 @@ import Testing
         let recorder = RestNotifierRecorder(now: noon)
         recorder.holdsAuthorization = true
         let notifier = RestNotifier.recording(into: recorder)
-        let run = Task { await notifier.schedule(at(5), recorder.clock) }
+        let run = Task { await notifier.schedule(at(5), recorder.clock, true) }
         try await waitUntil { recorder.waitingCount == 1 }
         recorder.now = at(5)
         recorder.release(0)

@@ -3,7 +3,7 @@ import Testing
 
 /// `SettingsContent` and `SettingsRows` are view code with no seam a unit test can drive, so what is reachable is scanned
 /// over their source: the row order of spec 2.1–2.4 (which is also AC-15's VoiceOver order), every visible string coming
-/// from `SettingsText`, the two reserved rows staying off and disabled, the accessibility shape of the two row kinds, and
+/// from `SettingsText`, the Haptics and Sound switches bound to their preferences, the accessibility shape of the two row kinds, and
 /// the screen's one write going through `RestartAction`. `//` comments are stripped first.
 @Suite struct SettingsScreenSourceTests {
     /// `<repo>/HomeGymLog`, derived from `<repo>/HomeGymLogTests/Static/…`.
@@ -51,10 +51,10 @@ import Testing
                                       "SettingsView.swift"])
     }
 
-    @Test("the preferences card lists Appearance, Units, the Daily reminder rows, Sound & haptics in that order")
+    @Test("the preferences card lists Appearance, Units, the Daily reminder rows, Haptics, Sound in that order")
     func preferencesRowOrder() throws {
         let lines = try Self.codeLines("Features/Settings/SettingsContent.swift")
-        let tokens = ["SettingsText.appearance", "SettingsText.units", "ReminderRows(", "SettingsText.haptics"]
+        let tokens = ["SettingsText.appearance", "SettingsText.units", "ReminderRows(", "SettingsText.haptics", "SettingsText.sound,"]
         let indexes = try tokens.map { token in try #require(lines.firstIndex { $0.contains(token) }, "\(token)") }
         #expect(indexes == indexes.sorted())
         #expect(Set(indexes).count == tokens.count)
@@ -106,7 +106,7 @@ import Testing
     func dividerCount() throws {
         let lines = try Self.codeLines("Features/Settings/SettingsContent.swift")
         let dividers = lines.filter { $0.contains("SettingsDivider()") }.count
-        #expect(dividers == 7, "4 preference rows + 3 program rows + 3 equipment rows = 7 gaps (the reminder's own divider is in ReminderRows)")
+        #expect(dividers == 8, "5 preference rows + 3 program rows + 3 equipment rows = 8 gaps (the reminder's own divider is in ReminderRows)")
     }
 
     @Test("no Settings file types a user-visible string: every one comes from SettingsText or an enum label")
@@ -117,19 +117,21 @@ import Testing
         }
     }
 
-    @Test("the one reserved row (Sound & haptics) is a switch that is off and disabled, never a stored preference")
-    func comingSoonRowsAreInert() throws {
+    @Test("rows 4–5 are two live toggle rows, Haptics then Sound, each with its subtitle, never disabled")
+    func feedbackToggleRows() throws {
         let content = try Self.codeLines("Features/Settings/SettingsContent.swift")
-        let reserved = content.filter { $0.contains("SettingsComingSoonRow(") }
-        #expect(reserved.count == 1)
-        #expect(reserved.first?.contains("SettingsText.haptics") == true)
+        let rows = content.filter { $0.contains("SettingsToggleRow(") }
+        #expect(rows.count == 2)
+        #expect(rows.first?.contains("SettingsText.haptics,") == true)
+        #expect(rows.first?.contains("SettingsText.hapticsSubtitle") == true)
+        #expect(rows.last?.contains("SettingsText.sound,") == true)
+        #expect(rows.last?.contains("SettingsText.soundSubtitle") == true)
         let lines = try Self.codeLines("Features/Settings/SettingsRows.swift")
         let code = lines.joined(separator: "\n")
-        #expect(code.contains("struct SettingsComingSoonRow"))
-        #expect(code.contains("Toggle(isOn: .constant(false))"))
-        #expect(code.contains(".disabled(true)"))
-        #expect(code.contains("SettingsText.comingSoon"))
-        #expect(lines.contains { $0.contains("@AppStorage") } == false, "nothing on these rows is stored")
+        #expect(code.contains("struct SettingsToggleRow"))
+        #expect(code.contains("Toggle(isOn: $isOn)"))
+        #expect(code.contains(".disabled(") == false)
+        #expect(lines.contains { $0.contains("@AppStorage") } == false, "the screen owns the stored preferences")
     }
 
     @Test("a read-only row is one element with a label and a value; a row holding a control is never combined")
@@ -137,7 +139,7 @@ import Testing
         let lines = try Self.codeLines("Features/Settings/SettingsRows.swift")
         guard let valueRow = lines.firstIndex(where: { $0.contains("struct SettingsValueRow") }),
               let controlRow = lines.firstIndex(where: { $0.contains("struct SettingsControlRow") }),
-              let comingSoonRow = lines.firstIndex(where: { $0.contains("struct SettingsComingSoonRow") }) else {
+              let toggleRow = lines.firstIndex(where: { $0.contains("struct SettingsToggleRow") }) else {
             Issue.record("the three row types are declared in SettingsRows.swift")
             return
         }
@@ -146,9 +148,13 @@ import Testing
         #expect(valueRowBody.contains { $0.contains(".accessibilityLabel(label)") })
         #expect(valueRowBody.contains { $0.contains(".accessibilityValue(value)") })
 
-        let controlRowBody = lines[controlRow..<comingSoonRow]
+        let controlRowBody = lines[controlRow..<toggleRow]
         #expect(controlRowBody.contains { $0.contains(".accessibilityElement(") } == false,
                 "combining would fold the control into the row and break AC-15's order")
+
+        let toggleRowEnd = lines.indices.first { $0 > toggleRow && lines[$0].hasPrefix("struct ") } ?? lines.endIndex
+        #expect(lines[toggleRow..<toggleRowEnd].contains { $0.contains(".accessibilityElement(") } == false,
+                "a labelled Toggle is already one switch")
     }
 
     @Test("the policy control speaks the row's label and the chosen policy as its value")

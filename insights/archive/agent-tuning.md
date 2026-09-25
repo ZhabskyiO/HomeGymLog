@@ -5,6 +5,16 @@ Moved out of `INSIGHTS.md` on 2026-09-16 to keep session and agent reads small. 
 
 ## Agent tuning
 
+- 2026-09-24 — **spec-creator**: m5-haptics' spec reached the planner with seven wording issues (S1–S7), one of which
+  would not compile (labelled call on a stored closure), plus a private fixture treated as shared and two breaking tests
+  unlisted. Edit: stored-closure calls are unlabelled; named fixtures checked for visibility; breaking tests listed.
+- 2026-09-24 — **implementation-planner**: weakened AC-12's `== .default` to `!= nil` over an unverified equality risk;
+  the verifier's only should-fix. Edit: keep the spec's assertion, name a fallback. (`==` turned out to work.)
+- 2026-09-24 — **implementer**: two new tests could not fail (a `.silent` seam's unreachable recorder, a tautological
+  count); the test-writer caught both. Edit: those two shapes named under the "must be able to fail" rule.
+- 2026-09-24 — **architecture-reviewer** (worked well): proved `@Entry` defaults are computed per read by macro expansion
+  (B2), a real bug the researcher had assumed away. **researcher** (worked well): the scoped U4/U5 addendum closed both
+  probes in one round, which removed a device-only caveat from the spec.
 - 2026-09-23 — **spec-creator**: m4-reminder's first spec left seven gaps the planner found (a root `@State` object
   calling an environment notifier, a calendar-less seam building date components, a row formatting a time without a
   calendar or locale, an AC count already false in current code), wrote the DST-wrong fire-time rule ("day + minutes")

@@ -1,8 +1,8 @@
 import SwiftUI
 import SwiftData
 
-/// The Settings tab: appearance and units, the daily reminder, one row reserved for a later slice, the program card (current program, the
-/// missed-day policy, "Build a new program…") and the read-only equipment card. The three preferences are `@AppStorage`
+/// The Settings tab: appearance and units, the daily reminder, the Haptics and Sound switches, the program card (current program, the
+/// missed-day policy, "Build a new program…") and the read-only equipment card. The preferences are `@AppStorage`
 /// (≈ localStorage read through a hook), so a tap is written at once and every other screen re-derives from it.
 /// The only write here is `ProgramStore.archive` behind the confirmation dialog.
 struct SettingsView: View {
@@ -15,6 +15,8 @@ struct SettingsView: View {
     @AppStorage(MissedDayPolicy.storageKey) private var policyRaw = MissedDayPolicy.ask.rawValue
     @AppStorage(ReminderPlan.enabledKey) private var reminderEnabled = false
     @AppStorage(ReminderPlan.minutesKey) private var reminderMinutes = ReminderPlan.defaultMinutes
+    @AppStorage(FeedbackCues.hapticsKey) private var hapticsEnabled = FeedbackCues.defaultEnabled
+    @AppStorage(FeedbackCues.soundKey) private var soundEnabled = FeedbackCues.defaultEnabled
     /// The root's one permission owner (≈ a context store); the reminder host refreshes it on every scene-active.
     @Environment(ReminderPermission.self) private var permission
     @Environment(\.reminderNotifier) private var reminderNotifier
@@ -38,6 +40,7 @@ struct SettingsView: View {
                             reminderState: reminderState,
                             onAllowNotifications: { requestPermission() },
                             onOpenNotificationSettings: { openURL(ReminderPermission.settingsURL) },
+                            hapticsEnabled: $hapticsEnabled, soundEnabled: $soundEnabled,
                             onRestart: { showsRestartConfirm = true })
         }
         .background(Theme.bg.ignoresSafeArea())

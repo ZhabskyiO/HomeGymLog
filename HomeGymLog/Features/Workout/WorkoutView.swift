@@ -36,15 +36,26 @@ struct WorkoutView: View {
     /// only while its key is the displayed one, so a key change never shows the previous key's pill. Finished logs cannot
     /// change while a workout is open, so a key is never re-fetched while it stays displayed.
     @State private var pillBaseline: (key: String, previous: PreviousTops)?
+    /// Haptic event counters (m5-haptics 5.1): bumped only by a handler whose save succeeded, read by `.workoutFeedback`,
+    /// which plays when one changes. `Int`, not `Bool`: two bumps in one turn still change the value (≈ a nonce).
+    @State private var setLoggedCount = 0
+    @State private var restFinishedCount = 0
+    @State private var workoutDoneCount = 0
     @Environment(\.appClock) private var clock
     @Environment(\.modelContext) private var modelContext
     /// Live in the app, silent in seeds and previews.
     @Environment(\.restNotifier) private var notifier
+    /// Live in the app, silent in seeds and previews.
+    @Environment(\.restChime) private var chime
     /// Active, inactive or background (≈ `document.visibilityState`).
     @Environment(\.scenePhase) private var scenePhase
     /// Nil except a DEBUG sheet seed (`-seed wo-adjust`, …), which opens that sheet as the screen appears.
     @Environment(\.workoutSheetPreview) private var sheetPreview
     @AppStorage("units") private var unitsRaw = WeightUnit.lb.rawValue
+    /// Settings' Sound preference (≈ a persisted setting read like `useState`): the chime and the rest notification's sound.
+    @AppStorage(FeedbackCues.soundKey) private var soundEnabled = FeedbackCues.defaultEnabled
+    /// Settings' Haptics preference: gates every haptic on this screen.
+    @AppStorage(FeedbackCues.hapticsKey) private var hapticsEnabled = FeedbackCues.defaultEnabled
 
     init(log: WorkoutLog, onDone: @escaping (Date) -> Void) {
         self.log = log
@@ -64,6 +75,8 @@ struct WorkoutView: View {
         let exercises = WorkoutFlow.sorted(WorkoutSnapshotBuilder.values(exercises: exerciseRows, sets: setRows))
         let state = WorkoutFlow.state(exercises: exercises)
         let displayed = WorkoutFlow.displayedExercise(exercises: exercises, state: state)
+        // The rest reconcile's inputs as one value (≈ a useEffect dependency array); nil while Exit deletes the row.
+        let restKey: RestReconcileKey? = isDiscarding ? nil : RestReconcileKey(restEndsAt: log.restEndsAt, withSound: soundEnabled)
         Group {
             if isDiscarding {
                 Theme.bg.ignoresSafeArea()
@@ -113,9 +126,10 @@ struct WorkoutView: View {
                 assertionFailure("PR baseline failed: \(error)")
             }
         }
-        // ≈ an effect whose AbortController fires when the id changes: schedules or cancels the rest notification.
-        .task(id: isDiscarding ? nil : log.restEndsAt) {
-            await notifier.reconcile(restEndsAt: isDiscarding ? nil : log.restEndsAt, clock: clock)
+        // ≈ an effect whose AbortController fires when the id changes: schedules or cancels the rest notification. Every
+        // input comes from the captured key, never from state read after an await.
+        .task(id: restKey) {
+            await notifier.reconcile(restEndsAt: restKey?.restEndsAt, clock: clock, withSound: restKey?.withSound ?? false)
         }
         // ≈ useEffect(load, [displayedKey]); keyed on nil while Exit deletes rows, so no fetch starts then (NB5).
         .task(id: isDiscarding ? nil : displayed?.exerciseKey) { loadPillBaseline(key: displayed?.exerciseKey) }
@@ -130,6 +144,10 @@ struct WorkoutView: View {
             }
         }
         .onDisappear { notifier.cancel() }
+        // On the outermost view, which stays mounted from the first set to Done (never the card, a row or the summary).
+        .workoutFeedback(setLogged: setLoggedCount, restFinished: restFinishedCount, workoutDone: workoutDoneCount,
+                         haptics: hapticsEnabled, sound: soundEnabled, isSummary: state == .summary && !isDiscarding,
+                         onSummaryShown: summaryShown)
     }
 
     // MARK: Rest effects
@@ -142,6 +160,17 @@ struct WorkoutView: View {
         lastSeenRestEnd = result.lastSeenEndsAt
         if result.announce {
             AccessibilityNotification.Announcement(RestText.restOver).post()
+        }
+        if let cue = FeedbackCues.restEndCue(result, haptics: hapticsEnabled, sound: soundEnabled) {
+            if cue.haptic != nil { restFinishedCount += 1 }
+            if cue.chime { chime.play() }
+        }
+    }
+
+    /// The summary first appeared after the last set (spec 5.4): one success haptic, no chime.
+    private func summaryShown() {
+        if FeedbackCues.cue(for: .workoutDone, haptics: hapticsEnabled, sound: soundEnabled)?.haptic != nil {
+            workoutDoneCount += 1
         }
     }
 
@@ -256,7 +285,8 @@ struct WorkoutView: View {
         sheet = nil
         guard let row = setRow(draft.setID) else { return }
         do {
-            try WorkoutLogStore.saveAndLogSet(row, weightLb: draft.weightLb, reps: draft.reps, at: clock.now(), in: modelContext)
+            let wrote = try WorkoutLogStore.saveAndLogSet(row, weightLb: draft.weightLb, reps: draft.reps, at: clock.now(), in: modelContext)
+            if wrote, FeedbackCues.cue(for: .setLogged, haptics: hapticsEnabled, sound: soundEnabled)?.haptic != nil { setLoggedCount += 1 }
         } catch {
             assertionFailure("Save & log set failed: \(error)")
         }
@@ -275,7 +305,8 @@ struct WorkoutView: View {
     private func logSet(_ setID: UUID) {
         guard let row = setRow(setID) else { return }
         do {
-            try WorkoutLogStore.logSet(row, at: clock.now(), in: modelContext)
+            let wrote = try WorkoutLogStore.logSet(row, at: clock.now(), in: modelContext)
+            if wrote, FeedbackCues.cue(for: .setLogged, haptics: hapticsEnabled, sound: soundEnabled)?.haptic != nil { setLoggedCount += 1 }
         } catch {
             assertionFailure("Log set failed: \(error)")
         }
@@ -308,10 +339,17 @@ struct WorkoutView: View {
         }
     }
 
-    /// Rest card "Skip": clears the rest; the bar comes back and the rows are unchanged.
+    /// Rest card "Skip": clears the rest; the bar comes back and the rows are unchanged. The cue is decided before the
+    /// save from the rest's liveness at the tap (a stale tap cues nothing, so one end never cues twice) and applied only
+    /// after the save returned true (a failed save is rolled back and the card stays, so nothing is felt).
     private func skipRest() {
+        let cue = FeedbackCues.restSkipCue(restEndsAt: log.restEndsAt, now: clock.now(), haptics: hapticsEnabled, sound: soundEnabled)
         do {
-            try WorkoutLogStore.skipRest(log, in: modelContext)
+            let wrote = try WorkoutLogStore.skipRest(log, in: modelContext)
+            if wrote, let cue {
+                if cue.haptic != nil { restFinishedCount += 1 }
+                if cue.chime { chime.play() }
+            }
         } catch {
             assertionFailure("Skip rest failed: \(error)")
         }
@@ -359,5 +397,6 @@ struct WorkoutView: View {
         .modelContainer(container)
         .environment(\.appClock, DebugSeed.woStart.clock(calendar: calendar))
         .environment(\.restNotifier, .silent())
+        .environment(\.restChime, .silent())
 }
 #endif

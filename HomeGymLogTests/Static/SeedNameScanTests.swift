@@ -10,7 +10,8 @@ import Testing
                                 "\"missed-several\"", "\"missed-shifted\"", "\"missed-skipped\"",
                                 "\"progress-history\"", "\"-progressExercise\"",
                                 "\"settings-restart\"", "\"restarted\"", "\"-holdBanner\"",
-                                "\"reminder-on\"", "\"reminder-denied\"", "\"reminder-unasked\""]
+                                "\"reminder-on\"", "\"reminder-denied\"", "\"reminder-unasked\"",
+                                "\"-haptics\"", "\"-sound\""]
 
     /// `<repo>/HomeGymLog`, derived from `<repo>/HomeGymLogTests/Static/…`.
     private static var appSourceRoot: URL {

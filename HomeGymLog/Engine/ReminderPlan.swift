@@ -93,6 +93,8 @@ extension ReminderPlan {
         let activeTick: Int
         let pendingDays: [Date]
         let workoutInProgress: Bool
+        /// The Sound preference: a flip re-adds every reminder with the new content (m5-haptics 4.2).
+        let sound: Bool
     }
 
     /// Off when disabled; the picker while allowed or before the first status read (nil); the denied or not-asked row
@@ -108,10 +110,10 @@ extension ReminderPlan {
 
     /// Nil while the permission has not been read yet, so no pass runs before the first status read.
     nonisolated static func reconcileKey(enabled: Bool, minutes: Int, status: ReminderAuthorization?, activeTick: Int,
-                             pendingDays: [Date], workoutInProgress: Bool) -> ReconcileKey? {
+                             pendingDays: [Date], workoutInProgress: Bool, sound: Bool) -> ReconcileKey? {
         guard let status else { return nil }
         return ReconcileKey(enabled: enabled, minutes: minutes, status: status, activeTick: activeTick,
-                            pendingDays: pendingDays.sorted(), workoutInProgress: workoutInProgress)
+                            pendingDays: pendingDays.sorted(), workoutInProgress: workoutInProgress, sound: sound)
     }
 
     /// The picker's `Date` for the stored minutes on `day` (an invalid value shows as 07:00).
