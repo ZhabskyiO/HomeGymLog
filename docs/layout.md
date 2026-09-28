@@ -1,4 +1,4 @@
-# File layout (as of M5 haptics slice, 2026-09-24)
+# File layout (as of M5 light-theme slice, 2026-09-27)
 
 The per-file roster, moved out of `CLAUDE.md` on 2026-09-16 so every session and agent stops paying for it. `CLAUDE.md` keeps
 the directory map; read this file when you need to know which file owns what. `doc-writer` updates it after each slice.
@@ -177,7 +177,9 @@ HomeGymLogTests/           Swift Testing target
                            midProgramDays over MissedDayFixtures, the typed freshProgramDays — and weekdayIDs, a calendar
                            walk that never calls ReminderPlan, so expected ids are an independent oracle),
                            ReminderNotifierRecorder (the RestNotifierRecorder shape for ReminderNotifier: pending and
-                           delivered id sets, a fixed status, every call in order, and held pending/status/request reads)
+                           delivered id sets, a fixed status, every call in order, and held pending/status/request reads),
+                           ContrastRatio (test-only WCAG 2.1 helper for `ColorsetContrastTests`: RGB, luminance, ratio,
+                           blend over spec 5.1/5.2/5.4; traps only on a malformed test string literal, total over RGB)
   App/                     RestNotifier(+Edge) suites: the notifier's rules over the recorder, never the system center;
                            AppNotificationDelegateTests (foreground presentation options per identifier prefix),
                            ReminderNotifierTests(+ReminderReconcileEdgeTests) (ReminderNotifier.using(_:).reconcile's
@@ -290,7 +292,10 @@ HomeGymLogTests/           Swift Testing target
                            .sensoryFeedback( on exactly three lines, all in WorkoutFeedback.swift; the Skip path's
                            restSkipCue( / WorkoutLogStore.skipRest( / restFinishedCount += 1 line order (B1);
                            hapticsEnabled/soundEnabled @AppStorage readers; SettingsComingSoonRow and
-                           SettingsText.comingSoon gone)
+                           SettingsText.comingSoon gone), ColorsetContrastTests (the 11 colorsets' entry shape and hex
+                           via a loud `#require` parser reading `Assets.xcassets` from the source tree; the AA floors
+                           and three recorded shortfalls of spec 2.4/5.3; Theme ↔ colorset names; the hard-coded color
+                           sites as sorted path lists)
 design/                    prototype export (read-only reference)
 docs/specs, docs/plans     specs from spec-creator, plans from implementation-planner (dated status when done)
 docs/tools                 make-rest-chime.py: generates HomeGymLog/rest-over.caf (880 Hz, 0.2 s, IMA4 CAF via

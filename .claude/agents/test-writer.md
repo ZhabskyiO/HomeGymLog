@@ -25,7 +25,9 @@ Conventions:
   `@Test(arguments:)` when the same rule has many cases.
 
 Run the tests with the command in `CLAUDE.md` (or `xcodebuild test` against an available iPhone
-simulator) and read the output. Never pass `-resultBundlePath`: a stale bundle at that path fails the run. If a test fails because the production code is wrong, keep the test,
+simulator) and read the output. Pass `-resultBundlePath` only after `rm -rf` of that path (a stale bundle fails the run), and when the caller asks for counts use
+the bundle and `xcrun xcresulttool get test-results summary`: distinct test names grepped from the log miscount
+parameterized tests (m5-light-theme: 1094 from the log, 1095 in the bundle). If a test fails because the production code is wrong, keep the test,
 do not change the production code, and report the failure with the expected and actual values. If a
 test fails because your test is wrong, fix the test. If production code is untestable (hidden
 dependency on `Date()`, a singleton), report the smallest change that would make it testable instead

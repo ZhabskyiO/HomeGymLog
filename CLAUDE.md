@@ -202,6 +202,17 @@ xcrun xcresulttool get test-results summary --path build/tests.xcresult   # tota
    green, swift review "ship" (three optional low notes, none applied: `docs/reviews/m5-haptics-swift-review.md`).
    Pending the user's MVP pass: AC-5–AC-10 on device (haptic feel, chime over AirPods music, Ring/Silent, locked-phone
    sound, VoiceOver).
+   — light-theme slice done 2026-09-27 (branch `m5-light-theme`: an audit found all 11 colorsets already matched the
+   prototype; `success` / `warning` gain a `luminosity = dark` entry holding today's `22C55E` / `F59E0B`, their light
+   base darkens to `15803D` / `B45309`; light `mu` darkens to `68646A`; no Swift file changed, `project.pbxproj`
+   untouched; a new Static suite (`ColorsetContrastTests` over a test-only `ContrastRatio` WCAG helper) reads the
+   colorset JSON from the source tree and pins the AA floors, the three recorded shortfalls, the Theme ↔ colorset
+   names and the hard-coded color sites; 1095 tests on iOS 17.5 and 26.5, Release green, swift review "ship" (three
+   optional low notes, none applied: `docs/reviews/m5-light-theme-swift-review.md`); Dark confirmed pixel-identical
+   before/after on both runtimes, every screen re-shot in Light against a light-patched scratch render of the
+   prototype, scratch-copy XCUITest confirmed AC-15 (live switch) and AC-16 (light keyboard); user accepted the
+   progression pill's 3.75 contrast and a white status bar under the missed-day scrim on a Dark device in Light).
+   Pending the user's MVP pass: the open-sheet half of AC-15, and AC-17 VoiceOver.
 
 ## Product decisions (settled 2026-09-09)
 

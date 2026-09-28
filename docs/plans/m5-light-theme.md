@@ -1,4 +1,7 @@
 # M5 slice 2 — Light theme audit (three colorset edits, contrast suite, every screen in Light on both runtimes): implementation plan
+**Status: implemented 2026-09-27** (branch `m5-light-theme`, 1095 tests on iOS 17.5 and 26.5, Release green; see
+INSIGHTS 2026-09-25 for the implementation bullet). Below is the verified plan, unchanged since draft.
+
 **Status: draft 2026-09-25, for plan-verifier.** For `docs/specs/m5-light-theme.md` (approved draft; architecture review
 `docs/reviews/m5-light-theme-architecture.md` B1, B2 (b), NB1–NB8 folded in). Spec §2–§6 and §8 are the contract (`AC-1`…`AC-17`)
 and are not restated. Format follows `docs/plans/m5-haptics.md`. `implementer`: one step per build, nothing committed.

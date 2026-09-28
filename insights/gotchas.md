@@ -204,6 +204,16 @@ are kept as history.
 
 ## SwiftUI
 
+- 2026-09-25 — **With the app's Light override on a dark device, the status bar turns light (white text) while the missed-day
+  prompt's 0.55 black scrim is up** (17.5 and 26.5, `-seed missed -appearance light`, still white after 8 s). The same seed
+  with Appearance = System on a light device shows a dark status bar, and every other overridden screen (sheets, the
+  restart dialog, workout) shows a dark one. No app code touches the status bar. Found by the m5-light-theme screen pass.
+  This is expected system behavior, not a bug: white is the more legible choice over the `6E6D6D` scrim (5.1 vs 4.1 for
+  dark text). Recognize it: only the scrim screen's status bar disagrees with the override.
+- 2026-09-25 — **On iOS 26.5 `.confirmationDialog` presents as a popover anchored to its button, with no "Cancel" button**
+  (the Settings restart dialog: only "Archive and start over"; an outside tap dismisses it). 17.5 shows the action sheet with
+  Cancel. An XCUITest that waits for `app.buttons["Cancel"]` passes on 17.5 and fails on 26.5 (m5-light-theme Step 8).
+
 - 2026-09-24 — **An `@Entry` default is a computed getter, evaluated on every environment read** (macro expansion,
   iOS 27.0 SDK; architecture review m5-haptics). A `.live()` default that builds a lazy player or cache rebuilds it
   each read; keep that state in a process-wide static.
@@ -415,6 +425,12 @@ are kept as history.
   (`(ONLY … & PID=$!; (sleep 500; kill $PID) & wait $PID)`) and read `build/last-test.log` for the result. Recognize it: a
   run past its timeout whose log already ends with the Swift Testing summary line.
 
+- 2026-09-25 — **On iOS 26.5 (iPhone 17) the first `simctl io screenshot` after a boot can include the Dynamic Island
+  and a black screen-corner mask**; later shots of the same screen do not. m5-light-theme Dark regression: `26 home`
+  differed in rows 0..152 px (x 0..791, 39,496 px: the island pill at y ≈ 42–152 plus 16 corner pixels), every later shot
+  and a re-shoot were clean, and `CMPX … 153` printed `same`. The plan's "status bar = rows < 150" allowance is 3 rows
+  too short for this device (the island reaches row 152). Recognize it: a byte-compare fail on the first seed of a run,
+  confined to the top 153 rows, with a black pill in one image. Fix: skip 153 rows on 26.5, or take a throwaway shot first.
 - 2026-09-22 — **The throwaway `seed` preferences suite can survive a launch**: after a run with `-appearance light`, later
   seeded launches read `appearance = light` even though the root calls `removePersistentDomain(forName: "seed")` at start
   and the app was uninstalled (`xcrun simctl spawn <udid> defaults read seed` showed the stale key; cfprefsd flushes the

@@ -5,6 +5,16 @@ Moved out of `INSIGHTS.md` on 2026-09-16 to keep session and agent reads small. 
 
 ## Agent tuning
 
+- 2026-09-27 — **spec-creator**: m5-light-theme modelled the progression pill's tint over white `sf` (4.14); it sits on
+  `bg` (3.75), caught only by the implementer's screen pass after the spec, plan and verifier all agreed. Edit: a
+  translucent element's ratio is composited over the parent surface read from code.
+- 2026-09-27 — **test-writer**: refused `-resultBundlePath` per its "never pass" rule and counted distinct names from the
+  log, one short (1094 vs 1095). Edit: pass it after `rm -rf`, and use `xcresulttool` for counts.
+- 2026-09-27 — **implementer**: strong run. It stopped on two unplanned findings (the pill over `bg`, the status bar
+  under the scrim) instead of changing the design, and left three sharp gotchas. It has no `/design-compare` tool in a
+  subagent and compared by reading both PNGs plus pixel counts, which was enough. No edit.
+- 2026-09-27 — **test-writer**: found a real spec contradiction (AC-12 said the pill was over `sf` at 4.0, §5.4 over `bg`
+  at 3.5) left by a late decision folded in the main session, and added parser-rejection tests the AC implied. No edit.
 - 2026-09-24 — **spec-creator**: m5-haptics' spec reached the planner with seven wording issues (S1–S7), one of which
   would not compile (labelled call on a stored closure), plus a private fixture treated as shared and two breaking tests
   unlisted. Edit: stored-closure calls are unlabelled; named fixtures checked for visibility; breaking tests listed.
@@ -247,6 +257,8 @@ Moved out of `INSIGHTS.md` on 2026-09-16 to keep session and agent reads small. 
 
 ### Skill tuning
 
+- 2026-09-27 — **design-compare**: step 1 now says how to get a light reference for any snapshot (the `patch_light.py`
+  recipe in `docs/plans/m5-light-theme.md` Step 2, rendered into `build/proto-light/`); before, only `home-light` existed.
 - 2026-09-23 — **milestone** (no edit): the researcher returns suggested gotchas and INSIGHTS lines by design; the
   m4-reminder brief asked it to append them itself, which it did not. Step 3's "Record findings that matter in
   `insights/`" already puts that on the main session; briefs should not ask the researcher to write insights.

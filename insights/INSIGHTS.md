@@ -13,13 +13,18 @@ session start, so nothing here depends on it.
 - **Audit result**: the 11 colorsets match the prototype's light and dark tokens exactly; the hard-coded black
   scrims/shadows and white-on-fill text are the prototype's own in both themes, so they stay.
 - **Success/warning in Light: darken the fills themselves** (user chose this over separate text tokens): light
-  entries are added to the `success` and `warning` colorsets and dark stays unchanged. Every green/amber fill and text
-  in Light darkens, which is a named deviation from `home-light`.
+  `success` / `warning` become `15803D` / `B45309` (green-700/amber-700), dark unchanged (`22C55E` / `F59E0B`).
+  Every green/amber fill and text in Light darkens, a named deviation from `home-light`. White on the fills goes from
+  2.2 to 5.02; text on `sf2` (4.12/4.13) is still just under AA, recorded. The "↑ +X" pill sits on `bg`, not a card:
+  its tint composites to `D5E2DA` and its text is 3.75, which the user accepted (test floor 3.5) rather than change the
+  pill (screen pass 2026-09-25).
+- **The status bar turns white under the missed-day scrim** on a dark device with the app in Light. That is iOS's choice
+  and is accepted: white is the more legible option there (5.1 vs 4.1 on `6E6D6D`).
 - **Light `mu` → `68646A`** (4.77 on `sf2`; the prototype's value was 4.36).
 - **Pairs that fail in both themes and in the prototype are accepted as brand** (white ✓ on fills, accent text, 0.45
   waiting rows), recorded in the spec rather than fixed.
 - **A Static test `ColorsetContrastTests`** reads the colorset JSON through a test-only `ContrastRatio` helper and
-  asserts ≥ 4.5 on bg/sf plus a 4.0 regression floor on the three recorded shortfalls, so a future token edit cannot
+  asserts ≥ 4.5 on bg/sf plus regression floors on the recorded shortfalls (4.0 for the `sf2` pairs, 3.5 for the pill), so a future token edit cannot
   silently regress them. Asset-catalog JSON is tested from the source tree via `#filePath`, never `Bundle.main`.
 - A token may carry an appearance-specific value where the prototype holds it constant: `Theme.phaseColor(.peak)`
   (= `warning`) darkens in Light too.
@@ -28,6 +33,18 @@ session start, so nothing here depends on it.
   something; Light references for screens with no light snapshot are rendered from a scratch copy of the prototype
   patched to `theme:'light'`.
 - The rest card keeps its black 0.4 shadow in Light. No new seed: every screen is its existing seed plus `-appearance light`.
+- **Implemented 2026-09-27** (branch `m5-light-theme`): the three `Contents.json` edits above (`success`, `warning` gain
+  a `luminosity = dark` entry, light base darkens; light `mu` darkens), no Swift file touched, `project.pbxproj`
+  untouched. New tests `HomeGymLogTests/Support/ContrastRatio.swift` (test-only WCAG helper) and
+  `HomeGymLogTests/Static/ColorsetContrastTests.swift` (15 tests, reads colorset JSON from the source tree via
+  `#filePath` with a loud parser; asserts the AA floors, the three recorded shortfalls, the Theme ↔ colorset names,
+  and the hard-coded color sites as path lists). 1095 tests on iOS 17.5 and 26.5, Debug and Release green, swift
+  review "ship" with three optional low notes, none applied (`docs/reviews/m5-light-theme-swift-review.md`). The 14
+  Dark screenshots taken before the edit matched the ones taken after byte for byte; 34 Light screens per runtime
+  matched a light-patched scratch render of the prototype; a scratch-copy XCUITest confirmed AC-15 (live switch) and
+  AC-16 (light keyboard) on both runtimes. User accepted the pill's 3.75 contrast and a white status bar under the
+  missed-day scrim on a Dark device with the app in Light. Pending the user's MVP pass: the open-sheet half of
+  AC-15, and AC-17 VoiceOver.
 
 ### 2026-09-24 — M5 haptics decisions (from the m5-haptics slice spec, user-answered)
 
@@ -814,6 +831,15 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
   does not break it.
 
 ## Patterns
+
+### 2026-09-27 — Asset-catalog colors under test: read the colorset JSON from the source tree (m5-light-theme)
+The hosted test bundle only sees the compiled `Assets.car`, so a token test walks `#filePath` up to
+`HomeGymLog/Assets.xcassets` and decodes every `*.colorset/Contents.json` with a loud parser (`0x` hex only, entry shape
+asserted, `#require` naming the file). A test-only `ContrastRatio` (WCAG 2.1 luminosity, alpha blend) then pins floors
+per pair, compared unrounded. A translucent element is blended over the surface it actually sits on. The pairs sit
+right at their floors: `15803D` on `bg` is 4.5001, and the pill's 3.5 floor guards 3.75. React analogy: a snapshot test
+of the design-token JSON, run in CI, instead of eyeballing Storybook.
+    ColorsetContrastTests: tokens = decode(assets/"success.colorset") → ratio(tokens.light, bg.light) >= 4.5
 
 ### 2026-09-24 — Haptic/chime cue: Int counters on a long-lived view, decided in Engine (m5-haptics)
 `.sensoryFeedback(trigger:)` needs a value that changes, never fires on first appearance, and is swallowed by a change

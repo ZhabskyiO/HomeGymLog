@@ -1,5 +1,8 @@
 # M5 slice 2 — Light theme audit (tokens, hard-coded colors, contrast, every screen in Light on both runtimes)
 
+**Status: implemented 2026-09-27** (branch `m5-light-theme`, 1095 tests on iOS 17.5 and 26.5, Release green, swift
+review "ship"; see INSIGHTS 2026-09-25 for the implementation bullet). Below is the approved spec, unchanged since draft.
+
 **Status: approved draft 2026-09-25, architecture review applied** (open questions Q1–Q6 answered by the user, §9; review
 `docs/reviews/m5-light-theme-architecture.md` "approve with changes": B1, B2 option (b), NB1–NB5, NB7, NB8 folded in and marked inline). Branch `m5-light-theme`. Depends on
 `m5-haptics` (merged 2026-09-24). Milestone-wide decisions (slicing, no new dependency or capability) are in `docs/specs/m5-haptics.md`
@@ -72,7 +75,7 @@ therefore also darken in Light (a fill, non-text: `B45309` on `sf` 5.02).
 | `.black.opacity(0.4)` shadow | `Workout/RestOverlay:58` | 353 `0 -20px 50px rgba(0,0,0,.4)` | Right, prototype-identical, kept (Q5 = A) |
 | `Theme.accent.opacity(0.22 → 0)` gradient | `Home/TodayCard:27` | 160 | Right; tint over white = `F8CDD7`, `tx` on it 12.6 |
 | `Theme.accent.opacity(0.28 / 0.08)` + `0.5` border | `Workout/SummaryCards:83,86` | 414 | Right |
-| `Theme.success.opacity(0.14)` pill background | `Workout/ProgressionPillView:19` | 323 | Right; composites to `DEEDE4` in Light after F1 (§5.4) |
+| `Theme.success.opacity(0.14)` pill background | `Workout/ProgressionPillView:19` | 323 | Right; composites to `D5E2DA` in Light after F1 (§5.4; the pill sits on `bg`, not a white card, found by the screen pass 2026-09-25) |
 | `Theme.bg.opacity(0)` fade | `Onboarding/OnboardingChrome:60` | — (token-based) | Right |
 | `.opacity(0.4)` disabled Continue / Swap / Next | `OnboardingChrome:55`, `WorkoutHeader:24`, `WorkoutBottomBar:22` | 638 `obNextOpacity … .4` | Right; inactive controls are exempt from AA |
 | `.opacity(0.45)` waiting set rows | `Workout/SetRow:33` | 718 `opacity … .45` | Prototype-faithful; `tx` at .45 on white = 2.94 (dark 4.17); accepted (Q3 = A) |
@@ -103,7 +106,7 @@ Every other text in the app carries `Theme.tx` or `Theme.mu` explicitly; every s
 | Color | Light | Dark | Text uses (size) | Verdict |
 |---|---|---|---|---|
 | `accent` | 4.21 / **4.70** / 3.86 | 4.10 / 3.73 / 3.36 | kickers "TODAY", "Session complete", "Personal records" (12 pt bold); "Progress ›" (13 pt); cue numbers (14 pt bold); "Build a new program…" (15 pt); tab label (10.5 pt); today numbers (11–12 pt bold) | fails 4.5 in **both** themes except accent-on-`sf` light; ≥ 3.36 everywhere; brand color, prototype-inherent — **accepted and recorded (Q3 = A)** |
-| `success` | **2.28 / 2.04 / 1.87 → 5.02 / 4.50 / 4.12** | 7.68 / 8.45 / 6.92 | "Completed" (`SessionCard:29`, 12 pt semibold), "+5 lb" delta (`ProgressChartCard:52`, 16 pt bold), "↑ +5 from your last" (`ProgressionPillView:16`, 12 pt, on its tint: **2.02 → 4.14**) | light fails badly → **F1 fixes** (the `sf2` and pill-tint rows land at 4.12 / 4.14, recorded shortfalls) |
+| `success` | **2.28 / 2.04 / 1.87 → 5.02 / 4.50 / 4.12** | 7.68 / 8.45 / 6.92 | "Completed" (`SessionCard:29`, 12 pt semibold), "+5 lb" delta (`ProgressChartCard:52`, 16 pt bold), "↑ +5 from your last" (`ProgressionPillView:16`, 12 pt, on its tint over `bg`: **→ 3.75**, screen pass 2026-09-25) | light fails badly → **F1 fixes** (the `sf2` and pill-tint rows land at 4.12 / 3.75, recorded shortfalls) |
 | `warning` | **2.15 / 1.93 / 1.77 → 5.02 / 4.51 / 4.13** | 8.15 / 8.97 / 7.34 | "Missed" (`SessionCard:29`), "MISSED SESSION" kicker (`MissedSessionCard:19`, 12 pt bold), week-strip missed number (`WeekStrip:51`, 11 pt bold on `sf`), calendar missed day (`MonthCalendar:78`, on `sf2`), negative delta | light fails badly → **F1 fixes** |
 | `phaseFoundation` | 3.23 on `sf`, 2.90 on `bg` | 5.42 / 5.96 | never text: 8 pt legend squares, `PhaseBar`, week-chip underline (`WeekChipRow:47`, on `sf`) | non-text 3 : 1: passes on `sf`, 2.90 on `bg` (`PhaseBar` in `HomeHeader` sits on `sf`); no fix |
 | `phaseDeload` | 3.35 / 3.01 | 5.23 / 5.75 | never text (same places) | pass (non-text) |
@@ -121,14 +124,14 @@ vs `E11D48` are in Dark by hue and lightness); no text sits on that seam.
 
 | # | Fix | Files | Visible change |
 |---|---|---|---|
-| F1 (Q1 = B) | `success.colorset` and `warning.colorset` gain a **`luminosity = dark`** entry holding today's `22C55E` / `F59E0B`; their **base** entry becomes light **`15803D`** / **`B45309`**. No new token, no view edit: every `Theme.success` / `Theme.warning` site follows | `Assets.xcassets/success.colorset`, `warning.colorset` | Light only: "Completed" / "Missed" / deltas / kickers / missed marks (text); the week-strip ✓ circle, calendar completed cells, `ProgramDayRow` dot, swipe tracks, `WorkoutHeader` passed dots, `SetRow` done badge, the Peak underline and legend square (fills); the progression pill's tint (`DEEDE4`). **Named `home-light` deviation: the week strip's ✓ circles are `15803D`, not the crop's `22c55e`** (AC-1) |
+| F1 (Q1 = B) | `success.colorset` and `warning.colorset` gain a **`luminosity = dark`** entry holding today's `22C55E` / `F59E0B`; their **base** entry becomes light **`15803D`** / **`B45309`**. No new token, no view edit: every `Theme.success` / `Theme.warning` site follows | `Assets.xcassets/success.colorset`, `warning.colorset` | Light only: "Completed" / "Missed" / deltas / kickers / missed marks (text); the week-strip ✓ circle, calendar completed cells, `ProgramDayRow` dot, swipe tracks, `WorkoutHeader` passed dots, `SetRow` done badge, the Peak underline and legend square (fills); the progression pill's tint (`D5E2DA` over `bg`). **Named `home-light` deviation: the week strip's ✓ circles are `15803D`, not the crop's `22c55e`** (AC-1) |
 | F2 (Q2 = A) | Light `mu` `6E6A70` → **`68646A`** (`mu.colorset` base entry only) | `mu.colorset` | Imperceptible at screenshot scale; `mu` on `sf2` 4.77, `bg` 5.21, `sf` 5.80. Named `home-light` deviation (AC-1) |
 | F3 (Q3 = A, Q5 = A) | No change to scrims, shadows, white-on-accent, accent text, tints, disabled / waiting opacities, or Dark's white-on-green | — | — |
 
 **Do the shades still read as the brand?** `22C55E` / `F59E0B` / `E11D48` are the green-500 / amber-500 / rose-600 steps of one
 published palette; `15803D` / `B45309` are that palette's green-700 / amber-700 — the same hues (≈ 142° / 26°), two steps darker, the
 conventional "same color on white" pairing. Recorded shortfalls after F1: `success` / `warning` text on `sf2` 4.12 / 4.13 (the
-calendar's missed day, the waiting badge never uses them) and pill text on its own tint 4.14; every other row ≥ 4.5.
+calendar's missed day, the waiting badge never uses them) and pill text on its own tint 3.75 (over `bg`; user accepted 2026-09-25, test floor 3.5); every other row ≥ 4.5.
 
 ---
 
@@ -189,7 +192,7 @@ Dark entries equal today's values, so Dark renders byte-identically.
 
 Light scrim: 0.55 · `000000` + 0.45 · `F4F2F3` = **`6E6D6D`**; the `sf` card on it = 5.16. Light hairline on `sf`: 0.08 · black + 0.92 ·
 white = `EBEBEB` (1.19). Pill tint after F1: 0.14 · `15803D` + 0.86 · `FFFFFF` = (0.14·21 + 219.3, 0.14·128 + 219.3, 0.14·61 + 219.3) =
-(222, 237, 228) = **`DEEDE4`**; `15803D` on it = **4.14** (was `22C55E` on `E0F7E8` = 2.02); the tint against the white card = 1.21
+(222, 237, 228) = **`DEEDE4`** over white; the pill actually sits on light `bg` `F4F2F3`, where it composites to **`D5E2DA`** and `15803D` on it is **3.75** (screen pass 2026-09-25; accepted, floor 3.5). Over white, `15803D` on it would be **4.14** (was `22C55E` on `E0F7E8` = 2.02); the tint against the white card = 1.21
 (was 1.13), so the pill's edge is slightly more visible.
 
 ### 5.5 Status tone → token (`StatusTone.color`, `ProgressText.deltaTone`; code unchanged)
@@ -217,7 +220,7 @@ white = `EBEBEB` (1.19). Pill tint after F1: 0.14 · `15803D` + 0.86 · `FFFFFF`
 | Rounding | Colorset hex is exact; alpha-blended values (§5.4) round per channel; ratios are reported to two decimals and a threshold is met at ≥ |
 | Reduce Transparency / Increase Contrast / Smart Invert | Not audited (out of scope); no material is used, so Reduce Transparency changes nothing |
 | Units, skipped sets, swapped exercises, missed sessions, background / kill | Unaffected: no logic changes; `missed`, `wo-swap-rdl`, `wo-notes` are re-shot to prove their colors only |
-| Cap | Every ratio table row must be ≥ its threshold after F1 + F2 except the three recorded shortfalls (§2.5: 4.12, 4.13, 4.14) |
+| Cap | Every ratio table row must be ≥ its threshold after F1 + F2 except the three recorded shortfalls (§2.5: 4.12, 4.13 with a 4.0 floor; the pill 3.75 over `bg` with a 3.5 floor) |
 
 ---
 
@@ -244,7 +247,7 @@ row's expected light values (`bg F4F2F3`, cards white, `sf2 EBE8EA`, `tx 17161A`
 differ from that render only by F1 / F2 (the patched prototype still draws `22c55e` / `f59e0b` / `6e6a70`), listed as deviations. Every
 shot also passes a **no-artifact checklist**: (a) no black or near-black surface except the 0.55 scrim and shadows, (b) no
 white-on-white text, (c) accent buttons white-on-accent, (d) every green / amber (text **and** fill) is `15803D` / `B45309`, never
-`22C55E` / `F59E0B`, (e) the tab bar capsule is white with its shadow, (f) status bar text dark. Deviations to skip = the row's existing
+`22C55E` / `F59E0B`, (e) the tab bar capsule is white with its shadow, (f) status bar text dark, except under the missed-day prompt's scrim, where iOS draws it white on a dark device (5.1 vs 4.1 on `6E6D6D`; accepted as system behavior 2026-09-25, gotchas). Deviations to skip = the row's existing
 spec deviations plus F1 / F2.
 
 | # | Launch (append `-appearance light`) | Screen / snapshot | Reference | Extra |
@@ -256,7 +259,7 @@ spec deviations plus F1 / F2.
 | 5 | `-seed midProgram -tab program`; `-seed missed -tab program -programWeek 2 -programDay 2`; `-seed missed-skipped -tab program -programWeek 2 -programDay 2` | `program`; Missed card; Skipped card | m2-program-tab AC-1, m4-missed-day AC-5 / AC-9 | "Missed" in `B45309`; "Skipped" in `mu`; selected day white-on-accent; completed-day dots `15803D` |
 | 6 | `-seed midProgram -tab progress`; `freshProgram -tab progress`; `progress-history -tab progress`; `missed -tab progress` | `progress`, empty, history, calendar with a missed day | m4-progress ACs | delta "+… lb" `15803D`; completed cells `15803D` with white numbers; rules `EBEBEB`; points white with accent ring; missed day `B45309` on `EBE8EA` |
 | 7 | `-seed midProgram -tab settings`; `settings-restart -tab settings`; `reminder-on`, `reminder-denied`, `reminder-unasked` (+ `-tab settings`); `midProgram -tab settings -haptics off` | `settings`, the dialog, the three reminder states, an off toggle | m4-settings AC-1 / AC-5, m4-reminder AC-1–3, m5-haptics AC-2 | "Light" segment selected (white on `EBE8EA` container); dialog light on **both runtimes**; the compact time bubble is the system light fill; the off toggle track is system gray |
-| 8 | `-seed wo-start`, `wo-swipe`, `wo-rpe`, `wo-adjust`, `wo-rest`, `summary`, `wo-detail`, `wo-swap`, `wo-swap-rdl`, `wo-notes` | B / C workout snapshots and the detail / swap / notes sheets | m3 ACs | rest card white with its 0.4 shadow; "↑ +X" pill `15803D` on `DEEDE4` (drawn in `wo-start`, m3-exercise-tools B2); `wo-swipe` track `15803D` with white "✓ Logged"; done badge `15803D`; header passed dots `15803D` (`wo-swap-rdl`); PR card pink gradient; sheets white on the 0.12 / 0.20 dim; note editor `EBE8EA` with `mu` placeholder |
+| 8 | `-seed wo-start`, `wo-swipe`, `wo-rpe`, `wo-adjust`, `wo-rest`, `summary`, `wo-detail`, `wo-swap`, `wo-swap-rdl`, `wo-notes` | B / C workout snapshots and the detail / swap / notes sheets | m3 ACs | rest card white with its 0.4 shadow; "↑ +X" pill `15803D` on `D5E2DA` (drawn in `wo-start`, m3-exercise-tools B2); `wo-swipe` track `15803D` with white "✓ Logged"; done badge `15803D`; header passed dots `15803D` (`wo-swap-rdl`); PR card pink gradient; sheets white on the 0.12 / 0.20 dim; note editor `EBE8EA` with `mu` placeholder |
 | 9 | **Dark regression (B1)**: #1, #5 first row, #6 first row, #7 first row, `wo-rest`, `summary`, `missed`, all **without** `-appearance light`, `defaults delete seed` before **each** launch (NB8) | their existing dark ACs | **baseline shots taken on the branch before any `Contents.json` edit (the plan's first step), on both runtimes**, clock pinned `status_bar override --time 9:41` for baseline and after-shot alike, compared with `cmp` outside the home-indicator band (gotchas 2026-09-22) | this is the one runtime probe of the slice: an "Any + Dark" set must resolve the dark entry to today's components |
 | 10 | Every row above on **iOS 26.5** (`name=iPhone 17,OS=26.5`) | same | same references | note the 0.20 dim and floating sheets as runtime facts |
 
@@ -278,7 +281,7 @@ spec deviations plus F1 / F2.
     "After" state (light `mu 68646A`, `success 15803D` / dark `22C55E`, `warning B45309` / dark `F59E0B`, the rest as today); and the §5.3
     rows hold: `tx` and `mu` on `bg` / `sf` / `sf2` ≥ 4.5 in both appearances; `success` / `warning` on `bg` and `sf` ≥ 4.5 and on `sf2` ≥ 4.0
     in Light, ≥ 4.5 everywhere in Dark; white on `AccentColor` ≥ 4.5; white on light `success` / `warning` ≥ 4.5; `success` on its 0.14 tint
-    over light `sf` ≥ 4.0. The accepted Dark rows (white on dark `success` / `warning`, accent on dark surfaces) are **not** asserted (Q3 = A).
+    over light `bg` (where the pill sits; tint `D5E2DA`) ≥ 3.5, the accepted 3.75 shortfall (screen pass 2026-09-25). The accepted Dark rows (white on dark `success` / `warning`, accent on dark surfaces) are **not** asserted (Q3 = A).
 13. `Theme.swift` references exactly the colorset directory names: the set of `Color("…")` literals in `Shared/Theme.swift` (11) equals the
     set of `*.colorset` names, and `FeedbackSourceTests.matches { $0.contains("Color(\"") }` (NB3: the existing `internal static`
     helpers `appSourceRoot`, `codeLines`, `appFiles()`, `matches(_:)`; no fourth copy) yields paths all equal to `Shared/Theme.swift`,

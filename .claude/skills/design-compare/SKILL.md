@@ -45,7 +45,11 @@ Compare one design state with the app. The output is a list of concrete differen
    the Home banner up for a screenshot. Workout seeds (`wo-start`, `wo-swipe`, `wo-rpe`, `wo-adjust`, `wo-rest`, `summary`, `wo-detail`, `wo-swap`, `wo-swap-rdl`,
    `wo-notes`)
    need no `-tab`: the workout replaces the shell at the root. For other frames in rows B–D, view `sips -Z 1500 build/proto-all.png` first to locate the frame, then crop. Re-render only
-   when the design export changes.
+   when the design export changes. **Light reference for any snapshot** (the export has only `home-light`): patch a copy
+   of the flows page with `patch_light.py` (verbatim in `docs/plans/m5-light-theme.md` Step 2; it decodes the gzip+base64
+   blobs, replaces the one `const s={...base};` with `const s={...base,theme:'light'};`, re-encodes, and asserts exactly one
+   site) into `build/proto-light/`, never `design/`, then render and crop it with the same offsets; its `home-light` crop is
+   byte-identical to the original's.
 2. **Capture the app.** Build if needed (`/build-and-run` build step), pick the iPhone 15 / iOS 17.5
    simulator (udid via `xcrun simctl list devices available -j`), install, launch with any launch
    arguments given (`xcrun simctl launch <udid> com.zhabskyi.homegymlog.ios -seed <state>`; a screen on a
