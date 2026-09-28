@@ -67,3 +67,7 @@ Any constant you quote from code (a library default, a grid step, a stored key) 
 and cited with that file's name, never inferred from a screenshot, the prototype's rendered numbers, or another spec's
 derived value (m4-settings quoted `lowRow 80`, which was a chart point in an earlier slice's data; the real default
 is 90).
+
+A contrast or color ratio for a translucent element (a tint, a scrim, a hairline) is composited over the surface it
+actually sits on, found by reading the parent view's background in code, never assumed to be a card (m5-light-theme:
+the progression pill was modelled over white `sf` at 4.14; it sits on `bg`, 3.75, found only by the screen pass).
