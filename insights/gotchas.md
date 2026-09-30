@@ -156,6 +156,28 @@ are kept as history.
   with the pending originals in `mainContext` after a real failed save.
 - (expected areas still open: previews)
 
+- 2026-09-29 — **`ModelContext.delete(model:)` is an immediate batch delete and throws for three of the six models.** On
+  17.5 and 26.5 it changes the store before any save (`hasChanges` stays false and a fresh context reads 0 rows at once), so it
+  can never sit inside an all-or-nothing write, and it throws `NSCocoaErrorDomain 134050` "Batch delete failed due to mandatory
+  OTO nullify inverse" for `LoggedSet`, `LoggedExercise` and `PlannedSession` (a to-one whose inverse is a cascade to-many);
+  `Program`, `WorkoutLog` and `ExerciseNote` succeed, and `Program` cascades through the batch path even on 17.5. Fix: per-row
+  deletes through `ProgramStore.delete` / `WorkoutLogStore.delete`. Recognize it: an import throwing 134050, or rows gone before
+  the save. Source: `docs/reviews/m5-export-researcher.md` Q3.
+- 2026-09-29 — **On 17.5 a released `ModelContainer` leaves its rows in the `-wal` file**: after the container went away the
+  `.store` was 122 880 bytes and the `-wal` 98–148 KB, and a copy of the `.store` alone opened with zero rows; on 26.5 the `-wal`
+  was 0 bytes and the copy had every row. Copy `.store`, `-wal` and `-shm` together, or write fixtures on 26.5. Recognize it: an
+  empty fixture store that was full when written.
+- 2026-09-29 — **A `@Query` does refresh after a save from another `ModelContext` on the same container** (17.5 and 26.5;
+  hosted `UIWindow` probe: insert, insert, replace-all). Objects already registered in `mainContext` kept their stale values
+  (`isDeleted == false`) rather than trapping in that probe; the 2026-09-13 fault trap still stands for true faults. Source:
+  `docs/reviews/m5-export-researcher.md` Q3.
+
+- 2026-09-29 — **On 17.5 a `@Query`'s value is stale inside the handler that just saved from a scratch context**: right after
+  the replace-all `save()`, `programs.first` was still the deleted row (26.5 already returned the new one); the very next
+  `body` pass held the new row on both runtimes, so a `RootView`-shaped route that clears an `isRestoring` flag in that
+  handler never mounted the shell with the deleted `Program` (hosted `UIWindow` probe, two runs per runtime). Never branch on
+  a `@Query` value in the handler after the save; decide from the DTOs or let the render decide. Source:
+  `docs/reviews/m5-export-researcher.md` B3 addendum.
 ## Swift language
 
 - 2026-09-23 — **Members declared in an `extension` of a `nonisolated` type do not inherit `nonisolated`**: under the
@@ -201,6 +223,12 @@ are kept as history.
   it does not overwrite like a JS object literal. Fix: use `Dictionary(_, uniquingKeysWith: { first, _ in first })`, or
   reject duplicates at the boundary that builds the values (`HomeStatsInput.init` throws `duplicateLogIndex`) — Home
   does both. Recognize it: a crash inside a one-line `Dictionary(...)` built from data rather than from a literal.
+
+- 2026-09-29 — **`JSONDecoder.DateDecodingStrategy.iso8601` rejects fractional seconds on iOS 17.5** (`"…T10:00:00.123Z"`
+  fails, `"…T10:00:00Z"` decodes) and accepts them on 26.5; an `ISO8601DateFormatter` with `.withFractionalSeconds` inside a
+  `.custom` strategy works on both. **`JSONEncoder` without `.sortedKeys` is not byte-stable on 26.5** (the same value encoded
+  twice in one process differed; 17.5 was stable). Recognize it: a backup test green on 26.5 and red on 17.5, or a
+  byte-comparison flaky only on 26.5. Source: `docs/reviews/m5-export-researcher.md` Q2.
 
 ## SwiftUI
 
@@ -545,6 +573,11 @@ are kept as history.
   `name=iPhone 15,OS=17.5` for iOS 17 runs, `name=iPhone 17,OS=26.5` for iOS 26 runs.
 - 2026-09-09 — `xcodebuild` needs a shared scheme. If "does not contain a scheme named HomeGymLog", tick Shared
   in Product → Scheme → Manage Schemes (creates `HomeGymLog.xcodeproj/xcshareddata/xcschemes/`).
+
+- 2026-09-29 — **`-only-testing:Target/Suite/function` without `()` selects nothing, silently**; `-only-testing:Target/Suite`
+  works. Parallel Swift Testing suites writing one read-append-write log file lose lines; wrap the write in an `NSLock`. A probe
+  whose crash hangs the test host leaves `xcodebuild` at 0 % CPU with no "Test case" output (killed after 6 min here): give
+  crash-prone probes their own suite and their own invocation. Source: m5-export researcher.
 
 ## Agent workflow
 
