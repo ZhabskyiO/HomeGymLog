@@ -34,7 +34,7 @@ import Testing
         let all = try Self.sources()
         #expect(all.count > 40, "the whole app target was scanned")
         let appearance = Self.hits("\"appearance\"", in: all)
-        #expect(appearance.map(\.path) == ["Shared/AppearanceMode.swift"])
+        #expect(appearance.map(\.path) == ["Engine/AppearanceMode.swift"])
         #expect(appearance.allSatisfy { $0.line.contains("storageKey") })
         let policy = Self.hits("\"missedDayPolicy\"", in: all)
         #expect(policy.map(\.path) == ["Engine/MissedDay.swift"])
@@ -56,7 +56,7 @@ import Testing
         #expect(Self.hits("preferredColorScheme", in: all).map(\.path) == [])
         #expect(Self.hits("overrideUserInterfaceStyle", in: all).map(\.path) == ["App/RootView.swift"])
         #expect(Self.hits("import UIKit", in: all).map(\.path) == ["App/RootView.swift"])
-        #expect(Self.hits("import UIKit", in: all.filter { $0.path == "Shared/AppearanceMode.swift" }).isEmpty)
+        #expect(Self.hits("import UIKit", in: all.filter { $0.path == "Engine/AppearanceMode.swift" }).isEmpty)
     }
 
     @Test("the settings control is a SegmentedPicker style, and the placeholder screen is gone")

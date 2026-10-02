@@ -96,12 +96,12 @@ import Testing
         }
     }
 
-    @Test("both reminder preferences are read in exactly the host and the Settings screen")
+    @Test("both reminder preferences are read in exactly the host, the root (restore writes them) and the Settings screen")
     func preferenceReaders() throws {
         let all = try Self.sources()
         for token in ["@AppStorage(ReminderPlan.enabledKey)", "@AppStorage(ReminderPlan.minutesKey)"] {
-            #expect(Self.files(containing: token, in: all) == ["App/ReminderHost.swift", "Features/Settings/SettingsView.swift"],
-                    "\(token)")
+            #expect(Self.files(containing: token, in: all) == ["App/ReminderHost.swift", "App/RootView.swift",
+                                                                 "Features/Settings/SettingsView.swift"], "\(token)")
         }
     }
 

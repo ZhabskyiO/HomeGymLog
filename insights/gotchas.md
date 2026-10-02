@@ -180,6 +180,13 @@ are kept as history.
   `docs/reviews/m5-export-researcher.md` B3 addendum.
 ## Swift language
 
+- 2026-10-02 — **A type conforming to `Transferable` is not main-actor under `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`**:
+  m5-export's `BackupFile` failed to build with "main actor-isolated property 'mainContext' can not be referenced from a
+  nonisolated context" inside its own helper method. The conformance (a `Sendable` protocol with nonisolated requirements)
+  makes the type infer nonisolated, so its members are too. Fix: mark the helpers that touch rows `@MainActor` and call them
+  through `MainActor.run` in the exporting closure. Recognize it: a main-actor error inside a plain method of an app-target
+  struct that conforms to `Transferable` (or another `Sendable` protocol).
+
 - 2026-09-23 — **Members declared in an `extension` of a `nonisolated` type do not inherit `nonisolated`**: under the
   app target's MainActor default isolation they are main-actor, which surfaced as `[#ActorIsolatedCall]` once the type's
   `nonisolated` `desired` called `time(minutes:on:calendar:)` from the extension (m4-reminder). Fix: mark each extension
@@ -231,6 +238,19 @@ are kept as history.
   byte-comparison flaky only on 26.5. Source: `docs/reviews/m5-export-researcher.md` Q2.
 
 ## SwiftUI
+
+- 2026-10-02 — **The tab shell draws scroll content all the way to the screen edge, so the ~34 pt strip below the floating
+  pill shows whatever sits there; "below the fold" means below the screen, not below the pill.** m5-export's BACKUP card made
+  `-seed midProgram -tab settings` differ from its baseline only in rows 2456–2555 px (17.5; 2496–2621 on 26.5): the top of
+  "Export backup…" peeks under the home indicator, and on the reminder seeds the "BACKUP" header does. No layout changed;
+  the Settings content simply got long enough to reach the strip. Recognize it: a screenshot `cmp` that fails only in the
+  bottom ~100 px of a screen whose content grew, with every row above byte-identical.
+  **Worse: at maximum scroll the last Settings row stays behind the pill.** Scratch-copy XCUITest (17.5): after 10 swipes
+  up, "Restore from backup…" has frame y 750–794 pt while the pill's buttons start at y 768, so the row cannot be uncovered
+  (the content's bottom padding is smaller than the pill). XCUITest still reported it `isHittable` (gotchas 2026-09-15:
+  hit-testing ignores overlays), so a hittable assertion is no proof; read the max-scroll screenshot. Open for a layout
+  decision (m5-export, reported 2026-10-02). Fixed by Settings-only padding (2026-10-02): `SettingsContent`'s bottom
+  padding is `FloatingTabBar.height + 16`, leaving a 24 pt gap above the pill at maximum scroll on 17.5 and 26.5.
 
 - 2026-09-25 — **With the app's Light override on a dark device, the status bar turns light (white text) while the missed-day
   prompt's 0.55 black scrim is up** (17.5 and 26.5, `-seed missed -appearance light`, still white after 8 s). The same seed

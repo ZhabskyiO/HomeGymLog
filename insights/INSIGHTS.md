@@ -33,9 +33,22 @@ session start, so nothing here depends on it.
     the save, in one synchronous handler.
   - **Validation boundary:** `BackupValidation` is the third validating boundary.
   - **Fixture store:** written once on 26.5 by the unversioned schema and never regenerated.
+  - **The floating tab pill covers the bottom of scrolled content** because the shell ignores the bottom safe area,
+    and nothing reserves the pill's height. Settings, the first tab long enough to hit it once the BACKUP card landed,
+    pads its own content bottom by the pill height plus a gap, from one named constant. The user chose this over a
+    shell-wide fix (2026-10-02); any other tab that grows that long needs the same constant.
   - **B3 resolved by probe (researcher addendum):** a plain `isRestoring` flag cleared in the same synchronous
     handler is enough. On 17.5 and 26.5 the first render afterwards already has the restored `Program`, so no hold is
     needed. Inside the handler, after the save, never read a `@Query` value: on 17.5 it is still the deleted row.
+- **Implemented 2026-10-02** (branch `m5-export`, not yet merged): 1169 tests on iOS 17.5 and 26.5, Release green,
+  `/design-compare` matched the Settings baseline except the new card and the strip below the pill, scratch-copy
+  XCUITest 4/4 on 17.5 and 3 on 26.5 (26.5's popover confirmation dialog has no Cancel, gotchas SwiftUI 2026-09-25),
+  swift review "ship" with four low notes, none applied (`docs/reviews/m5-export-swift-review.md`): an unstructured
+  `Task {}` for the picked-file read; same-day export path reuse if `exporting` runs twice; `ReminderHost`'s child
+  `@Query` not probed through a restore; readability in `BackupValidation`/`BackupDocument`. The tab-pill padding fix
+  (`SettingsContent`'s bottom padding now `FloatingTabBar.height + 16`) is recorded in gotchas SwiftUI 2026-10-02.
+  Pending the user's MVP pass: AC-6–AC-10 (the real share sheet, Files, AirDrop and Mail, the iCloud picker, a device
+  restore, VoiceOver).
 
 ### 2026-09-25 — M5 light-theme decisions (from the m5-light-theme slice spec, user-answered)
 
@@ -860,6 +873,13 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
   does not break it.
 
 ## Patterns
+
+### 2026-10-02 — An unverified race from review: probe it before adding the guard (m5-export B3)
+When a review says a render could see a stale row and proposes defensive state (hold a route until query ids change),
+first run the researcher's smallest faithful probe on both runtimes and log what `body` sees on each pass. In m5-export
+the plain flag was already safe on the first render, so the hold was dropped and only the probe's real finding became a
+rule: never read a `@Query` inside the handler after the save. React analogy: reproduce the stale-closure bug in a
+sandbox before wrapping everything in `useRef`.
 
 ### 2026-09-29 — Versioned schema retrofit: V1 lists the live top-level classes (m5-export researcher)
 `AppSchemaV1: VersionedSchema` lists the six existing classes in `models` with `versionIdentifier = Schema.Version(1, 0, 0)`,

@@ -1,8 +1,9 @@
 import Foundation
 import SwiftData
 
-/// The model layer's two failed-save helpers, shared by every store (INSIGHTS "Failed-save policy": insert writers
-/// rehearse, field writers restore). ≈ a tiny transaction module every repository imports.
+/// The model layer's failed-save helpers, shared by every store (INSIGHTS "Failed-save policy": insert writers
+/// rehearse, field writers restore, the whole-store replace drops its scratch context). ≈ a tiny transaction module every
+/// repository imports.
 enum StoreCommit {
     /// Field writers' save. If the save throws: `rollback()` first, then `revert` puts back every field the action changed,
     /// then the error is rethrown. ≈ aborting the transaction, then re-dispatching the previous state into the store, so no
@@ -44,6 +45,18 @@ enum StoreCommit {
         guard let remove = try insert(scratch) else { return }
         try scratch.save()
         remove()
+        try scratch.save()
+    }
+
+    /// The whole-store replace's save (m5-export B2, the third failed-save shape): `write` runs in a scratch context on the
+    /// same container, which is saved once. If `write` or the save throws, the error propagates and the scratch context
+    /// leaves scope with its pending deletes and inserts never saved: never rolled back (a pending delete crashes 17.5's
+    /// rollback, gotchas SwiftData 2026-09-13), and the main context was never touched. The caller must keep the whole pass
+    /// synchronous (no `await` between the first delete and the save). ≈ a second DB connection running one transaction
+    /// that is simply abandoned on error.
+    static func replaceInScratch(in container: ModelContainer, _ write: (ModelContext) throws -> Void) throws {
+        let scratch = ModelContext(container)
+        try write(scratch)
         try scratch.save()
     }
 }

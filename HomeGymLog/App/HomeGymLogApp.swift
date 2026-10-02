@@ -32,6 +32,8 @@ struct HomeGymLogApp: App {
     private let reminderNotifier: ReminderNotifier?
     /// Nil except `-seed settings-restart`, which opens Settings with its restart confirmation already up.
     private let settingsRestartPreview: Bool?
+    /// Nil except the three `backup-*` seeds, which open a backup dialog, alert or the Restoring screen.
+    private let backupPreview: BackupPreview?
     /// Nil unless a DEBUG launch argument holds the missed-action banner up (`App/DebugSeed/DebugBannerHold.swift`).
     private let missedBannerHold: Bool?
 
@@ -53,6 +55,7 @@ struct HomeGymLogApp: App {
         var restChime: RestChime? = nil
         var reminderNotifier: ReminderNotifier? = nil
         var settingsRestartPreview: Bool? = nil
+        var backupPreview: BackupPreview? = nil
         var missedBannerHold: Bool? = nil
         #if DEBUG
         do {
@@ -74,6 +77,7 @@ struct HomeGymLogApp: App {
                 sheetPreview = seed.workoutSheetPreview
                 missedPromptEnabled = seed.forcesMissedDayPrompt
                 settingsRestartPreview = seed.settingsRestartPreview
+                backupPreview = seed.settingsBackupPreview
                 restNotifier = .silent()   // seeds freeze the clock: screenshot-only, never a real notification
                 restChime = .silent()   // and never a sound
                 reminderNotifier = .silent(status: seed.reminderStatus)
@@ -106,6 +110,7 @@ struct HomeGymLogApp: App {
         self.restChime = restChime
         self.reminderNotifier = reminderNotifier
         self.settingsRestartPreview = settingsRestartPreview
+        self.backupPreview = backupPreview
         self.missedBannerHold = missedBannerHold
         #if DEBUG
         if case .failure(let error) = containerResult {
@@ -129,6 +134,7 @@ struct HomeGymLogApp: App {
                     .environment(\.missedPromptEnabled, missedPromptEnabled)
                     .environment(\.progressPreselection, progressPreselection)
                     .environment(\.settingsRestartPreview, settingsRestartPreview)
+                    .environment(\.settingsBackupPreview, backupPreview)
                     .environment(\.missedBannerHold, missedBannerHold)
                     // ≈ a provider that overrides a context value only when a prop is set; otherwise the live default stays.
                     .transformEnvironment(\.restNotifier) { value in

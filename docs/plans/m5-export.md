@@ -1,5 +1,8 @@
 # Plan — m5-export (JSON backup, replace-import, frozen `AppSchemaV1`)
 
+**Status: implemented 2026-10-02** (branch `m5-export`, not yet merged; 1169 tests on iOS 17.5 and 26.5, Release
+green, swift review "ship" with four low notes, none applied).
+
 Spec `docs/specs/m5-export.md` (approved 2026-09-29), branch `m5-export`; reports `docs/reviews/m5-export-researcher.md` (Q1–Q8, B3 addendum),
 `…-architecture.md` (folded in), `…-verifier-1.md` (round 1 fixed). Code read: every file each step touches, and every scan AC-19 names.
 

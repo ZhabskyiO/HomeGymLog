@@ -5,6 +5,20 @@ Moved out of `INSIGHTS.md` on 2026-09-16 to keep session and agent reads small. 
 
 ## Agent tuning
 
+- 2026-10-02 — **spec-creator**: m5-export's spec missed `DebugSeedTests.parses(seed:)` (new seeds with a different
+  clock), which was the verifier's only blocking finding. Separately, the planner found seven spec issues, three of them
+  file-ownership statements contradicting AC-19's scan counts. Edit: grep `allCases` for new seeds, and cross-check file
+  ownership against the pinned counts.
+- 2026-10-02 — **implementation-planner**: the optional XCUITest step was the only check that found a real bug (the
+  last Settings row hidden behind the tab pill at max scroll); seeds and `/design-compare` never scroll. Edit: when a
+  slice makes a tab longer, the step checks max-scroll clearance by screenshot, not `isHittable`.
+- 2026-10-02 — **researcher**: strong. It corrected the brief's "exact" date round-trip (ISO 8601 fractional is
+  millisecond precision) and found `delete(model:)` throwing 134050. Its scoped B3 probe showed the reviewer's proposed
+  hold was unnecessary, which saved a guard nobody needed. No edit.
+- 2026-10-02 — **test-writer**: the 2026-09-27 result-bundle edit worked (it ran with bundles and counted 1169
+  exactly), and it proved the plain date fallback is load-bearing. No edit.
+- 2026-10-02 — **implementer**: stopped on the max-scroll bug and on new strip content instead of choosing a layout,
+  and recorded three gotchas. No edit.
 - 2026-09-27 — **spec-creator**: m5-light-theme modelled the progression pill's tint over white `sf` (4.14); it sits on
   `bg` (3.75), caught only by the implementer's screen pass after the spec, plan and verifier all agreed. Edit: a
   translucent element's ratio is composited over the parent surface read from code.

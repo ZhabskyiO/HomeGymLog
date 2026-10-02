@@ -49,6 +49,10 @@ extension EnvironmentValues {
     /// dialog can be screenshot without a tap. Nil in Release and in every other launch; only the root's `#if DEBUG` block
     /// sets it (the `workoutSheetPreview` pattern).
     @Entry var settingsRestartPreview: Bool? = nil
+    /// The backup presentation Settings (or the root) opens with (`-seed backup-confirm` / `backup-failed` /
+    /// `backup-restoring`), so each can be screenshot without a tap. Nil in Release and in every other launch; only the root's
+    /// `#if DEBUG` block sets it (the `workoutSheetPreview` pattern).
+    @Entry var settingsBackupPreview: BackupPreview? = nil
     /// Keeps the Home missed-action banner up with no auto-dismiss (`-holdBanner`), so a frozen-clock screenshot can catch
     /// it. Nil in Release and in every launch without the argument.
     @Entry var missedBannerHold: Bool? = nil

@@ -182,16 +182,17 @@ import Testing
         #expect(found.first?.line.contains(declaration) == true)
     }
 
-    @Test("the Haptics preference is read by SettingsView and WorkoutView only")
+    @Test("the Haptics preference is read by RootView (restore writes it), SettingsView and WorkoutView only")
     func hapticsReaders() throws {
         let found = try Self.matches { $0.contains("@AppStorage(FeedbackCues.hapticsKey)") }
-        #expect(found.map(\.path).sorted() == ["Features/Settings/SettingsView.swift", "Features/Workout/WorkoutView.swift"])
+        #expect(found.map(\.path).sorted() == ["App/RootView.swift", "Features/Settings/SettingsView.swift",
+                                               "Features/Workout/WorkoutView.swift"])
     }
 
-    @Test("the Sound preference is read by SettingsView, WorkoutView and ReminderHost only")
+    @Test("the Sound preference is read by RootView (restore writes it), SettingsView, WorkoutView and ReminderHost only")
     func soundReaders() throws {
         let found = try Self.matches { $0.contains("@AppStorage(FeedbackCues.soundKey)") }
-        #expect(found.map(\.path).sorted() == ["App/ReminderHost.swift", "Features/Settings/SettingsView.swift",
+        #expect(found.map(\.path).sorted() == ["App/ReminderHost.swift", "App/RootView.swift", "Features/Settings/SettingsView.swift",
                                                "Features/Workout/WorkoutView.swift"])
     }
 

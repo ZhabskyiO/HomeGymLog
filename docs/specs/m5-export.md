@@ -1,5 +1,9 @@
 # M5 slice 3 — Export (JSON backup, replace-import, frozen `AppSchemaV1`)
 
+**Status: implemented 2026-10-02** (branch `m5-export`, not yet merged; 1169 tests on iOS 17.5 and 26.5, Release
+green, swift review "ship" with four low notes, none applied, `docs/reviews/m5-export-swift-review.md`). Pending the
+user's MVP pass: AC-6–AC-10.
+
 **Status: approved draft 2026-09-29** (the user's §9 answers folded in; architecture review `docs/reviews/m5-export-architecture.md` "approve with changes" applied: B1, B2, B4, NB1–NB8 marked inline; B3 resolved by the researcher's addendum of 2026-09-29: plain flag, §2.4). Branch `m5-export`. Depends on `m5-light-theme` (merged 2026-09-27). Milestone-wide
 decisions live in `docs/specs/m5-haptics.md` (header) and INSIGHTS 2026-09-24 "M5 slicing" (a JSON backup **with import**, the frozen schema
 lands here); neither is restated. The Settings screen is owned by `docs/specs/m4-settings.md` (§2 geometry, §2.3 restart, AC-1 deviations) and

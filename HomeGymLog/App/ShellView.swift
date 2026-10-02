@@ -11,6 +11,8 @@ struct ShellView: View {
     /// Owned by `RootView`, which outlives this view while a workout replaces the shell. `@Binding` ≈ a
     /// `value` + `onChange` prop pair from the parent.
     @Binding var selected: AppTab
+    /// Settings' confirmed backup, handed up to the root that owns the restore state (≈ a callback prop, B4).
+    let onRestore: (BackupDocument) -> Void
 
     var body: some View {
         TabView(selection: $selected) {
@@ -40,7 +42,7 @@ struct ShellView: View {
         case .home: HomeView(program: program, selectedTab: $selected).id(program.id)   // ≈ key={program.id}: resets @State with the program
         case .program: ProgramView(program: program, selectedTab: $selected).id(program.id)
         case .progress: ProgressTabView(program: program, selectedTab: selected).id(program.id)
-        case .settings: SettingsView(program: program, selectedTab: $selected).id(program.id)
+        case .settings: SettingsView(program: program, selectedTab: $selected, onRestore: onRestore).id(program.id)
         }
     }
 }
@@ -49,7 +51,7 @@ struct ShellView: View {
 #Preview {
     let calendar = AppClock.live().calendar
     let container = try! DebugSeed.midProgram.makeContainer(calendar: calendar)
-    return ShellView(program: try! ProgramStore.current(in: container.mainContext)!, selected: .constant(.home))
+    return ShellView(program: try! ProgramStore.current(in: container.mainContext)!, selected: .constant(.home), onRestore: { _ in })
         .modelContainer(container)
         .environment(\.appClock, DebugSeed.midProgram.clock(calendar: calendar))
         // The root normally provides both; a preview must never reach the system notification center.
