@@ -58,8 +58,9 @@ import Testing
         #expect(found == ["App/HomeGymLogApp.swift"])
     }
 
-    /// m4-settings AC-22: the policy is read by the prompt host and the Settings screen, and nowhere else.
-    @Test("@AppStorage(MissedDayPolicy.storageKey) appears in exactly two files")
+    /// m4-settings AC-22: the policy is read by the prompt host and the Settings screen, and (m5-export) the root, which
+    /// writes a restored backup's value; nowhere else.
+    @Test("@AppStorage(MissedDayPolicy.storageKey) appears in exactly three files")
     func policyReaders() throws {
         let enumerator = try #require(FileManager.default.enumerator(at: Self.appSourceRoot, includingPropertiesForKeys: nil))
         let files = enumerator.compactMap { $0 as? URL }.filter { $0.pathExtension == "swift" }
@@ -70,7 +71,7 @@ import Testing
                 found.append(file.path.replacingOccurrences(of: Self.appSourceRoot.path + "/", with: ""))
             }
         }
-        #expect(found.sorted() == ["Features/Home/MissedPromptHost.swift", "Features/Settings/SettingsView.swift"])
+        #expect(found.sorted() == ["App/RootView.swift", "Features/Home/MissedPromptHost.swift", "Features/Settings/SettingsView.swift"])
     }
 
     /// m4-settings B1: the automatic pass runs from one keyed task, synchronously — an `await` between the skip saves would

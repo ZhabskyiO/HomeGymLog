@@ -4,12 +4,15 @@ import SwiftData
 /// The Settings tab: appearance and units, the daily reminder, the Haptics and Sound switches, the program card (current program, the
 /// missed-day policy, "Build a new program…") and the read-only equipment card. The preferences are `@AppStorage`
 /// (≈ localStorage read through a hook), so a tap is written at once and every other screen re-derives from it.
-/// The only write here is `ProgramStore.archive` behind the confirmation dialog.
+/// The only write here is `ProgramStore.archive` behind the confirmation dialog; the backup card's restore is handed to the
+/// root through `onRestore`.
 struct SettingsView: View {
     /// Immutable fields only: id (the call site's `.id`), months and frequency for the Current row.
     let program: Program
     /// Owned by `RootView`: a confirmed restart resets it to Home, so the new program's shell does not open on Settings.
     @Binding var selectedTab: AppTab
+    /// Hands a confirmed backup to the root, which owns the restore (B4).
+    let onRestore: (BackupDocument) -> Void
     @AppStorage(AppearanceMode.storageKey) private var appearanceRaw = AppearanceMode.system.rawValue
     @AppStorage("units") private var unitsRaw = WeightUnit.lb.rawValue
     @AppStorage(MissedDayPolicy.storageKey) private var policyRaw = MissedDayPolicy.ask.rawValue
@@ -17,6 +20,8 @@ struct SettingsView: View {
     @AppStorage(ReminderPlan.minutesKey) private var reminderMinutes = ReminderPlan.defaultMinutes
     @AppStorage(FeedbackCues.hapticsKey) private var hapticsEnabled = FeedbackCues.defaultEnabled
     @AppStorage(FeedbackCues.soundKey) private var soundEnabled = FeedbackCues.defaultEnabled
+    /// Onboarding's body-weight unit: not shown here, read only so an export carries all eight preferences.
+    @AppStorage("bodyWeightUnits") private var bodyWeightUnitsRaw = WeightUnit.lb.rawValue
     /// The root's one permission owner (≈ a context store); the reminder host refreshes it on every scene-active.
     @Environment(ReminderPermission.self) private var permission
     @Environment(\.reminderNotifier) private var reminderNotifier
@@ -41,7 +46,10 @@ struct SettingsView: View {
                             onAllowNotifications: { requestPermission() },
                             onOpenNotificationSettings: { openURL(ReminderPermission.settingsURL) },
                             hapticsEnabled: $hapticsEnabled, soundEnabled: $soundEnabled,
-                            onRestart: { showsRestartConfirm = true })
+                            onRestart: { showsRestartConfirm = true },
+                            backupFile: BackupFile(container: modelContext.container, clock: clock, preferences: backupPreferences,
+                                                   suggestedName: BackupText.fileName(date: clock.now(), calendar: clock.calendar)),
+                            onRestore: onRestore)
         }
         .background(Theme.bg.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
@@ -59,6 +67,13 @@ struct SettingsView: View {
         .onAppear {
             if restartPreview == true { showsRestartConfirm = true }
         }
+    }
+
+    /// The eight stored preferences as the backup writes them (spec 5.7): raw values, exactly as stored.
+    private var backupPreferences: BackupPreferences {
+        BackupPreferences(units: unitsRaw, bodyWeightUnits: bodyWeightUnitsRaw, appearance: appearanceRaw, missedDayPolicy: policyRaw,
+                          reminderEnabled: reminderEnabled, reminderMinutes: reminderMinutes, hapticsEnabled: hapticsEnabled,
+                          soundEnabled: soundEnabled)
     }
 
     // Raw-string storage on one side, typed enums on the other (≈ a controlled input with parse / serialize).
@@ -119,7 +134,7 @@ struct SettingsView: View {
 #Preview {
     let calendar = AppClock.live().calendar
     let container = try! DebugSeed.midProgram.makeContainer(calendar: calendar)
-    return SettingsView(program: try! ProgramStore.current(in: container.mainContext)!, selectedTab: .constant(.settings))
+    return SettingsView(program: try! ProgramStore.current(in: container.mainContext)!, selectedTab: .constant(.settings), onRestore: { _ in })
         .modelContainer(container)
         .environment(\.appClock, DebugSeed.midProgram.clock(calendar: calendar))
         // The root normally provides both; a preview must never reach the system notification center.

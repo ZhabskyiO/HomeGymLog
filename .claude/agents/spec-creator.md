@@ -68,6 +68,11 @@ and cited with that file's name, never inferred from a screenshot, the prototype
 derived value (m4-settings quoted `lowRow 80`, which was a chart point in an earlier slice's data; the real default
 is 90).
 
+A new `DebugSeed` case breaks every test that iterates `DebugSeed.allCases` with a `default:` expectation
+(`DebugSeedTests.parses(seed:)` checks the clock); grep for `allCases` in `HomeGymLogTests/` and list each one. Before
+returning, check every file-ownership statement (which file holds a card, a reader, a divider) against the counts
+the breaking-tests AC pins (m5-export: the verifier found the first and the planner found three of the second).
+
 A contrast or color ratio for a translucent element (a tint, a scrim, a hairline) is composited over the surface it
 actually sits on, found by reading the parent view's background in code, never assumed to be a card (m5-light-theme:
 the progression pill was modelled over white `sf` at 4.14; it sits on `bg`, 3.75, found only by the screen pass).

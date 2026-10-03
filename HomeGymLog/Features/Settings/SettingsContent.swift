@@ -21,6 +21,14 @@ struct SettingsContent: View {
     @Binding var hapticsEnabled: Bool
     @Binding var soundEnabled: Bool
     let onRestart: () -> Void
+    /// The backup card's inputs (m5-export 2.1): the lazily built export file and the restore hand-off to the root.
+    let backupFile: BackupFile
+    let onRestore: (BackupDocument) -> Void
+
+    /// Room under the last card so it scrolls clear of the floating pill (m5-export: at maximum scroll "Restore from
+    /// backup…" sat behind it). The scroll view ends at the bottom safe area while the pill floats above it, so the pill's
+    /// height plus a gap leaves a visible gap. Settings only; the other tabs keep their own spacing.
+    private static let bottomPadding = FloatingTabBar.height + 16
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -32,10 +40,12 @@ struct SettingsContent: View {
             programCard
             SettingsSectionHeader(title: SettingsText.equipmentSection)
             equipmentCard
+            SettingsSectionHeader(title: BackupText.section)
+            backupCard
         }
         .padding(.horizontal, 18)
         .padding(.top, 8)
-        .padding(.bottom, 24)
+        .padding(.bottom, Self.bottomPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
@@ -82,6 +92,14 @@ struct SettingsContent: View {
         }
     }
 
+    private var backupCard: some View {
+        SettingsCard {
+            BackupExportRow(file: backupFile)
+            SettingsDivider()
+            BackupRestoreRow(onRestore: onRestore, preferences: backupFile.preferences)
+        }
+    }
+
     private var equipmentCard: some View {
         SettingsCard {
             SettingsValueRow(label: SettingsText.dumbbells, value: SettingsText.dumbbellRange(unit: units))
@@ -93,7 +111,7 @@ struct SettingsContent: View {
     }
 }
 
-/// "PROGRAM" / "EQUIPMENT": 22 pt above, 8 pt below (spec 2).
+/// "PROGRAM" / "EQUIPMENT" / "BACKUP": 22 pt above, 8 pt below (spec 2).
 struct SettingsSectionHeader: View {
     let title: String
 

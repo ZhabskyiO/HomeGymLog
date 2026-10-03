@@ -156,7 +156,36 @@ are kept as history.
   with the pending originals in `mainContext` after a real failed save.
 - (expected areas still open: previews)
 
+- 2026-09-29 — **`ModelContext.delete(model:)` is an immediate batch delete and throws for three of the six models.** On
+  17.5 and 26.5 it changes the store before any save (`hasChanges` stays false and a fresh context reads 0 rows at once), so it
+  can never sit inside an all-or-nothing write, and it throws `NSCocoaErrorDomain 134050` "Batch delete failed due to mandatory
+  OTO nullify inverse" for `LoggedSet`, `LoggedExercise` and `PlannedSession` (a to-one whose inverse is a cascade to-many);
+  `Program`, `WorkoutLog` and `ExerciseNote` succeed, and `Program` cascades through the batch path even on 17.5. Fix: per-row
+  deletes through `ProgramStore.delete` / `WorkoutLogStore.delete`. Recognize it: an import throwing 134050, or rows gone before
+  the save. Source: `docs/reviews/m5-export-researcher.md` Q3.
+- 2026-09-29 — **On 17.5 a released `ModelContainer` leaves its rows in the `-wal` file**: after the container went away the
+  `.store` was 122 880 bytes and the `-wal` 98–148 KB, and a copy of the `.store` alone opened with zero rows; on 26.5 the `-wal`
+  was 0 bytes and the copy had every row. Copy `.store`, `-wal` and `-shm` together, or write fixtures on 26.5. Recognize it: an
+  empty fixture store that was full when written.
+- 2026-09-29 — **A `@Query` does refresh after a save from another `ModelContext` on the same container** (17.5 and 26.5;
+  hosted `UIWindow` probe: insert, insert, replace-all). Objects already registered in `mainContext` kept their stale values
+  (`isDeleted == false`) rather than trapping in that probe; the 2026-09-13 fault trap still stands for true faults. Source:
+  `docs/reviews/m5-export-researcher.md` Q3.
+
+- 2026-09-29 — **On 17.5 a `@Query`'s value is stale inside the handler that just saved from a scratch context**: right after
+  the replace-all `save()`, `programs.first` was still the deleted row (26.5 already returned the new one); the very next
+  `body` pass held the new row on both runtimes, so a `RootView`-shaped route that clears an `isRestoring` flag in that
+  handler never mounted the shell with the deleted `Program` (hosted `UIWindow` probe, two runs per runtime). Never branch on
+  a `@Query` value in the handler after the save; decide from the DTOs or let the render decide. Source:
+  `docs/reviews/m5-export-researcher.md` B3 addendum.
 ## Swift language
+
+- 2026-10-02 — **A type conforming to `Transferable` is not main-actor under `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`**:
+  m5-export's `BackupFile` failed to build with "main actor-isolated property 'mainContext' can not be referenced from a
+  nonisolated context" inside its own helper method. The conformance (a `Sendable` protocol with nonisolated requirements)
+  makes the type infer nonisolated, so its members are too. Fix: mark the helpers that touch rows `@MainActor` and call them
+  through `MainActor.run` in the exporting closure. Recognize it: a main-actor error inside a plain method of an app-target
+  struct that conforms to `Transferable` (or another `Sendable` protocol).
 
 - 2026-09-23 — **Members declared in an `extension` of a `nonisolated` type do not inherit `nonisolated`**: under the
   app target's MainActor default isolation they are main-actor, which surfaced as `[#ActorIsolatedCall]` once the type's
@@ -202,7 +231,26 @@ are kept as history.
   reject duplicates at the boundary that builds the values (`HomeStatsInput.init` throws `duplicateLogIndex`) — Home
   does both. Recognize it: a crash inside a one-line `Dictionary(...)` built from data rather than from a literal.
 
+- 2026-09-29 — **`JSONDecoder.DateDecodingStrategy.iso8601` rejects fractional seconds on iOS 17.5** (`"…T10:00:00.123Z"`
+  fails, `"…T10:00:00Z"` decodes) and accepts them on 26.5; an `ISO8601DateFormatter` with `.withFractionalSeconds` inside a
+  `.custom` strategy works on both. **`JSONEncoder` without `.sortedKeys` is not byte-stable on 26.5** (the same value encoded
+  twice in one process differed; 17.5 was stable). Recognize it: a backup test green on 26.5 and red on 17.5, or a
+  byte-comparison flaky only on 26.5. Source: `docs/reviews/m5-export-researcher.md` Q2.
+
 ## SwiftUI
+
+- 2026-10-02 — **The tab shell draws scroll content all the way to the screen edge, so the ~34 pt strip below the floating
+  pill shows whatever sits there; "below the fold" means below the screen, not below the pill.** m5-export's BACKUP card made
+  `-seed midProgram -tab settings` differ from its baseline only in rows 2456–2555 px (17.5; 2496–2621 on 26.5): the top of
+  "Export backup…" peeks under the home indicator, and on the reminder seeds the "BACKUP" header does. No layout changed;
+  the Settings content simply got long enough to reach the strip. Recognize it: a screenshot `cmp` that fails only in the
+  bottom ~100 px of a screen whose content grew, with every row above byte-identical.
+  **Worse: at maximum scroll the last Settings row stays behind the pill.** Scratch-copy XCUITest (17.5): after 10 swipes
+  up, "Restore from backup…" has frame y 750–794 pt while the pill's buttons start at y 768, so the row cannot be uncovered
+  (the content's bottom padding is smaller than the pill). XCUITest still reported it `isHittable` (gotchas 2026-09-15:
+  hit-testing ignores overlays), so a hittable assertion is no proof; read the max-scroll screenshot. Open for a layout
+  decision (m5-export, reported 2026-10-02). Fixed by Settings-only padding (2026-10-02): `SettingsContent`'s bottom
+  padding is `FloatingTabBar.height + 16`, leaving a 24 pt gap above the pill at maximum scroll on 17.5 and 26.5.
 
 - 2026-09-25 — **With the app's Light override on a dark device, the status bar turns light (white text) while the missed-day
   prompt's 0.55 black scrim is up** (17.5 and 26.5, `-seed missed -appearance light`, still white after 8 s). The same seed
@@ -545,6 +593,11 @@ are kept as history.
   `name=iPhone 15,OS=17.5` for iOS 17 runs, `name=iPhone 17,OS=26.5` for iOS 26 runs.
 - 2026-09-09 — `xcodebuild` needs a shared scheme. If "does not contain a scheme named HomeGymLog", tick Shared
   in Product → Scheme → Manage Schemes (creates `HomeGymLog.xcodeproj/xcshareddata/xcschemes/`).
+
+- 2026-09-29 — **`-only-testing:Target/Suite/function` without `()` selects nothing, silently**; `-only-testing:Target/Suite`
+  works. Parallel Swift Testing suites writing one read-append-write log file lose lines; wrap the write in an `NSLock`. A probe
+  whose crash hangs the test host leaves `xcodebuild` at 0 % CPU with no "Test case" output (killed after 6 min here): give
+  crash-prone probes their own suite and their own invocation. Source: m5-export researcher.
 
 ## Agent workflow
 

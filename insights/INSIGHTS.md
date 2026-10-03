@@ -8,6 +8,48 @@ session start, so nothing here depends on it.
 
 ## Architecture decisions
 
+### 2026-09-29 — M5 export decisions (from the m5-export slice spec, user-answered)
+
+- **A "BACKUP" card below EQUIPMENT** in Settings with two rows: "Export backup…" (a `ShareLink` to
+  `HomeGymLog-backup-<yyyy-MM-dd>.json`) and "Restore from backup…" (`.fileImporter`, then a destructive confirm).
+  There is no "Last backup" row, since `ShareLink` reports no completion.
+- **The backup is complete**: the current and archived programs with every session, log, set and exercise note,
+  **plus the preferences, which are applied on restore** (the user chose this over data only). Notification
+  permission is never restored, because it is system state. Preferences are written only after the store save succeeds.
+- **Restore replaces everything, with no merge.** The file is decoded and validated in Engine before anything is
+  touched, then per-row deletes and inserts are committed in one save on a scratch `ModelContext`, gated by a root
+  "Restoring…" state. After it, the app lands on Home with no alert. An in-progress log in the backup is restored as is
+  and the workout resumes.
+- `AppSchemaV1` (the six existing classes, `Version(1,0,0)`, an empty-stage plan) is frozen here; it opens existing
+  stores with every row (researcher, `docs/reviews/m5-export-researcher.md`).
+- **Architecture review (2026-09-29, approve with changes, `docs/reviews/m5-export-architecture.md`)**:
+  - **Scratch context:** replace-all is the second writer outside `mainContext` and the third failed-save shape. Its
+    scratch context is opened only by `StoreCommit.replaceInScratch(in:_:)`, which `BackupStore.replaceAll` calls (B2).
+    There is no `await` between the first delete and the save.
+  - **`AppearanceMode` moves to Engine** because `ResolvedPreferences` needs it; its `label` stays a Shared extension (B1).
+  - **Hand-off:** Settings passes the confirmed `BackupDocument` to the root through an `onRestore` closure prop via
+    `ShellView` (B4). One root restore enum holds the state.
+  - **Preferences after the save:** restored preferences are written through the root's `@AppStorage` bindings after
+    the save, in one synchronous handler.
+  - **Validation boundary:** `BackupValidation` is the third validating boundary.
+  - **Fixture store:** written once on 26.5 by the unversioned schema and never regenerated.
+  - **The floating tab pill covers the bottom of scrolled content** because the shell ignores the bottom safe area,
+    and nothing reserves the pill's height. Settings, the first tab long enough to hit it once the BACKUP card landed,
+    pads its own content bottom by the pill height plus a gap, from one named constant. The user chose this over a
+    shell-wide fix (2026-10-02); any other tab that grows that long needs the same constant.
+  - **B3 resolved by probe (researcher addendum):** a plain `isRestoring` flag cleared in the same synchronous
+    handler is enough. On 17.5 and 26.5 the first render afterwards already has the restored `Program`, so no hold is
+    needed. Inside the handler, after the save, never read a `@Query` value: on 17.5 it is still the deleted row.
+- **Implemented 2026-10-02** (branch `m5-export`, not yet merged): 1169 tests on iOS 17.5 and 26.5, Release green,
+  `/design-compare` matched the Settings baseline except the new card and the strip below the pill, scratch-copy
+  XCUITest 4/4 on 17.5 and 3 on 26.5 (26.5's popover confirmation dialog has no Cancel, gotchas SwiftUI 2026-09-25),
+  swift review "ship" with four low notes, none applied (`docs/reviews/m5-export-swift-review.md`): an unstructured
+  `Task {}` for the picked-file read; same-day export path reuse if `exporting` runs twice; `ReminderHost`'s child
+  `@Query` not probed through a restore; readability in `BackupValidation`/`BackupDocument`. The tab-pill padding fix
+  (`SettingsContent`'s bottom padding now `FloatingTabBar.height + 16`) is recorded in gotchas SwiftUI 2026-10-02.
+  Pending the user's MVP pass: AC-6–AC-10 (the real share sheet, Files, AirDrop and Mail, the iCloud picker, a device
+  restore, VoiceOver).
+
 ### 2026-09-25 — M5 light-theme decisions (from the m5-light-theme slice spec, user-answered)
 
 - **Audit result**: the 11 colorsets match the prototype's light and dark tokens exactly; the hard-coded black
@@ -831,6 +873,41 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
   does not break it.
 
 ## Patterns
+
+### 2026-10-02 — An unverified race from review: probe it before adding the guard (m5-export B3)
+When a review says a render could see a stale row and proposes defensive state (hold a route until query ids change),
+first run the researcher's smallest faithful probe on both runtimes and log what `body` sees on each pass. In m5-export
+the plain flag was already safe on the first render, so the hold was dropped and only the probe's real finding became a
+rule: never read a `@Query` inside the handler after the save. React analogy: reproduce the stale-closure bug in a
+sandbox before wrapping everything in `useRef`.
+
+### 2026-09-29 — Versioned schema retrofit: V1 lists the live top-level classes (m5-export researcher)
+`AppSchemaV1: VersionedSchema` lists the six existing classes in `models` with `versionIdentifier = Schema.Version(1, 0, 0)`,
+which is what `Schema([...])` already wrote into every store (`NSStoreModelVersionIdentifiers = ("1.0.0")`); `AppMigrationPlan`
+has one schema and `stages: []`; `AppSchema.schema = Schema(versionedSchema: AppSchemaV1.self)` and `makeContainer` passes the
+plan. Nothing else changes: `@Query`, `#Predicate<Program>` and every `ModelContainer(for: AppSchema.schema, configurations:)`
+keep working (unversioned stores opened with every row on 17.5 and 26.5; the scratch copy's full suite stayed green apart from
+source scans broken by the scratch path). When V2 arrives, copy the six classes into `AppSchemaV1` as nested frozen `@Model`s
+and point V2 at the top-level ones with a `.lightweight` stage. `nonisolated` is not needed on the enums. ≈ freezing the
+initial migration file. Source: `docs/reviews/m5-export-researcher.md` Q1.
+
+### 2026-09-29 — Whole-store replace (backup import): validate, then per-row deletes + inserts + one save in a scratch context
+Decode the whole JSON into Codable DTOs and validate every invariant in Engine first; only then, in `ModelContext(container)`:
+`ProgramStore.delete` per program (explicit cascade), `WorkoutLogStore.delete` per orphan log, leftovers and notes row by row,
+insert the new graph, one `save()` (5–9 ms for a 6-session graph). A mounted `@Query` refreshes from that scratch save on 17.5
+and 26.5 and `mainContext.fetch` sees the new graph at once; on a failed save drop the context and the screen still shows what
+the store holds. Never `delete(model:)` (gotchas SwiftData 2026-09-29). Gate `RootView`'s routes with an `isRestoring` flag
+(the `isDiscarding` pattern) so no view holds old rows across the save. Replace only, never merge. ≈ a second DB connection
+running one transaction. Source: `docs/reviews/m5-export-researcher.md` Q3.
+
+### 2026-09-29 — Backup JSON: Codable DTO mirror in Engine, row mapping in Models
+`@Model` classes are not Codable; a flat `BackupDocument` (`formatVersion`, one table of DTOs per model with `id: UUID` and
+optional parent ids) lives in Engine with its `JSONEncoder`/`JSONDecoder` configuration and validation; `BackupSnapshotBuilder`
+(rows → DTOs) and `BackupStore` (DTOs → rows) live in Models. `.sortedKeys` always (26.5 key order is not stable without it);
+dates as ISO 8601 with fractional seconds through a `.custom` strategy around one `ISO8601DateFormatter` (millisecond precision
+by contract, so tests compare re-encoded bytes or ≤ 1 ms, never `Date ==`). Export through `ShareLink` + a `Transferable`
+`FileRepresentation(exportedContentType: .json)`, import through `.fileImporter([.json])`; no plist keys, no capability,
+"Data Not Collected" unchanged. Source: `docs/reviews/m5-export-researcher.md` Q2, Q5–Q7.
 
 ### 2026-09-27 — Asset-catalog colors under test: read the colorset JSON from the source tree (m5-light-theme)
 The hosted test bundle only sees the compiled `Assets.car`, so a token test walks `#filePath` up to

@@ -70,6 +70,12 @@ enum DebugSeed: String, CaseIterable {
     /// `midProgram` data with the reminder on and permission never asked: "Notifications not allowed yet" and the "Allow
     /// notifications" row.
     case reminderUnasked = "reminder-unasked"
+    /// `midProgram` with Settings' backup replace confirmation up over its own rows (m5-export AC-2).
+    case backupConfirm = "backup-confirm"
+    /// `midProgram` with Settings' read-failed alert up for a newer-format file (AC-3).
+    case backupFailed = "backup-failed"
+    /// `midProgram` behind the root's Restoring screen, with no write in flight (AC-4).
+    case backupRestoring = "backup-restoring"
 
     /// nil when no `-seed` is present; throws for an unknown name or a trailing `-seed` with no value.
     static func parse(arguments: [String]) throws -> DebugSeed? {
@@ -88,6 +94,7 @@ enum DebugSeed: String, CaseIterable {
             day = DateComponents(year: 2026, month: 9, day: 15, hour: 12)
         case .settingsRestart, .restarted: day = DateComponents(year: 2026, month: 9, day: 15, hour: 12)
         case .reminderOn, .reminderDenied, .reminderUnasked: day = DateComponents(year: 2026, month: 9, day: 15, hour: 12)
+        case .backupConfirm, .backupFailed, .backupRestoring: day = DateComponents(year: 2026, month: 9, day: 15, hour: 12)
         case .missedSeveral: day = DateComponents(year: 2026, month: 9, day: 17, hour: 12)
         case .restDay: day = DateComponents(year: 2026, month: 9, day: 19, hour: 12)
         case .freshProgram: day = DateComponents(year: 2026, month: 8, day: 31, hour: 12)
@@ -111,7 +118,8 @@ enum DebugSeed: String, CaseIterable {
             return draft
         case .midProgram, .missed, .missedSeveral, .missedShifted, .missedSkipped, .restDay, .freshProgram, .woStart, .woSwipe,
              .woRPE, .woAdjust, .woRest, .summary, .woDetail, .woSwap, .woSwapRDL, .woNotes, .progressHistory,
-             .settingsRestart, .restarted, .reminderOn, .reminderDenied, .reminderUnasked:
+             .settingsRestart, .restarted, .reminderOn, .reminderDenied, .reminderUnasked, .backupConfirm, .backupFailed,
+             .backupRestoring:
             return nil
         }
     }
@@ -120,7 +128,8 @@ enum DebugSeed: String, CaseIterable {
     func makeContainer(calendar: Calendar) throws -> ModelContainer {
         let container = try AppSchema.makeContainer(inMemory: true)
         switch self {
-        case .midProgram, .missed, .missedSeveral, .settingsRestart, .reminderOn, .reminderDenied, .reminderUnasked:
+        case .midProgram, .missed, .missedSeveral, .settingsRestart, .reminderOn, .reminderDenied, .reminderUnasked,
+             .backupConfirm, .backupFailed, .backupRestoring:
             try MidProgramSeed.populate(in: container.mainContext, calendar: calendar)
         case .restarted:
             try RestartSeed.populate(in: container.mainContext, calendar: calendar)

@@ -81,7 +81,9 @@ the only seeds that let the Home prompt show), `restDay`, `freshProgram`, `progr
 `midProgram`, for the Progress tab's cross-program chart and calendar), `settings-restart` (Settings with the restart
 confirmation dialog up), `restarted` (no current program, one archived program, onboarding opens prefilled at A2), and
 the reminder seeds `reminder-on`, `reminder-denied`, `reminder-unasked` (Settings with the Daily reminder on and each
-permission state), and the workout seeds `wo-start`, `wo-swipe`, `wo-rpe`,
+permission state), the backup seeds `backup-confirm`, `backup-failed`, `backup-restoring` (Settings with the restore
+confirmation dialog, the read-failed alert, and the root's "Restoring…" state up), and the workout seeds `wo-start`,
+`wo-swipe`, `wo-rpe`,
 `wo-adjust`, `wo-rest`, `summary`, `wo-detail`, `wo-swap`, `wo-swap-rdl`, `wo-notes`, which open at the root with no
 `-tab`; frozen clock, in-memory store, throwaway preferences).
 Eight more DEBUG launch arguments target a screen without taps (taps are refused on this machine): `-programWeek <n>
@@ -213,6 +215,18 @@ xcrun xcresulttool get test-results summary --path build/tests.xcresult   # tota
    prototype, scratch-copy XCUITest confirmed AC-15 (live switch) and AC-16 (light keyboard); user accepted the
    progression pill's 3.75 contrast and a white status bar under the missed-day scrim on a Dark device in Light).
    Pending the user's MVP pass: the open-sheet half of AC-15, and AC-17 VoiceOver.
+   — export slice done 2026-10-02 (branch `m5-export`: `AppSchemaV1` freezes the schema at `Version(1,0,0)` with an
+   empty migration plan, verified against a committed fixture store; Engine codec and validation in `Engine/Backup/`
+   (a `Codable` DTO mirror, `.sortedKeys`, fractional ISO 8601 with a plain fallback); the eight preferences ride in
+   the backup with per-key fallback; restore replaces everything through `StoreCommit.replaceInScratch` /
+   `BackupStore.replaceAll` on a scratch context, gated by a root "Restoring…" state (`App/RestoringView.swift`),
+   preferences written only after the save succeeds; `AppearanceMode` moved to Engine, its `label` a Shared
+   extension; Settings BACKUP card below EQUIPMENT ("Export backup…" a `ShareLink`, "Restore from backup…" a
+   `.fileImporter` with a destructive confirm); `SettingsContent`'s bottom padding is now `FloatingTabBar.height + 16`
+   so the last row clears the tab pill at max scroll; seeds `backup-confirm`, `backup-failed`, `backup-restoring`;
+   1169 tests on iOS 17.5 and 26.5, Release green, swift review "ship" with four low notes, none applied
+   (`docs/reviews/m5-export-swift-review.md`). Pending the user's MVP pass: AC-6–AC-10 (real share sheet, Files,
+   AirDrop, Mail, the iCloud picker, a device restore, VoiceOver).
 
 ## Product decisions (settled 2026-09-09)
 

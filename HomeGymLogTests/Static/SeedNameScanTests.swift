@@ -11,7 +11,8 @@ import Testing
                                 "\"progress-history\"", "\"-progressExercise\"",
                                 "\"settings-restart\"", "\"restarted\"", "\"-holdBanner\"",
                                 "\"reminder-on\"", "\"reminder-denied\"", "\"reminder-unasked\"",
-                                "\"-haptics\"", "\"-sound\""]
+                                "\"-haptics\"", "\"-sound\"",
+                                "\"backup-confirm\"", "\"backup-failed\"", "\"backup-restoring\""]
 
     /// `<repo>/HomeGymLog`, derived from `<repo>/HomeGymLogTests/Static/…`.
     private static var appSourceRoot: URL {

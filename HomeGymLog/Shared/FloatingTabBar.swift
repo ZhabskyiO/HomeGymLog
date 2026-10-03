@@ -3,6 +3,9 @@ import SwiftUI
 /// The floating pill from the prototype: 64 pt tall, full radius, `sf` fill, hairline border, soft shadow.
 /// `@Binding` ≈ receiving `[value, setValue]` from the parent.
 struct FloatingTabBar: View {
+    /// The pill's own height (the prototype's 64 pt). Named so a screen whose content must clear the pill can pad by it.
+    static let height: CGFloat = 64
+
     @Binding var selected: AppTab
 
     var body: some View {
@@ -28,7 +31,7 @@ struct FloatingTabBar: View {
             }
         }
         .padding(.horizontal, 8)
-        .frame(height: 64)
+        .frame(height: Self.height)
         .background(Theme.sf)
         .clipShape(Capsule())
         .overlay(Capsule().strokeBorder(Theme.bd, lineWidth: 1))
