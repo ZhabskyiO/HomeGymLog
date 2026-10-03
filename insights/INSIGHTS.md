@@ -8,6 +8,50 @@ session start, so nothing here depends on it.
 
 ## Architecture decisions
 
+### 2026-10-02 — M5 live-activity decisions (user-answered before the spec; researcher `docs/reviews/m5-live-activity-researcher.md`)
+
+- **The Live Activity has "+30s" and "Skip" buttons** (the user chose this over tap-to-open only, against the
+  recommendation). They are `Button(intent:)` over a `LiveActivityIntent`, which runs in the app's process, so the
+  write goes through the existing `WorkoutLogStore` rest writers and the intent reconciles the "Rest over" notification
+  and the activity itself (the workout screen may not be alive). Runtime details in the researcher addendum.
+- **The Lock Screen view and the expanded Dynamic Island mirror the rest card**: ring with the remaining share,
+  "Rest", the `m:ss` countdown, "Next: …". Compact island: a timer glyph leading, the countdown trailing; minimal: the glyph.
+- **A Settings switch** for the Lock Screen rest timer, default on, a ninth preference that rides in the backup.
+- **The extension's asset catalog gets copies of the needed colorsets** (plain files under its synchronized folder, no
+  project edit); a Static test pins each copy equal to the app's.
+- **No capability, entitlement, push or privacy-manifest change** (the 2026-09-24 slicing note's "an entitlement" was
+  wrong): one Widget Extension target with `NSSupportsLiveActivities` on the app, deployment target typed 17.0.
+  Every ActivityKit API used is iOS 16.1/16.2. The `ActivityAttributes` and the intent live in a root `HomeGymLogShared/`
+  synchronized folder that belongs to both targets, declared `nonisolated` (the extension has no `MainActor` default).
+- **Lifecycle**: request at rest start with `staleDate = restEndsAt`, update on +30s, `end(.immediate)` on every
+  clearing write and on a foreground end, reconcile against `Activity.activities` at launch and activation. No
+  `alertConfiguration` (the local notification stays the one alert). The countdown is `Text(timerInterval:)`, which keeps
+  ticking with no updates and with the process killed.
+- **Spec defaults taken without asking (2026-10-02, the user delegated them)**: a stale activity (end passed while the app was
+  away) shows "Rest over" with the ring and buttons hidden via `context.isStale` until the next active pass ends it; the
+  expanded island is leading ring, center "Rest" + "Next:", trailing countdown, bottom buttons; `isDiscoverable = false` on
+  the intents; the "Next:" text is pre-formatted by the app and carried opaque; the root host only ends strays while the
+  workout screen owns request and update; the backup's ninth key `liveActivityEnabled` falls back to true.
+- **Architecture review (2026-10-02, approve with changes, `docs/reviews/m5-live-activity-architecture.md`)**:
+  - **Three callers, one rule, one entry**: the workout screen (request/update), the root `RestActivityHost` (ends strays)
+    and the intent handler (re-sync with no scene) all go through the pure `RestActivityPlan.decide` / `stranded` and the
+    seam's single `apply`. A single root owner was rejected because the root may not read a log's rest fields in `body`
+    (the 26.5 delete trap) and the handler must work with no scene at all (NB11).
+  - **The out-of-view write path**: the handler is installed in `App.init`, `@MainActor`, **serialized through a chained
+    `inFlight` Task** (two rapid Lock Screen taps must land in order; `Task.isCancelled` never fires outside `.task(id:)`
+    and actors are not FIFO, B1), writes through the ONE container's `mainContext`, re-syncs the activity from the stored
+    row (never from the intended values), decides no cue and asserts nothing.
+  - **Side-effect passes over a system service check `Task.isCancelled` after every await** (m3 B4 generalized from
+    notifications to ActivityKit) and resolve activity ids at call time, skipping missing ones, so overlapping passes from
+    the three callers are idempotent (B2).
+  - **`StoreCommit.commit` leaves `hasChanges` true after rollback + restore**, so a failed-save test asserts the
+    same-context fetch by id, not `hasChanges == false` (B3; two shipped tests already pin this).
+  - **Two more source roots**: `HomeGymLogShared/` (both targets, `nonisolated`, no UIKit, no app types) and
+    `HomeGymLogWidgets/` (the extension). Engine mirrors the ActivityKit `ContentState` deliberately; the mapping lives
+    only in the seam's `.live()` (NB10). `ClockUsageTests` scans the shared folder too (NB9).
+  - **U1 (the background/terminated intent launch path) is the one load-bearing unverified fact**; its probe is the device
+    pass (AC-27/28) and its fallback, removing the buttons for tap-to-open, keeps the slice shippable.
+
 ### 2026-09-29 — M5 export decisions (from the m5-export slice spec, user-answered)
 
 - **A "BACKUP" card below EQUIPMENT** in Settings with two rows: "Export backup…" (a `ShareLink` to
@@ -126,7 +170,7 @@ session start, so nothing here depends on it.
 ### 2026-09-24 — M5 slicing (user-answered)
 
 - **Five slices, each merged before the next**: `m5-haptics` → `m5-light-theme` → `m5-export` → `m5-live-activity` →
-  `m5-release`. The small slices go first; the Live Activity (a widget extension target, Xcode GUI steps, an entitlement)
+  `m5-release`. The small slices go first; the Live Activity (a widget extension target, Xcode GUI steps; no entitlement, corrected 2026-10-02)
   comes late. `m5-release` = icon (replacing the "H" welcome tile), copy audit (the A4 subtitle), privacy manifest,
   App Store metadata.
 - **Export is a JSON backup with import** (the user chose it over CSV only and over CSV plus a JSON that nothing reads).
