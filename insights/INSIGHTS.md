@@ -1049,6 +1049,22 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
 
 ## Patterns
 
+
+### 2026-10-04 — Release Info keys: once `INFOPLIST_FILE` names a merged plist, put new keys there, not in GUI build settings (m5-release)
+Xcode 27's GUI saved the orientation and the plist path on the first try but never saved "App Uses Non-Exempt Encryption"
+in two attempts (Build Settings search, Info tab), and the GUI writes a different text shape than the one inferred
+(`INFOPLIST_KEY_UISupportedInterfaceOrientations` without `_iPhone`). A key in `HomeGymLogSupport/Info.plist`
+(`<key>ITSAppUsesNonExemptEncryption</key><false/>`) merges into the built plist deterministically, needs no user step,
+and is pinned the same way (`Bundle.main.infoDictionary` in a hosted test, `plutil -p` on the Release product). Rule: a
+new Info key goes into the merged plist; a GUI build setting only when the key has no plist equivalent. pbxproj pins stay
+semantic (token present with the expected value, never an exact line).
+
+### 2026-10-04 — Seeing below-the-fold UI without taps: a scratch copy with the view moved to the top (m5-release)
+The Settings ABOUT card sits under the fold even on the iPhone 17 Pro Max, and the simulator cannot be scrolled from
+the CLI. Cheaper than a UI-test target: `rsync` the repo (minus `build/`, `.git`) to the scratchpad, move the card to the
+top of the `VStack` in the copy only, build the copy, install, `-seed … -tab settings`, screenshot, then reinstall the
+real build and delete the copy. The card's own rendering is checked faithfully; its position is already pinned by the
+padding constant test. Ten minutes, no project change.
 ### 2026-10-03 — Shared code for an app extension: a root synchronized folder in both targets, `nonisolated`, a hook the app fills
 A widget extension runs in its own process, so it needs its own copy of anything the app and the extension both draw
 (here, the Live Activity's `ActivityAttributes` and its two buttons' intents). Give both targets one more synchronized

@@ -61,6 +61,8 @@ developer new to Swift: add one-line React analogies in doc comments where a Swi
 ## Report
 
 Per step: files created or changed, the build and test result (counts), screenshots taken and the verdict against
-the prototype with each visible difference. Then: the Release build result, every deviation from the plan and why,
+the prototype with each visible difference. The final totals are `totalTestCount` quoted from `xcrun xcresulttool get
+test-results summary` for each runtime (write a result bundle for the last run), never a running sum of tests added;
+m5-release reported 1334 where the bundle said 1306. Then: the Release build result, every deviation from the plan and why,
 gotchas added, anything left for the user to check by hand on the simulator (taps that cannot be scripted), and
 what is blocked. Do not commit; the main session runs test-writer, swift-reviewer, doc-writer and ship-check next.

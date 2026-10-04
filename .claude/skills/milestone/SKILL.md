@@ -22,7 +22,9 @@ multiple-choice question when the slicing is not obvious.
    `/pr-self-review` and merge.
 2. Read `CLAUDE.md`, `insights/INSIGHTS.md`, `insights/gotchas.md`, and any earlier spec of the same
    milestone under `docs/specs/`. Note any platform question the slice raises (an API, an entitlement, an
-   iOS 17 availability doubt). Skip `researcher` when there are none.
+   iOS 17 availability doubt). Skip `researcher` when there are none. Run `git status --short` and tell the user about
+   any untracked file (m5-release: the real icon artwork had been dropped into `design/` and only the planner noticed);
+   a user-supplied input changes the spec, so settle it before `spec-creator` launches.
 3. If there are platform questions, launch `researcher` with them. If a question decides the data flow
    (SwiftData observation, queries, what a view must own to re-render), wait for its answer and hand it to
    `spec-creator`; only API-availability questions run in parallel with step 4. It writes its report to

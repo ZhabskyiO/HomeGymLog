@@ -29,5 +29,8 @@ Rules: write for a reader who knows React and TypeScript but not Swift, so defin
 use with a one-line analogy. State facts about the code only after reading it. Do not change Swift
 logic, tests, or project settings. Do not document what the code makes obvious.
 
+If the Edit tool fails with "string not found" on text you just read, re-read the file with `cat` and splice by exact
+bytes (python line-indexed edit); do not retry the same Edit (m5-release, CLAUDE.md and docs/layout.md).
+
 Return a list of the files you changed and one line per change describing what and why. If any Swift
 file was touched, say so on the first line so the caller rebuilds.

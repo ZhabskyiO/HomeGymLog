@@ -13,7 +13,9 @@ Verify the working tree is ready to commit. Report failures; do not hide them.
    iPhone 17 / iOS 26.5 (runtime behavior differs between the two; see gotchas "SwiftData"). Result bundles written
    after the newest Swift edit may be reused instead of re-running: compare the bundle's mtime with the newest
    `HomeGymLog*/**/*.swift` mtime and read `xcrun xcresulttool get test-results summary` for the counts and device.
-   The Release build in step 3 always runs fresh (a product's timestamp does not prove the current code compiles).
+   The Release build in step 3 always runs fresh (a product's timestamp does not prove the current code compiles), and
+   its warning count is only meaningful after `rm -rf build/DerivedData/Build/Intermediates.noindex` (an incremental
+   Release build after a non-Swift change recompiles nothing and prints 0; gotcha 2026-10-03).
 3. Run the `build-and-run` skill build step only (no launch) if the diff touches anything outside
    tests and docs. Also build the Release configuration once, since `#if DEBUG`-only types leak silently
    otherwise: `xcodebuild -scheme HomeGymLog -configuration Release -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.5' -derivedDataPath build/DerivedData CODE_SIGNING_ALLOWED=NO build`. If the diff touches `Features/` or `Shared/`, run `/design-compare` for every prototype

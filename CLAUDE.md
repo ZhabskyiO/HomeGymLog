@@ -127,7 +127,8 @@ a PreToolUse hook (`.claude/hooks/guard-pbxproj.sh`, wired in `.claude/settings.
 # the iOS 27.0 runtime has its own iPhone 17, so `name=iPhone 17` always carries `OS=26.5`.
 xcodebuild -scheme HomeGymLog -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.5' -derivedDataPath build/DerivedData build
 xcodebuild -scheme HomeGymLog -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.5' -derivedDataPath build/DerivedData test
-# Release build: catches DEBUG-only types used outside #if DEBUG (nothing else builds Release before an archive)
+# Release build: catches DEBUG-only types used outside #if DEBUG (nothing else builds Release before an archive).
+# A warning count needs a clean build first: rm -rf build/DerivedData/Build/Intermediates.noindex (incremental = 0 by accident)
 xcodebuild -scheme HomeGymLog -configuration Release -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.5' -derivedDataPath build/DerivedData CODE_SIGNING_ALLOWED=NO build
 xcodebuild -scheme HomeGymLog -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.5' -derivedDataPath build/DerivedData test
 # To count or inspect results, write a result bundle (delete a stale one first; xcodebuild refuses to overwrite it):
