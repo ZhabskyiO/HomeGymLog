@@ -8,6 +8,24 @@ session start, so nothing here depends on it.
 
 ## Architecture decisions
 
+### 2026-10-04 — M6 scope: Apple Watch companion for version 1.1 (user-answered, not yet specced)
+
+- **Order**: submit 1.0 first (the current `main`, after the user's MVP pass and the App Store Connect steps in
+  `docs/release/release-checklist.md`); M6 ships as the 1.1 update. The user chose this over building M6 before submitting.
+- **Scope**: a watchOS companion app with **live mirroring**: starting a workout on the phone starts a workout session on the
+  watch; the phone shows live heart rate and active calories during the workout; the watch shows the timer, heart rate,
+  calories, current exercise and set. Logging sets from the wrist is out (the larger option was declined). The read-only
+  "import from Apple's Workout app" option was declined.
+- **Display**: live HR/kcal on the workout screen, totals (active calories, average HR) on the summary and stored with the
+  log, a calories series on the Progress tab, and this week's calories as a Home stat tile.
+- **Health**: each workout is **saved to Apple Health** as Traditional Strength Training (HealthKit read + write, usage
+  strings, the first capability the app adds; both targets). Data stays on-device, so "Data Not Collected" is expected to
+  hold, but the privacy policy, the App Privacy answers and the metadata must name Health data; the researcher verifies.
+- **Known costs before the spec**: a watchOS target (Xcode GUI, the user's steps), `AppSchemaV2` with a migration for the
+  stored calories/HR (the backup format is frozen at V1 and gains a formatVersion 2), iOS 17 workout mirroring APIs to be
+  verified by the researcher first (`HKWorkoutSession` mirroring to the companion, `startWatchApp`), hardware testing on
+  the user's Series 10 (simulator pairing is unreliable). Three or four slices.
+
 ### 2026-10-03 — M5 release decisions (user-answered before the spec; researcher `docs/reviews/m5-release-researcher.md`)
 
 - **Icon (superseded the same evening by the artwork bullet below): the user supplies the artwork; the slice was to ship a placeholder** (white "H" on the accent color, generated from an

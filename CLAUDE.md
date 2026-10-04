@@ -275,6 +275,11 @@ xcrun xcresulttool get test-results summary --path build/tests.xcresult   # tota
    except the user's manual checks (AC-20, AC-22) and the App Store Connect steps
    (`docs/release/release-checklist.md` steps 3–7).
 
+6. Apple Watch companion (version 1.1, after the 1.0 submission; scope in INSIGHTS 2026-10-04): a watchOS app with live
+   workout mirroring (heart rate and active calories on the phone's workout screen, totals on the summary and in Progress,
+   a Home tile), each workout saved to Apple Health as strength training. First capability (HealthKit), `AppSchemaV2`.
+   Not started.
+
 ## Product decisions (settled 2026-09-09)
 
 - **Home screen**: the main prototype variant (stat tiles, week strip, today card with exercise list, recent PRs).
