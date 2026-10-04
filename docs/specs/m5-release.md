@@ -151,7 +151,7 @@ backup keeps nine preferences. `DebugSeed.allCases` is unchanged, so all eight `
 ### 4.3 Xcode GUI steps (the user's, **performed before the implementer starts**; `HomeGymLogSupport/Info.plist` is already on disk, 11 lines, `plutil -lint` OK, written by the main session 2026-10-03)
 
 1. **Portrait.** General → Deployment Info → iPhone Orientation: untick **Landscape Left** and **Landscape Right**; Portrait stays ticked.
-2. **Encryption.** Build Settings → All → search `Non-Exempt` → "App Uses Non-Exempt Encryption" → **No** (sets both configurations).
+2. **Encryption.** *Superseded 2026-10-03:* two GUI attempts (Build Settings search `Non-Exempt` / `ITSAppUsesNonExemptEncryption`, Info tab) saved nothing to `project.pbxproj`, so the key lives in the merged `HomeGymLogSupport/Info.plist` as `<key>ITSAppUsesNonExemptEncryption</key><false/>` (written by the main session; same mechanism as the launch color). No GUI step.
 3. **Launch color.** Build Settings → All → search `Info.plist File`
    → Packaging → "Info.plist File": type exactly `HomeGymLogSupport/Info.plist` (press Return; it applies to Debug and Release). Never add the
    file or drag `HomeGymLogSupport/` into the navigator (Xcode 27 would make it a synchronized folder and the plist would "Multiple commands produce", gotcha
@@ -166,13 +166,14 @@ and the two tools to `docs/layout.md` and CLAUDE.md's layout block; if the revie
 Read-only gate, semantic (key and value tokens per line, never an exact line — the GUI's exact text was never observed, B-2; `P=HomeGymLog.xcodeproj/project.pbxproj`):
 
 ```
-grep "INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone" $P | grep -c -E "Landscape|UpsideDown"  # 0 (today 2) — the tell; `… | grep -c Portrait` is 2 before and after (F8)
-grep "INFOPLIST_KEY_ITSAppUsesNonExemptEncryption" $P | grep -c "NO"                                 # 2 (today 0)
+grep "INFOPLIST_KEY_UISupportedInterfaceOrientations" $P | grep -v _iPad | grep -c -E "Landscape|UpsideDown"  # 0 (today 2) — the tell; `… | grep -v _iPad | grep -c Portrait` is 2 before and after (F8) (observed 2026-10-03: Xcode 27's General tab writes the **unsuffixed** `INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;` and deletes the `_iPhone` key; the `_iPad` line stays and is excluded)
+grep -c "ITSAppUsesNonExemptEncryption" $P                                                            # 0 — the key is in HomeGymLogSupport/Info.plist, not the project (see step 2)
+plutil -extract ITSAppUsesNonExemptEncryption raw HomeGymLogSupport/Info.plist                        # false
 grep -v GENERATE_INFOPLIST_FILE $P | grep INFOPLIST_FILE | grep -c "HomeGymLogSupport/Info.plist"     # 2 (today 0)
 grep -v GENERATE_INFOPLIST_FILE $P | grep -c INFOPLIST_FILE                                          # 4 (today 2, the widget's); `GENERATE_INFOPLIST_FILE = YES;` ×6 also contains the token (F1)
 grep -c "MARKETING_VERSION = 1.0;" $P; grep -c "CURRENT_PROJECT_VERSION = 1;" $P                      # 6 and 6;  git diff --stat $P → only those settings
 ```
-Expected read-back: `…Orientations_iPhone = UIInterfaceOrientationPortrait;`, `…NonExemptEncryption = NO;`, `INFOPLIST_FILE = HomeGymLogSupport/Info.plist;` — a quoted or `$(SRCROOT)/`-prefixed line still passes.
+Expected read-back: `INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;` (unsuffixed, as observed), `INFOPLIST_FILE = HomeGymLogSupport/Info.plist;` — a quoted or `$(SRCROOT)/`-prefixed line still passes.
 
 ### 4.4 Platform facts (binding; researcher unless marked "this spec") and the unverified ones
 
@@ -192,7 +193,7 @@ Expected read-back: `…Orientations_iPhone = UIInterfaceOrientationPortrait;`, 
 | **Unverified (U2)** App Store validation of leftover `mac` entries / the appex's empty `AppIcon` set; **(U3)** Xcode's Info-tab behaviour for a key with no `INFOPLIST_KEY_` | Q2, Q3 | §4.2 deletes the `mac` entries; §4.3 uses the explicit path |
 | **Unverified (U4)** `-exportArchive … destination upload` on the signed-in account alone; **(U5)** where iOS shows a Live-Activity-only extension's `CFBundleDisplayName` | Q5, Q4 | out of scope (no upload); widget display name untouched |
 | **Unverified (U6)** the age-rating answer options' exact labels; **(U7)** the Support URL field rejecting `mailto:`; **(U8)** ITMS-90473 severity today | Q7, Q6, Q4 | §2.4 "yes" = the option saying the topic is present; a web page with the email; versions kept equal |
-| **Unverified (U9)** the exact pbxproj text Xcode's GUI writes for a one-value orientation setting and the typed Info.plist path (Q4: inferred; Q9 used CLI overrides) | review U-1 | §4.3 greps and AC-14 pin tokens, not lines; observed lines recorded in gotchas at the checkpoint |
+| **(U9, observed 2026-10-03)** Xcode 27 wrote `INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;` (unsuffixed, `_iPhone` key removed, `_iPad` reordered) and `INFOPLIST_FILE = HomeGymLogSupport/Info.plist;` bare; the Release build merged `UILaunchScreen → UIColorName = bg` and read back `UISupportedInterfaceOrientations = [Portrait]`; the appex kept `NSExtension` | review U-1 | §4.3 greps and AC-14 pin tokens, not lines; observed lines recorded in gotchas at the checkpoint |
 | **Unverified (U10)** `infoDictionary["UILaunchScreen"]` bridging as `[String: String]` (Q3 verified `plutil` and the rendered color only) | review U-2 | AC-10 casts `as? [String: Any]` and reads `["UIColorName"] as? String == "bg"` |
 | **Unverified (U11)** the four closure-form fixes compile warning-free (three are the exact analog of `WorkoutLogStore.swift:324`, which is not among the six) | review U-3 | AC-15's Release build is the probe |
 | **Unverified (U12)** AC-8–10's hosted reads were verified on 17.5 only | review U-4 | AC-18 runs the full suite, `ReleaseBundleTests` included, on 26.5 |
@@ -228,8 +229,8 @@ Four top-level keys: `NSPrivacyTracking` `false`; `NSPrivacyTrackingDomains` and
 
 | Key | Value | Mechanism |
 |---|---|---|
-| `UISupportedInterfaceOrientations~iphone` (resolves to `UISupportedInterfaceOrientations`) | `["UIInterfaceOrientationPortrait"]` | `INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone`, GUI step 1 |
-| `ITSAppUsesNonExemptEncryption` | `false` (stored as `0`; `as? Bool == false`) | `INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO`, GUI step 2 |
+| `UISupportedInterfaceOrientations~iphone` (resolves to `UISupportedInterfaceOrientations`) | `["UIInterfaceOrientationPortrait"]` | `INFOPLIST_KEY_UISupportedInterfaceOrientations` (unsuffixed; Xcode 27 removed the `_iPhone` key), GUI step 1 |
+| `ITSAppUsesNonExemptEncryption` | `false` (stored as `0`; `as? Bool == false`) | `<false/>` in the merged `HomeGymLogSupport/Info.plist` (step 2, superseded GUI path); verified in a Release build 2026-10-03 |
 | `UILaunchScreen` | `["UIColorName": "bg"]` (today `{}` from `UILaunchScreen_Generation`) | merged `HomeGymLogSupport/Info.plist` (`<dict><key>UILaunchScreen</key><dict><key>UIColorName</key><string>bg</string></dict></dict>`), GUI step 3 |
 | `NSSupportsLiveActivities`, `CFBundleShortVersionString` 1.0, `CFBundleVersion` 1, `CFBundleName` HomeGymLog | unchanged | — |
 
@@ -343,8 +344,8 @@ the Live Activity device checks; any new capability, entitlement or `CFBundleDis
 7. `HomeGymLog/PrivacyInfo.xcprivacy` parses with `PropertyListSerialization` to the four keys: `NSPrivacyTracking == false`, `NSPrivacyTrackingDomains`
    empty, `NSPrivacyCollectedDataTypes` empty, `NSPrivacyAccessedAPITypes` exactly one entry with type `NSPrivacyAccessedAPICategoryUserDefaults`
    and reasons `["CA92.1"]`; no file named `PrivacyInfo.xcprivacy` anywhere under `HomeGymLogWidgets/` or `HomeGymLogShared/`.
-   `HomeGymLogSupport/Info.plist` (repo root) parses to exactly one key, `UILaunchScreen`, a dictionary whose only entry is `UIColorName` → `"bg"` (read as
-   `[String: Any]`, U10); no `Info.plist` exists under `HomeGymLog/`.
+   `HomeGymLogSupport/Info.plist` (repo root) parses to exactly two keys: `UILaunchScreen`, a dictionary whose only entry is `UIColorName` → `"bg"` (read as
+   `[String: Any]`, U10), and `ITSAppUsesNonExemptEncryption == false`; no `Info.plist` exists under `HomeGymLog/`.
    **Bundle-resource surface (NB-2):** the set of non-`.swift` files under `HomeGymLog/` outside `Assets.xcassets` is exactly `{rest-over.caf, PrivacyInfo.xcprivacy}`,
    and the only `.svg` anywhere under `HomeGymLog/` is `Assets.xcassets/WelcomeTile.imageset/WelcomeTile.svg` (the PNGs and SVG compile into `Assets.car`; the manifest is a plain copy).
 
@@ -377,9 +378,8 @@ the Live Activity device checks; any new capability, entitlement or `CFBundleDis
 
 **Unit tests — project** (`HomeGymLogTests/Static/ReleaseProjectTests.swift`, the `LiveActivityProjectTests.lines()` shape; plain `#expect`, the §4.3 gate precedes implementation, B-3):
 
-14. In `project.pbxproj`, **semantic pins (B-2)**: exactly 2 lines contain `INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone`, each contains
-    `UIInterfaceOrientationPortrait`, none contains `Landscape` or `UpsideDown`; exactly 2 lines contain `INFOPLIST_KEY_ITSAppUsesNonExemptEncryption` and each
-    has the value token `NO`; of the lines containing `INFOPLIST_FILE` **and not `GENERATE_INFOPLIST_FILE`** (F1: `GENERATE_INFOPLIST_FILE = YES;` ×6 carries the
+14. In `project.pbxproj`, **semantic pins (B-2)**: exactly 2 lines contain `INFOPLIST_KEY_UISupportedInterfaceOrientations` and not `_iPad` (the unsuffixed key Xcode 27 wrote; a `_iPhone` line would also count), each contains
+    `UIInterfaceOrientationPortrait`, none contains `Landscape` or `UpsideDown`; no line contains `ITSAppUsesNonExemptEncryption` (the key is in the merged plist; AC-7's plist test pins it `false` and AC-10 reads it from the bundle); of the lines containing `INFOPLIST_FILE` **and not `GENERATE_INFOPLIST_FILE`** (F1: `GENERATE_INFOPLIST_FILE = YES;` ×6 carries the
     token) there are exactly 4, of which 2 contain `HomeGymLogSupport/Info.plist` (a `$(SRCROOT)/` prefix or quotes pass) and 2 contain `HomeGymLogWidgets/Info.plist`; `MARKETING_VERSION = 1.0;` ×6, `CURRENT_PROJECT_VERSION = 1;` ×6; `INFOPLIST_KEY_NSSupportsLiveActivities = YES` still ×2.
 
 **Builds and artifacts** (commands from CLAUDE.md):

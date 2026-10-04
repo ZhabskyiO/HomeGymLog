@@ -79,16 +79,17 @@ The crops are copied from `build/light-env.sh` `CROPS` (`ob0|3000x5600|640 720|2
 `sips` takes h w, then y x).
 **Gate first** (read-only, spec §4.3 semantic greps). Stop and report on any mismatch; do not build:
 ```
-grep INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone $PBX | grep -cE "Landscape|UpsideDown"  # 0 (the tell, F8)
-grep INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone $PBX | grep -c Portrait                 # 2
-grep INFOPLIST_KEY_ITSAppUsesNonExemptEncryption $PBX | grep -c "NO"                               # 2
+grep INFOPLIST_KEY_UISupportedInterfaceOrientations $PBX | grep -v _iPad | grep -cE "Landscape|UpsideDown"  # 0 (the tell, F8; the key is unsuffixed since Xcode 27 wrote it, U9)
+grep INFOPLIST_KEY_UISupportedInterfaceOrientations $PBX | grep -v _iPad | grep -c Portrait        # 2
+grep -c ITSAppUsesNonExemptEncryption $PBX                                                        # 0 (the key lives in HomeGymLogSupport/Info.plist, spec §4.3 step 2)
+plutil -extract ITSAppUsesNonExemptEncryption raw HomeGymLogSupport/Info.plist                    # false
 grep -v GENERATE_INFOPLIST_FILE $PBX | grep INFOPLIST_FILE | grep -c "HomeGymLogSupport/Info.plist" # 2
 grep -v GENERATE_INFOPLIST_FILE $PBX | grep -c INFOPLIST_FILE                                      # 4 (F1)
 grep -c "MARKETING_VERSION = 1.0;" $PBX; grep -c "CURRENT_PROJECT_VERSION = 1;" $PBX               # 6 and 6
 grep -c "INFOPLIST_KEY_NSSupportsLiveActivities = YES" $PBX                                        # 2
 plutil -lint HomeGymLogSupport/Info.plist; ls HomeGymLog/Info.plist 2>/dev/null                    # OK; nothing
 git diff --stat $PBX; git status --short HomeGymLog.xcodeproj                                      # only project.pbxproj, only the three settings
-git show HEAD:$PBX | grep _iPhone | grep -cE "Landscape"; git show HEAD:$PBX | grep -c ITSAppUses  # 2 and 0: the predicates of Steps 3/8 were false at HEAD
+git show HEAD:$PBX | grep UISupportedInterfaceOrientations | grep -v _iPad | grep -cE "Landscape"; git show HEAD:$PBX | grep -c ITSAppUses  # 2 and 0: the predicates of Steps 3/8 were false at HEAD
 ```
 **Record U9.** `git diff $PBX > build/rel/pbxproj-gui.diff`. Append one dated entry to `insights/gotchas.md` "Xcode / build" quoting the exact lines the
 GUI wrote: whether they are quoted, and whether they carry a `$(SRCROOT)/` prefix. This is the only non-code write in this step.
@@ -190,7 +191,7 @@ dark `yes` shows that AC-5's predicate tells the two apart. **AC-4, AC-5, AC-6, 
 Tests, written before the manifest; the manifest and bundle checks fail first:
 - `ReleaseAssetTests`, appended. **AC-7:** the manifest parses to exactly four keys (`NSPrivacyTracking as? Bool == false`; tracking domains and collected
   data types empty; one accessed-API dict, `NSPrivacyAccessedAPICategoryUserDefaults` / `["CA92.1"]`); none under `HomeGymLogWidgets/` or `HomeGymLogShared/`;
-  `HomeGymLogSupport/Info.plist` has exactly one key `UILaunchScreen` (`[String: Any]`, U10) whose only entry is `UIColorName == "bg"`; no `Info.plist`
+  `HomeGymLogSupport/Info.plist` has exactly two keys: `UILaunchScreen` (`[String: Any]`, U10) whose only entry is `UIColorName == "bg"`, and `ITSAppUsesNonExemptEncryption == false`; no `Info.plist`
   under `HomeGymLog/`; NB-2: the non-`.swift` files under `HomeGymLog/` outside `Assets.xcassets/` (`.skipsHiddenFiles`) are exactly `{"rest-over.caf", "PrivacyInfo.xcprivacy"}`.
 - `ReleaseBundleTests`, appended:
   - **AC-8:** `Bundle.main.url(forResource: "PrivacyInfo", withExtension: "xcprivacy")` is non-nil. Its `deletingLastPathComponent().resolvingSymlinksInPath().path`
@@ -200,8 +201,7 @@ Tests, written before the manifest; the manifest and bundle checks fail first:
     `CFBundleShortVersionString == "1.0"`, `CFBundleVersion == "1"`, `NSSupportsLiveActivities as? Bool == true`.
 - New `HomeGymLogTests/Static/ReleaseProjectTests.swift`, using `LiveActivityProjectTests.lines()` (internal `static func`, `Static/LiveActivityProjectTests.swift:16`).
   **AC-14**, semantic (B-2):
-  2 `…UISupportedInterfaceOrientations_iPhone` lines, each with `UIInterfaceOrientationPortrait`, none with `Landscape`/`UpsideDown`; 2 `…ITSAppUsesNonExemptEncryption`
-  lines whose value (after `=`, trimmed of spaces, `;`, `"`) is `NO`; 4 `INFOPLIST_FILE` lines that are not `GENERATE_INFOPLIST_FILE`, 2 with `HomeGymLogSupport/Info.plist`
+  2 `…UISupportedInterfaceOrientations` lines that are not `_iPad` (unsuffixed since Xcode 27 wrote it; a `_iPhone` line would also count), each with `UIInterfaceOrientationPortrait`, none with `Landscape`/`UpsideDown`; no `ITSAppUsesNonExemptEncryption` line (the key is in the merged plist, pinned by AC-7 and AC-10); 4 `INFOPLIST_FILE` lines that are not `GENERATE_INFOPLIST_FILE`, 2 with `HomeGymLogSupport/Info.plist`
   and 2 with `HomeGymLogWidgets/Info.plist`; `MARKETING_VERSION = 1.0;` ×6, `CURRENT_PROJECT_VERSION = 1;` ×6, `INFOPLIST_KEY_NSSupportsLiveActivities = YES` ×2.
   Step 0's `git show HEAD:` lines show these predicates were false before the GUI steps.
 
@@ -406,7 +406,7 @@ None: no `@Model`, field, relationship, delete rule, `#Predicate`, preference ke
 | Risk | Mitigation |
 |---|---|
 | The GUI settings are missing or wrong when implementation starts | Step 0 gate; stop and report, never patch `project.pbxproj` (the hook forbids it) |
-| U9 pbxproj line shape | **Observed at the gate; the lines are recorded in gotchas at Step 0**; pins are token-and-value (B-2) |
+| U9 pbxproj line shape | **Observed 2026-10-03 before implementation** (unsuffixed orientation key, bare `INFOPLIST_FILE`); recorded in gotchas; pins are token-and-value (B-2) |
 | A CLI `INFOPLIST_FILE=` breaks the appex; dragging `HomeGymLogSupport/` into the navigator → "Multiple commands produce" (gotchas 2026-10-03) | No `INFOPLIST_*` on any command line; Step 8 checks the appex's `NSExtensionPointIdentifier` |
 | F1: `GENERATE_INFOPLIST_FILE` carries the token | Excluded in the gate grep and in `ReleaseProjectTests` |
 | `codeLines` truncates `https://…` at `//` | The URL scans read raw lines (Step 5) |

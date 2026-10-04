@@ -475,6 +475,15 @@ are kept as history.
 
 ## Xcode / build
 
+- 2026-10-03 — **Xcode 27's General → iPhone Orientation checkboxes write the unsuffixed key**: unticking both Landscape boxes
+  replaced `INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "… Portrait … LandscapeLeft … LandscapeRight"` with
+  `INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;` (no `_iPhone`), and reordered the inert
+  `_iPad` value list; the built plist still reads `UISupportedInterfaceOrientations = [Portrait]`. A pin on the `_iPhone` key
+  fails on a correct project; pin `UISupportedInterfaceOrientations` lines that are not `_iPad`. The typed "Info.plist File"
+  landed bare (`INFOPLIST_FILE = HomeGymLogSupport/Info.plist;`, no `$(SRCROOT)/`). The Build Settings search for
+  `Non-Exempt` did **not** produce a saved `INFOPLIST_KEY_ITSAppUsesNonExemptEncryption` on the first try (m5-release gate).
+  An incremental Release build after a plist-only change prints 0 `warning:` lines because no Swift file recompiles; a
+  warning count is only meaningful after a clean build.
 - 2026-10-03 — **`INFOPLIST_FILE=` (and any `INFOPLIST_KEY_*`) on the xcodebuild command line applies to every target**: it
   replaced the widget's Info.plist, dropped `NSExtension`, and `simctl install` failed with "Failed to create app extension
   placeholder". Scope `INFOPLIST_FILE` to the app target in the project; use CLI overrides only for keys harmless in the appex.
