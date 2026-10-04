@@ -475,6 +475,10 @@ are kept as history.
 
 ## Xcode / build
 
+- 2026-10-03 — **Xcode 27's Widget Extension wizard names the target and product `<Name>Extension`** (`HomeGymLogWidgetsExtension`,
+  `PlugIns/HomeGymLogWidgetsExtension.appex`) while the folder stays `<Name>/` and the proposed bundle id uses `<Name>`. A
+  plan written against the folder name (`HomeGymLogWidgets.appex`) breaks every path and target-name pin. Recognize it:
+  `grep -n "name = " project.pbxproj` after the wizard. Accept the name rather than renaming the target.
 - 2026-10-03 — **The App Intents metadata extractor rejects an intent `title` built from a constant**: `static let title =
   LocalizedStringResource(stringLiteral: RestActivityText.addAccessibility)` compiled, then the build failed in
   `appintentsmetadataprocessor` with "'LocalizedStringResource' must be initialized with a call to its initializer or a string
