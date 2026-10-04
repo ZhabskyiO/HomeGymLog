@@ -475,6 +475,20 @@ are kept as history.
 
 ## Xcode / build
 
+- 2026-10-03 — **`INFOPLIST_FILE=` (and any `INFOPLIST_KEY_*`) on the xcodebuild command line applies to every target**: it
+  replaced the widget's Info.plist, dropped `NSExtension`, and `simctl install` failed with "Failed to create app extension
+  placeholder". Scope `INFOPLIST_FILE` to the app target in the project; use CLI overrides only for keys harmless in the appex.
+  Source: `docs/reviews/m5-release-researcher.md` Q3.
+- 2026-10-03 — **An `Info.plist` inside a synchronized folder fails with "Multiple commands produce …/Info.plist"** unless a
+  membership exception exists (the widget wizard added one; the app target has none). Put a hand-made plist outside the
+  synchronized folders (`HomeGymLogSupport/Info.plist`) or untick its Target Membership in the File inspector.
+- 2026-10-03 — **`qlmanage -t` and `sips` emit RGBA PNGs from an SVG; `rsvg-convert` (and headless Chrome) emit RGB.** The App
+  Store icon must have no alpha (ITMS-90717) and actool never warns about it; check with `file icon.png` ("RGB" vs "RGBA").
+- 2026-10-03 — **To screenshot the launch screen on the simulator use `simctl launch --wait-for-debugger`** (the short `-w`
+  printed usage and launched nothing); the system holds the launch image until a debugger attaches. Eight back-to-back
+  screenshots around a normal launch never caught it.
+- 2026-10-03 — **A single-scale SVG imageset reports its intrinsic size** (`UIImage(named:)` → 1024 × 1024 pt from a 1024-unit
+  SVG, scale 3); author the SVG at the point size you want or `.resizable().frame(…)`.
 - 2026-10-03 — **Xcode 27's Widget Extension wizard names the target and product `<Name>Extension`** (`HomeGymLogWidgetsExtension`,
   `PlugIns/HomeGymLogWidgetsExtension.appex`) while the folder stays `<Name>/` and the proposed bundle id uses `<Name>`. A
   plan written against the folder name (`HomeGymLogWidgets.appex`) breaks every path and target-name pin. Recognize it:
