@@ -6,11 +6,8 @@ struct WelcomeStep: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("H")
-                .font(.system(size: 22, weight: .heavy))
-                .foregroundStyle(Color.white)
-                .frame(width: 44, height: 44)
-                .background(Theme.accent, in: RoundedRectangle(cornerRadius: 12))
+            // The app icon artwork; `decorative` keeps it out of VoiceOver (≈ `alt=""` with `aria-hidden`).
+            Image(decorative: "WelcomeTile").resizable().scaledToFit().frame(width: 44, height: 44).clipShape(RoundedRectangle(cornerRadius: 12))
             Text("Your gym.\nYour program.")
                 .font(.system(size: 38, weight: .bold))
                 .tracking(-1.4)

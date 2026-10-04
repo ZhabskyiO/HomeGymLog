@@ -247,6 +247,10 @@ are kept as history.
   `.custom` strategy works on both. **`JSONEncoder` without `.sortedKeys` is not byte-stable on 26.5** (the same value encoded
   twice in one process differed; 17.5 was stable). Recognize it: a backup test green on 26.5 and red on 17.5, or a
   byte-comparison flaky only on 26.5. Source: `docs/reviews/m5-export-researcher.md` Q2.
+- 2026-10-04 — **Swift `Regex` does not support lookbehind at runtime**: `try Regex(#"(?<![A-Za-z])Link\("#)` compiled, then the
+  test threw "lookbehind is not currently supported" on iOS 17.5 (m5-release `ReleaseCopyTests`, the whole-token `Link(` scan
+  that must not match `ShareLink(`). Use ICU instead: `line.range(of: pattern, options: .regularExpression) != nil`, which
+  supports `(?<!…)`. Recognize it: a "Caught error" from a test, not a compile error, naming lookbehind.
 
 ## SwiftUI
 
@@ -428,6 +432,13 @@ are kept as history.
   - **Recognize it:** a "tap beside the button" check that performs the button's action, or a blocking check that fails only
     because the tap dismissed the overlay.
 - (expected areas still open: sheet + navigation interplay)
+- 2026-10-04 — **Adding a card below the fold can move unchanged text above it by 1 px**: after m5-release appended the
+  Settings ABOUT card (off-screen on the 6.1" iPhone 15), the non-scrolled `settings` screenshot was no longer byte-equal to the
+  baseline: the "Appearance" label, the "6-month program · 5 days" value and text behind the tab pill were drawn exactly
+  1 px (1/3 pt) higher; every other pixel, and the look at full size, was unchanged, and a reshoot reproduced it (deterministic).
+  A longer scroll content changes SwiftUI's pixel snapping of some text runs. Recognize it: a `CMPX` row diff confined to a
+  few text runs that match the baseline when shifted by one row (`dy = -1`); a plan's "pixel-identical because below the
+  fold" is then wrong, not the view.
 
 ## User notifications
 
@@ -475,6 +486,29 @@ are kept as history.
 
 ## Xcode / build
 
+- 2026-10-03 — **Xcode 27's General → iPhone Orientation checkboxes write the unsuffixed key**: unticking both Landscape boxes
+  replaced `INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "… Portrait … LandscapeLeft … LandscapeRight"` with
+  `INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;` (no `_iPhone`), and reordered the inert
+  `_iPad` value list; the built plist still reads `UISupportedInterfaceOrientations = [Portrait]`. A pin on the `_iPhone` key
+  fails on a correct project; pin `UISupportedInterfaceOrientations` lines that are not `_iPad`. The typed "Info.plist File"
+  landed bare (`INFOPLIST_FILE = HomeGymLogSupport/Info.plist;`, no `$(SRCROOT)/`). The Build Settings search for
+  `Non-Exempt` did **not** produce a saved `INFOPLIST_KEY_ITSAppUsesNonExemptEncryption` on the first try (m5-release gate).
+  An incremental Release build after a plist-only change prints 0 `warning:` lines because no Swift file recompiles; a
+  warning count is only meaningful after a clean build.
+- 2026-10-03 — **`INFOPLIST_FILE=` (and any `INFOPLIST_KEY_*`) on the xcodebuild command line applies to every target**: it
+  replaced the widget's Info.plist, dropped `NSExtension`, and `simctl install` failed with "Failed to create app extension
+  placeholder". Scope `INFOPLIST_FILE` to the app target in the project; use CLI overrides only for keys harmless in the appex.
+  Source: `docs/reviews/m5-release-researcher.md` Q3.
+- 2026-10-03 — **An `Info.plist` inside a synchronized folder fails with "Multiple commands produce …/Info.plist"** unless a
+  membership exception exists (the widget wizard added one; the app target has none). Put a hand-made plist outside the
+  synchronized folders (`HomeGymLogSupport/Info.plist`) or untick its Target Membership in the File inspector.
+- 2026-10-03 — **`qlmanage -t` and `sips` emit RGBA PNGs from an SVG; `rsvg-convert` (and headless Chrome) emit RGB.** The App
+  Store icon must have no alpha (ITMS-90717) and actool never warns about it; check with `file icon.png` ("RGB" vs "RGBA").
+- 2026-10-03 — **To screenshot the launch screen on the simulator use `simctl launch --wait-for-debugger`** (the short `-w`
+  printed usage and launched nothing); the system holds the launch image until a debugger attaches. Eight back-to-back
+  screenshots around a normal launch never caught it.
+- 2026-10-03 — **A single-scale SVG imageset reports its intrinsic size** (`UIImage(named:)` → 1024 × 1024 pt from a 1024-unit
+  SVG, scale 3); author the SVG at the point size you want or `.resizable().frame(…)`.
 - 2026-10-03 — **Xcode 27's Widget Extension wizard names the target and product `<Name>Extension`** (`HomeGymLogWidgetsExtension`,
   `PlugIns/HomeGymLogWidgetsExtension.appex`) while the folder stays `<Name>/` and the proposed bundle id uses `<Name>`. A
   plan written against the folder name (`HomeGymLogWidgets.appex`) breaks every path and target-name pin. Recognize it:

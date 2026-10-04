@@ -29,7 +29,8 @@ final class OnboardingDraft {
     private(set) var preview: ProgramSummary?
 
     static let ctaLabels = ["Set up my program", "Continue", "Continue", "Continue", "Generate program", "Start program"]
-    static let bodyWeightRangeLb = 50.0...500.0
+    /// Forwards to Engine's bound so Engine never reaches into this main-actor class (a computed `static var` ≈ a getter).
+    static var bodyWeightRangeLb: ClosedRange<Double> { ProgramGenerator.bodyWeightRangeLb }
 
     init(units: WeightUnit = .lb, months: Int = 1, frequency: Int = 4) {
         self.units = units

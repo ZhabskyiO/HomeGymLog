@@ -8,6 +8,118 @@ session start, so nothing here depends on it.
 
 ## Architecture decisions
 
+### 2026-10-03 — M5 release decisions (user-answered before the spec; researcher `docs/reviews/m5-release-researcher.md`)
+
+- **Icon (superseded the same evening by the artwork bullet below): the user supplies the artwork; the slice was to ship a placeholder** (white "H" on the accent color, generated from an
+  SVG with `rsvg-convert`, which emits the opaque 1024×1024 PNG the App Store requires; `qlmanage` and `sips` emit RGBA and
+  are unusable). Fixed file names in `AppIcon.appiconset` (light, dark, tinted) so the real PNGs drop in by name later;
+  tests pin only dimensions and "no alpha" on the light image. The welcome tile stops being a `Text("H")` and shows the same
+  artwork from an imageset. The ten empty `mac` idiom entries left by the wizard are deleted from the app's
+  `AppIcon.appiconset/Contents.json` (never compiled for an iOS-only target; tidiness). The widget extension needs no icon.
+- **Privacy manifest** `HomeGymLog/PrivacyInfo.xcprivacy` at the synchronized folder's root (lands at the app bundle root as
+  a plain copied resource, no project edit): tracking false, no tracking domains, no collected data types, one accessed-API
+  entry `NSPrivacyAccessedAPICategoryUserDefaults` / `CA92.1` (every `UserDefaults`/`@AppStorage` use is the app's own
+  preferences). Required for upload since 2024-05-01. The widget extension uses no required-reason API and gets no manifest.
+- **Info keys, set by the user in Xcode's GUI as `INFOPLIST_KEY_*` build settings** (all three exist in Xcode 27's xcspec):
+  portrait only (`UISupportedInterfaceOrientations_iPhone`), `ITSAppUsesNonExemptEncryption = NO` (skips the export-compliance
+  question on every upload), and the launch screen's `bg` color, which has no `INFOPLIST_KEY_` and needs a small merged
+  Info.plist **outside** the synchronized folder (inside it, the build fails with "Multiple commands produce") with
+  `INFOPLIST_FILE` set on the app target only (a CLI `INFOPLIST_FILE=` override hits every target and breaks the appex).
+  Each key is pinned by a hosted test over `Bundle.main.infoDictionary`. Both targets stay at `MARKETING_VERSION 1.0` /
+  `CURRENT_PROJECT_VERSION 1` (a mismatch is ITMS-90473).
+- **Copy audit**: the only inaccurate string is the A4 subtitle; it becomes "Session length sets how many exercises you do."
+  (body weight and experience feed no formula; they stay collected and stored). Everything else in the inventory stands.
+- **Release build warnings to zero** (the researcher's scratch Release build showed 6 Swift concurrency warnings in
+  `RestartPrefill`, `WorkoutView`, `WorkoutLogStore` despite the "0 warnings" note of 2026-10-03); 0 warnings is an AC.
+- **App Store metadata** lives in `docs/release/` as paste-ready text: name HomeGymLog, subtitle, promotional text, description,
+  keywords, category Health & Fitness, App Privacy "Data Not Collected" (the export/share feature and local notifications do not
+  change it), age rating **9+** (the "Health or Wellness Topics" question answered yes, since the app prescribes exercise
+  programs), plus the one-page privacy policy and support page. **Those two pages are hosted from a separate public repo
+  with GitHub Pages** (this repo stays private; Pages on a private repo needs a paid plan); the URLs are filled in once the
+  user creates that repo.
+- **Store screenshots**: one 6.9" set (1320×2868) from the iPhone 17 Pro Max simulator on iOS 26.5 with
+  `simctl status_bar override` (9:41, full battery and signal), from the existing `-seed` states; iPhone 15 shots qualify
+  only for the optional 6.3" row.
+- **Definition of done: the Release archive builds from the CLI with the appex embedded and signed; no upload.** Creating
+  the App Store Connect record, Organizer "Validate App", the TestFlight upload and "Submit for Review" are the user's
+  actions after the MVP manual pass; the slice leaves numbered click-by-click directions for them.
+- **Spec §9 defaults taken (2026-10-03, user-answered)**: the in-app privacy-policy link (guideline 5.1.1(i)) is a small
+  follow-up slice once the Pages URL is live, before Submit for Review, not part of `m5-release`; the dark icon placeholder is
+  transparent with an accent "H" (Apple's recommended dark style); a raster-only real artwork makes the welcome tile a 3x PNG
+  imageset; the age-rating option is whichever states Health or Wellness Topics content is present (result 9+); copyright is a
+  placeholder the user types in App Store Connect.
+- **Architecture review (2026-10-03, approve with changes, `docs/reviews/m5-release-architecture.md`)**:
+  - **`HomeGymLogSupport/` holds path-referenced build inputs** (today the merged `Info.plist` for the launch color), never a
+    synchronized folder and never dragged into the project navigator; `INFOPLIST_FILE` names it on the app target only (B-2/NB-3).
+  - **Program-input bounds live on `ProgramGenerator`**: the body-weight range moves from the `@MainActor` `OnboardingDraft`
+    into Engine and the draft forwards to it; Engine never references a `Features/` type (B-1). The other five Release
+    warnings take the **closure form** (a main-actor member passed as a function value into a generic nonisolated closure
+    becomes `{ x in Member(x) }`, the pattern already at `WorkoutLogStore.swift:324`); no `nonisolated` on `RestText` (NB-1).
+  - **Tests that depend on the user's Xcode GUI steps are created after that checkpoint and fail loudly** (plain `#expect`,
+    no `withKnownIssue`, no skip) (B-3). **`project.pbxproj` pins are semantic** (key present with the expected value, not an
+    exact line), because the GUI-written text shape is inferred until observed (B-2).
+  - **`docs/release/` holds the paste-ready metadata with its limits pinned by a test; screenshots are regenerated by a script
+    as provenance**, like `docs/tools/make-rest-chime.py` (NB-5). A Static test pins the non-Swift files under `HomeGymLog/`
+    to the two intended resources and the one SVG inside its imageset (NB-2).
+- **The real icon artwork arrived during planning (2026-10-03, user-confirmed)**: `design/icon/HomeGymLog-icon.svg`, `-dark.svg`,
+  `-tinted.svg`, a 1024 RGB PNG and `NOTE.md` (a white dumbbell that reads as an "H" on `#E11D48`; produced with Claude at the
+  user's request; its C2PA `<metadata>` provenance block was stripped from the SVGs the same evening at the user's request, renders
+  byte-identical before and after). The slice ships it instead of the placeholder: `docs/tools/make-app-icon.py` reads
+  `design/icon/` directly (one source of truth, no copy under `docs/tools/`), the three PNGs render from it, the welcome tile
+  is a byte copy of the light SVG, and the "drop in later" AC is closed. **The dark icon ships
+  transparent with the accent mark** (the dark SVG's opaque `0F0E10` field is dropped by the render script), per the user's
+  earlier dark-style answer; the tinted SVG ships as drawn. `design/icon/` is the only copy (root duplicates removed).
+- **Both remaining risks closed before implementation (2026-10-03, user-answered)**: (1) the Xcode GUI checkpoint (portrait only,
+  `ITSAppUsesNonExemptEncryption`, `INFOPLIST_FILE = HomeGymLogSupport/Info.plist`) is performed by the user **before** the
+  implementer starts, with the 11-line plist written by the main session first, so the plan's Step 7 is already done and no step
+  stops for the user; (2) the in-app privacy-policy link (guideline 5.1.1(i)) joins this slice: the public repo
+  `ZhabskyiO/homegymlog-site` is created now with GitHub Pages (`https://zhabskyio.github.io/homegymlog-site/privacy/` and
+  `/support/`), the contact email is `poltavagaz@gmail.com`, and Settings gains an ABOUT card (Privacy policy, Support, Version)
+  below BACKUP. The follow-up slice for the link is cancelled.
+- **Gate outcome (2026-10-03)**: portrait and the plist path landed (Xcode 27 wrote the unsuffixed orientation key, gotcha);
+  the encryption key did not land after two GUI attempts, so it lives in the merged `HomeGymLogSupport/Info.plist` as
+  `<false/>` next to the launch color (one file, two release keys; both verified in the built plist by a Release build).
+- **Implemented 2026-10-04** (branch `m5-release`, not yet merged): 1343 tests on iOS 17.5 and 26.5 (1301 baseline →
+  1334 from the implementer's per-step tests → 1343 after the test-writer's 37 cases in 8 functions,
+  `docs/reviews/m5-release-tests.md`), Release build 0 warnings from a clean build (the six §5.7 concurrency warnings
+  fixed; an incremental Release build after a plist-only change prints 0 by accident, a gotcha already recorded).
+  Archive `** ARCHIVE SUCCEEDED **` with both dSYMs, the appex embedded under `PlugIns/`, `PrivacyInfo.xcprivacy` at
+  the app root, the three Info values present; no export, no upload. Swift review "ship" with five low notes
+  (`docs/reviews/m5-release-swift-review.md`): the first two (the screenshot script keeps stderr; the icon script
+  renders to tmp and moves all four outputs at the end) applied by the main session; the other three (a
+  declared-type scan for "no Features type in Engine", now covered by the test-writer's `ReleaseIsolationSourceTests`;
+  a `SettingsActionLabel` extraction; the link trait is a device check) left as follow-ups. What shipped: the real
+  app icon from `design/icon/` (a white dumbbell-"H" on `#E11D48`; light opaque, dark transparent with the accent
+  mark, tinted white on transparent) rendered by `docs/tools/make-app-icon.py` into `AppIcon.appiconset` (the ten
+  `mac` entries removed); the welcome tile as `Image(decorative: "WelcomeTile")` from an SVG imageset (a byte copy
+  of the light SVG); the A4 subtitle "Session length sets how many exercises you do."; `HomeGymLog/PrivacyInfo.xcprivacy`
+  (UserDefaults / CA92.1); `HomeGymLogSupport/Info.plist` (merged via `INFOPLIST_FILE` on the app target, set by the
+  user in Xcode: `UILaunchScreen → UIColorName = bg`, `ITSAppUsesNonExemptEncryption = false`); portrait only (Xcode 27
+  wrote the unsuffixed `INFOPLIST_KEY_UISupportedInterfaceOrientations`); a Settings ABOUT card below BACKUP
+  (`Features/Settings/AboutRows.swift`'s `AboutLinkRow` on `Link`, rows Privacy policy / Support opening the live
+  Pages site, Version "1.0 (1)" via `SettingsText.versionText`); `docs/release/` (paste-ready App Store metadata,
+  committed copies of the live privacy/support pages at commit `dea6a29`, a release checklist, five 1320×2868
+  screenshots from the iPhone 17 Pro Max / 26.5 via `docs/tools/make-store-screenshots.sh`);
+  `ProgramGenerator.bodyWeightRangeLb` with `OnboardingDraft` forwarding (Engine no longer names a `Features/` type);
+  closure-form fixes in `WorkoutView` and `WorkoutLogStore`. Deviations from the plan: the `awaitsRating` guard uses
+  `{ awaitsRating($0) }` inside `guard` (a bare trailing closure is refused there); Swift `Regex` has no runtime
+  lookbehind, so the whole-token `Link(` scan uses ICU `range(of:options: .regularExpression)` (gotcha recorded);
+  the `settings` regression shot differs by a 1 px vertical shift of three text runs (SwiftUI sub-pixel snapping
+  once the ABOUT card lengthened the scroll content; swift review judged it acceptable, and the `settings` baseline
+  for future `/design-compare` runs is the new shot; gotcha recorded). M5 is complete except the user's manual pass:
+  AC-20 (Settings at max scroll, the two links, VoiceOver order, the Home Screen icon and the `bg` cold launch) and
+  AC-22 (the App Store Connect record, Validate App, TestFlight, Submit for Review — `docs/release/release-checklist.md`
+  steps 3–7).
+
+
+- **Security audit (2026-10-04, pass, `docs/reviews/m5-release-security-audit.md`)**: no blocking, high or medium finding; the
+  privacy manifest, the encryption answer, the two `https` Settings links, the backup validation order, the notification bodies, the
+  Live Activity content and the "Data Not Collected" label all verified against the code. Three low notes left as follow-ups: a
+  whole-file read before the backup header check (a huge file could be jettisoned instead of alerting), the newest exported backup
+  staying in the sandbox `tmp/` until the next export, and the decision below.
+- **The SwiftData store is included in iCloud and device backup** (the default; nothing sets `isExcludedFromBackup`). Decided
+  2026-10-04 at the audit's request: it stays included, since the JSON export is the user's explicit backup and the store holds
+  nothing that must not leave the device.
 ### 2026-10-02 — M5 live-activity decisions (user-answered before the spec; researcher `docs/reviews/m5-live-activity-researcher.md`)
 
 - **The Live Activity has "+30s" and "Skip" buttons** (the user chose this over tap-to-open only, against the
@@ -937,6 +1049,22 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
 
 ## Patterns
 
+
+### 2026-10-04 — Release Info keys: once `INFOPLIST_FILE` names a merged plist, put new keys there, not in GUI build settings (m5-release)
+Xcode 27's GUI saved the orientation and the plist path on the first try but never saved "App Uses Non-Exempt Encryption"
+in two attempts (Build Settings search, Info tab), and the GUI writes a different text shape than the one inferred
+(`INFOPLIST_KEY_UISupportedInterfaceOrientations` without `_iPhone`). A key in `HomeGymLogSupport/Info.plist`
+(`<key>ITSAppUsesNonExemptEncryption</key><false/>`) merges into the built plist deterministically, needs no user step,
+and is pinned the same way (`Bundle.main.infoDictionary` in a hosted test, `plutil -p` on the Release product). Rule: a
+new Info key goes into the merged plist; a GUI build setting only when the key has no plist equivalent. pbxproj pins stay
+semantic (token present with the expected value, never an exact line).
+
+### 2026-10-04 — Seeing below-the-fold UI without taps: a scratch copy with the view moved to the top (m5-release)
+The Settings ABOUT card sits under the fold even on the iPhone 17 Pro Max, and the simulator cannot be scrolled from
+the CLI. Cheaper than a UI-test target: `rsync` the repo (minus `build/`, `.git`) to the scratchpad, move the card to the
+top of the `VStack` in the copy only, build the copy, install, `-seed … -tab settings`, screenshot, then reinstall the
+real build and delete the copy. The card's own rendering is checked faithfully; its position is already pinned by the
+padding constant test. Ten minutes, no project change.
 ### 2026-10-03 — Shared code for an app extension: a root synchronized folder in both targets, `nonisolated`, a hook the app fills
 A widget extension runs in its own process, so it needs its own copy of anything the app and the extension both draw
 (here, the Live Activity's `ActivityAttributes` and its two buttons' intents). Give both targets one more synchronized

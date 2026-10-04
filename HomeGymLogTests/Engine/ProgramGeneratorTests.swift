@@ -231,4 +231,19 @@ import Testing
         #expect(program.trainingWeekdays == [0, 2, 4])
         #expect(program.sessions.map(\.scheduledDate) == (try generateA()).sessions.map(\.scheduledDate))
     }
+
+    // MARK: - m5-release Step 1 (spec §5.7, B-1): the body-weight bound lives in Engine
+
+    @Test("the body-weight range is 50…500 lb, owned by Engine")
+    func bodyWeightRange() {
+        #expect(ProgramGenerator.bodyWeightRangeLb == 50.0...500.0)
+    }
+
+    @Test("no Engine file names a Features type (OnboardingDraft)")
+    func engineNamesNoFeaturesType() throws {
+        let engine = try FeedbackSourceTests.appFiles().filter { $0.path.hasPrefix("Engine/") }
+        #expect(engine.count > 10)   // the walk found the Engine folder at all
+        let hits = engine.filter { file in file.lines.contains { $0.contains("OnboardingDraft") } }.map(\.path)
+        #expect(hits == [])
+    }
 }

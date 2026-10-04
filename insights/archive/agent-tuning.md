@@ -5,6 +5,18 @@ Moved out of `INSIGHTS.md` on 2026-09-16 to keep session and agent reads small. 
 
 ## Agent tuning
 
+- 2026-10-04 — **implementer**: reported "1334 tests on both runtimes" when the result bundle said 1306 (the test-writer's
+  arithmetic exposed it: 1343 − 37). Edit: the final report quotes `totalTestCount` from `xcrun xcresulttool get test-results
+  summary` for each runtime, never a running sum of "new tests added".
+- 2026-10-04 — **doc-writer**: the Edit tool failed "string not found" twice on CLAUDE.md and docs/layout.md right after a Read;
+  it recovered with python line-indexed splicing. Edit: when Edit fails on text just read, re-read with `cat` and splice by
+  exact bytes; do not retry the same Edit.
+- 2026-10-04 — **planner**: found the user's untracked icon artwork in `design/` (F3) that no earlier stage had noticed, and
+  eight spec counting slips (F1 `GENERATE_INFOPLIST_FILE` carrying the `INFOPLIST_FILE` token, F8 a grep that could not
+  change). Kept as is; the `/milestone` skill now checks `git status` for untracked design inputs before the spec is written.
+- 2026-10-04 — **researcher**: inferred the GUI-written pbxproj text (`…Orientations_iPhone = …Portrait;`) and marked it
+  unverified (U-1) — correct — but the spec still pinned exact lines until the architecture reviewer's B-2. Kept; the
+  INSIGHTS pattern "semantic pbxproj pins" and the merged-plist rule now make the inferred shape irrelevant.
 - 2026-10-03 — **doc-writer**: wrote a gotcha's GUI recipe from its own idea of Xcode ("File → New → File…") instead of
   the sequence the brief gave (Add Files… with a non-empty folder, both targets, then Convert to Folder); the main session
   fixed the entry. Edit: copy a GUI sequence from the brief verbatim; never reconstruct one not witnessed.
@@ -290,6 +302,15 @@ Moved out of `INSIGHTS.md` on 2026-09-16 to keep session and agent reads small. 
 
 ### Skill tuning
 
+- 2026-10-04 — **milestone**: the user dropped real icon artwork into `design/` during planning; only the planner noticed.
+  Edit: step 2 runs `git status --short` and surfaces untracked files under `design/` (or anywhere) to the user before
+  `spec-creator` launches, since user-supplied inputs change the spec.
+- 2026-10-04 — **ship-check** / **CLAUDE.md commands**: the Release "0 warnings" check printed 0 after a plist-only
+  change because no Swift file recompiled. Edit: the warning count is taken only after deleting
+  `build/DerivedData/Build/Intermediates.noindex` (or on fresh derived data).
+- 2026-10-04 — **milestone**: two plan-verifier rounds were spent on edits the main session made after PASS (About card,
+  gate moved); each scoped round was cheap (3–10 min) and found one real slip each (`ShareLink(` vs `Link(`; a stale S1/S2
+  note). Kept: re-verify scoped after any post-PASS spec change rather than skipping.
 - 2026-10-03 — **milestone**: the user's product questions were asked after the researcher but before `spec-creator`,
   with the researcher's facts as option descriptions; the spec then needed only the architecture review's edits. Edit:
   step 4 now says to do this whenever research reshapes the options.

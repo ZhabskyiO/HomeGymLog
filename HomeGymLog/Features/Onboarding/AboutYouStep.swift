@@ -6,7 +6,7 @@ struct AboutYouStep: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            StepTitle(title: "About you", subtitle: "Used to size sessions and starting loads.")
+            StepTitle(title: "About you", subtitle: "Session length sets how many exercises you do.")
             VStack(spacing: 10) {
                 HStack {
                     VStack(alignment: .leading, spacing: 6) {
