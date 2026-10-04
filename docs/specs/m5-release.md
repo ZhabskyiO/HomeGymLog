@@ -1,5 +1,10 @@
 # m5-release — app icon, copy audit, privacy manifest, Info keys, zero warnings, store metadata, screenshots, archive
 
+**Status: implemented 2026-10-04** (branch `m5-release`, not yet merged; 1343 tests on iOS 17.5 and 26.5, Release
+build 0 warnings from a clean build, archive `** ARCHIVE SUCCEEDED **` with both dSYMs and the appex embedded, swift
+review "ship" with five low notes, two applied, `docs/reviews/m5-release-swift-review.md`). Pending the user's MVP
+pass: AC-20 and AC-22 (device checks and the App Store Connect steps, `docs/release/release-checklist.md` 3–7).
+
 Spec 2026-10-03 (M5 slice 5, the last). Decisions: INSIGHTS "2026-10-03 — M5 release decisions" (settled). Platform facts: `docs/reviews/m5-release-researcher.md`
 (Q1–Q9, binding); probes made for this spec are marked "this spec" in §4.4; architecture review `docs/reviews/m5-release-architecture.md` applied (B-1–B-3, NB-1–NB-6, U9–U13).
 

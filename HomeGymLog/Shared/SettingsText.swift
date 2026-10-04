@@ -36,6 +36,21 @@ enum SettingsText {
     static let benchDetail = "Flat · incline"
     static let marcy = "Marcy home gym"
 
+    /// The ABOUT card (m5-release §2.7, §5.9): guideline 5.1.1(i)'s in-app privacy-policy link, support, and the version.
+    /// The two URLs live here and nowhere else in the app; the same strings are in `docs/release/app-store-metadata.md`.
+    static let aboutSection = "ABOUT"
+    static let privacyPolicy = "Privacy policy"
+    static let support = "Support"
+    static let version = "Version"
+    static let privacyPolicyURL = URL(string: "https://zhabskyio.github.io/homegymlog-site/privacy/")!
+    static let supportURL = URL(string: "https://zhabskyio.github.io/homegymlog-site/support/")!
+
+    /// "1.0 (1)" from the bundle's short version and build; "—" (U+2014) when either is missing or empty. Total.
+    static func versionText(short: String?, build: String?) -> String {
+        guard let short, !short.isEmpty, let build, !build.isEmpty else { return "\u{2014}" }
+        return "\(short) (\(build))"
+    }
+
     /// "6-month program · 5 days" (spec 5.1); frequency is always 3, 4 or 5, so the plural never varies.
     static func currentProgram(months: Int, frequency: Int) -> String {
         "\(ProgramSummaryText.title(months: months)) · \(frequency) days"

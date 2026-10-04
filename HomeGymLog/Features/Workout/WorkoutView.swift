@@ -88,7 +88,7 @@ struct WorkoutView: View {
         // The Live Activity pass's inputs (no clock read here, NB4: the time is read inside the task); nil while Exit deletes.
         let activityKey: RestActivityKey? = isDiscarding ? nil : RestActivityKey(
             logID: log.id.uuidString, restStartedAt: log.restStartedAt, restEndsAt: log.restEndsAt,
-            nextText: RestTimer.next(exercises: exercises, state: state).map(RestText.nextLine),
+            nextText: RestTimer.next(exercises: exercises, state: state).map { RestText.nextLine($0) },   // a closure: the unapplied main-actor reference warns in Release
             enabled: liveActivityEnabled, activeTick: activeTick, endedCount: endedCount)
         Group {
             if isDiscarding {

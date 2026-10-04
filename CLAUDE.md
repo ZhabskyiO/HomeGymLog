@@ -57,7 +57,9 @@ HomeGymLog/            app target; synchronized folder, so every .swift under it
   Features/<Screen>/   one folder per screen (Onboarding, Home, Program, Workout, Progress, Settings); one screen per
                        file, subviews extracted once a body passes ~80 lines
   Shared/              Theme, tab bar, reusable controls, and every *Text helper (all formatting lives here, never in Engine)
-  Assets.xcassets/     theme color sets
+  Assets.xcassets/     theme color sets, the real app icon (AppIcon.appiconset) and the welcome tile (WelcomeTile.imageset)
+HomeGymLogSupport/     a path-referenced build input, never a synchronized folder: Info.plist, the merged plist named
+                       by INFOPLIST_FILE on the app target only (the launch-screen color, the encryption key)
 HomeGymLogShared/      types the app target and the widget extension both compile (synchronized folder in both
                        targets, nonisolated, no UIKit, no app types): the Live Activity's ActivityAttributes, its two
                        intents, a hook the app fills with its own handler, and the shared rest-card strings
@@ -65,9 +67,13 @@ HomeGymLogWidgets/     the widget extension target (HomeGymLogWidgetsExtension):
                        Dynamic Island views, and its own copy of four colorsets
 HomeGymLogTests/       Swift Testing target: Support/ fixtures, then one folder per layer (App, Engine, Persistence,
                        Onboarding, Shared, Seed (Debug only), Static source scans)
-design/                prototype export (read-only reference)
+design/                prototype export (read-only reference); icon/ the app icon source SVGs (edit here, rerun
+                       docs/tools/make-app-icon.py)
 docs/specs, docs/plans specs and plans per slice (dated status when done)
 docs/reviews           saved agent reports per slice; docs/learning study notes; docs/layout.md the file roster
+docs/release           paste-ready App Store metadata, privacy/support page copies, store screenshots
+docs/tools             provenance scripts, never run by a build: make-rest-chime.py, make-app-icon.py,
+                       make-store-screenshots.sh
 insights/              INSIGHTS.md (decisions, patterns), gotchas.md, archive/ (agent and skill tuning history, not read at start)
 .claude/agents, .claude/skills
 ```
@@ -252,6 +258,21 @@ xcrun xcresulttool get test-results summary --path build/tests.xcresult   # tota
    follow-ups (`docs/reviews/m5-live-activity-swift-review.md`). Pending the user's MVP pass: the Lock Screen and
    expanded island, the buttons, the suspended/terminated intent path, the Settings switch and denied pair on device,
    and `….ios.widgets` signing (AC-26–AC-32).
+   — release slice done 2026-10-04 (branch `m5-release`: the real app icon from `design/icon/` (a white dumbbell-"H"
+   on `#E11D48`) rendered by `docs/tools/make-app-icon.py` into `AppIcon.appiconset` (light opaque, dark and tinted
+   transparent, the ten inert `mac` entries removed), the same artwork replacing the A1 welcome tile's "H"; the A4
+   subtitle corrected to "Session length sets how many exercises you do."; `HomeGymLog/PrivacyInfo.xcprivacy`
+   (UserDefaults / CA92.1, no tracking, no collected data); the three release Info keys landed through a merged
+   `HomeGymLogSupport/Info.plist` plus the user's Xcode GUI steps (portrait only, `ITSAppUsesNonExemptEncryption`,
+   the `bg` launch screen); a Settings ABOUT card below BACKUP (`Features/Settings/AboutRows.swift`: Privacy policy
+   and Support links to the live Pages site, a read-only Version row); the six Release-build concurrency warnings
+   fixed for 0 warnings from a clean build (`ProgramGenerator.bodyWeightRangeLb` replacing a Features-type reference
+   from Engine, three closure-form fixes); `docs/release/` (paste-ready App Store metadata, privacy/support page
+   copies, a release checklist, five 6.9" screenshots via `docs/tools/make-store-screenshots.sh`); 1343 tests on iOS
+   17.5 and 26.5, Release build 0 warnings, a signed CLI archive with both dSYMs and the appex embedded (no upload),
+   swift review "ship" with five low notes, two applied (`docs/reviews/m5-release-swift-review.md`). M5 is complete
+   except the user's manual checks (AC-20, AC-22) and the App Store Connect steps
+   (`docs/release/release-checklist.md` steps 3–7).
 
 ## Product decisions (settled 2026-09-09)
 

@@ -79,7 +79,47 @@ session start, so nothing here depends on it.
 - **Gate outcome (2026-10-03)**: portrait and the plist path landed (Xcode 27 wrote the unsuffixed orientation key, gotcha);
   the encryption key did not land after two GUI attempts, so it lives in the merged `HomeGymLogSupport/Info.plist` as
   `<false/>` next to the launch color (one file, two release keys; both verified in the built plist by a Release build).
+- **Implemented 2026-10-04** (branch `m5-release`, not yet merged): 1343 tests on iOS 17.5 and 26.5 (1301 baseline →
+  1334 from the implementer's per-step tests → 1343 after the test-writer's 37 cases in 8 functions,
+  `docs/reviews/m5-release-tests.md`), Release build 0 warnings from a clean build (the six §5.7 concurrency warnings
+  fixed; an incremental Release build after a plist-only change prints 0 by accident, a gotcha already recorded).
+  Archive `** ARCHIVE SUCCEEDED **` with both dSYMs, the appex embedded under `PlugIns/`, `PrivacyInfo.xcprivacy` at
+  the app root, the three Info values present; no export, no upload. Swift review "ship" with five low notes
+  (`docs/reviews/m5-release-swift-review.md`): the first two (the screenshot script keeps stderr; the icon script
+  renders to tmp and moves all four outputs at the end) applied by the main session; the other three (a
+  declared-type scan for "no Features type in Engine", now covered by the test-writer's `ReleaseIsolationSourceTests`;
+  a `SettingsActionLabel` extraction; the link trait is a device check) left as follow-ups. What shipped: the real
+  app icon from `design/icon/` (a white dumbbell-"H" on `#E11D48`; light opaque, dark transparent with the accent
+  mark, tinted white on transparent) rendered by `docs/tools/make-app-icon.py` into `AppIcon.appiconset` (the ten
+  `mac` entries removed); the welcome tile as `Image(decorative: "WelcomeTile")` from an SVG imageset (a byte copy
+  of the light SVG); the A4 subtitle "Session length sets how many exercises you do."; `HomeGymLog/PrivacyInfo.xcprivacy`
+  (UserDefaults / CA92.1); `HomeGymLogSupport/Info.plist` (merged via `INFOPLIST_FILE` on the app target, set by the
+  user in Xcode: `UILaunchScreen → UIColorName = bg`, `ITSAppUsesNonExemptEncryption = false`); portrait only (Xcode 27
+  wrote the unsuffixed `INFOPLIST_KEY_UISupportedInterfaceOrientations`); a Settings ABOUT card below BACKUP
+  (`Features/Settings/AboutRows.swift`'s `AboutLinkRow` on `Link`, rows Privacy policy / Support opening the live
+  Pages site, Version "1.0 (1)" via `SettingsText.versionText`); `docs/release/` (paste-ready App Store metadata,
+  committed copies of the live privacy/support pages at commit `dea6a29`, a release checklist, five 1320×2868
+  screenshots from the iPhone 17 Pro Max / 26.5 via `docs/tools/make-store-screenshots.sh`);
+  `ProgramGenerator.bodyWeightRangeLb` with `OnboardingDraft` forwarding (Engine no longer names a `Features/` type);
+  closure-form fixes in `WorkoutView` and `WorkoutLogStore`. Deviations from the plan: the `awaitsRating` guard uses
+  `{ awaitsRating($0) }` inside `guard` (a bare trailing closure is refused there); Swift `Regex` has no runtime
+  lookbehind, so the whole-token `Link(` scan uses ICU `range(of:options: .regularExpression)` (gotcha recorded);
+  the `settings` regression shot differs by a 1 px vertical shift of three text runs (SwiftUI sub-pixel snapping
+  once the ABOUT card lengthened the scroll content; swift review judged it acceptable, and the `settings` baseline
+  for future `/design-compare` runs is the new shot; gotcha recorded). M5 is complete except the user's manual pass:
+  AC-20 (Settings at max scroll, the two links, VoiceOver order, the Home Screen icon and the `bg` cold launch) and
+  AC-22 (the App Store Connect record, Validate App, TestFlight, Submit for Review — `docs/release/release-checklist.md`
+  steps 3–7).
 
+
+- **Security audit (2026-10-04, pass, `docs/reviews/m5-release-security-audit.md`)**: no blocking, high or medium finding; the
+  privacy manifest, the encryption answer, the two `https` Settings links, the backup validation order, the notification bodies, the
+  Live Activity content and the "Data Not Collected" label all verified against the code. Three low notes left as follow-ups: a
+  whole-file read before the backup header check (a huge file could be jettisoned instead of alerting), the newest exported backup
+  staying in the sandbox `tmp/` until the next export, and the decision below.
+- **The SwiftData store is included in iCloud and device backup** (the default; nothing sets `isExcludedFromBackup`). Decided
+  2026-10-04 at the audit's request: it stays included, since the JSON export is the user's explicit backup and the store holds
+  nothing that must not leave the device.
 ### 2026-10-02 — M5 live-activity decisions (user-answered before the spec; researcher `docs/reviews/m5-live-activity-researcher.md`)
 
 - **The Live Activity has "+30s" and "Skip" buttons** (the user chose this over tap-to-open only, against the

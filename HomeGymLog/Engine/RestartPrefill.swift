@@ -28,8 +28,8 @@ nonisolated enum RestartPrefill {
             frequency: frequency,
             trainingWeekdays: weekdays(trainingWeekdays, frequency: frequency),
             sessionLengthMinutes: length,
-            bodyWeightLb: min(max(bodyWeightLb, OnboardingDraft.bodyWeightRangeLb.lowerBound),
-                              OnboardingDraft.bodyWeightRangeLb.upperBound),
+            bodyWeightLb: min(max(bodyWeightLb, ProgramGenerator.bodyWeightRangeLb.lowerBound),
+                              ProgramGenerator.bodyWeightRangeLb.upperBound),
             experience: Experience(rawValue: experience) ?? .intermediate,
             startingWeightsLb: startingWeightsLb.filter { key, lb in
                 guard let exercise = ExerciseLibrary.exercise(for: key) else { return false }

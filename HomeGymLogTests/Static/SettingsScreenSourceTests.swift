@@ -44,10 +44,10 @@ import Testing
         return members
     }
 
-    @Test("the eight Settings files are scanned")
+    @Test("the ten Settings files are scanned")
     func filesScanned() throws {
         let files = try Self.settingsFiles()
-        #expect(files.map(\.path) == ["BackupFile.swift", "BackupImportAction.swift", "BackupRows.swift", "LiveActivityRows.swift",
+        #expect(files.map(\.path) == ["AboutRows.swift", "BackupFile.swift", "BackupImportAction.swift", "BackupRows.swift", "LiveActivityRows.swift",
                                       "ReminderRows.swift", "RestartAction.swift", "SettingsContent.swift", "SettingsRows.swift",
                                       "SettingsView.swift"])
     }
@@ -97,24 +97,25 @@ import Testing
         #expect(members.filter { group.contains($0) } == group)
     }
 
-    @Test("the three section headers in order: PROGRAM, EQUIPMENT (SettingsText), then BACKUP (BackupText)")
+    @Test("the four section headers in order: PROGRAM, EQUIPMENT (SettingsText), BACKUP (BackupText), then ABOUT (SettingsText)")
     func sectionHeaders() throws {
         let lines = try Self.codeLines("Features/Settings/SettingsContent.swift")
         let members = Self.textMembers(in: lines)
-        #expect(members.filter { $0.hasSuffix("Section") } == ["programSection", "equipmentSection"])
+        #expect(members.filter { $0.hasSuffix("Section") } == ["programSection", "equipmentSection", "aboutSection"])
         #expect(members.first == "title", "the screen title is drawn first")
-        let headers = try ["SettingsText.programSection", "SettingsText.equipmentSection", "BackupText.section"].map { token in
+        let headers = try ["SettingsText.programSection", "SettingsText.equipmentSection", "BackupText.section",
+                       "SettingsText.aboutSection"].map { token in
             try #require(lines.firstIndex { $0.contains("SettingsSectionHeader(title: \(token))") }, "\(token)")
         }
         #expect(headers == headers.sorted())
-        #expect(Set(headers).count == 3)
+        #expect(Set(headers).count == 4)
     }
 
     @Test("each card's rows are separated by a hairline, and there is one fewer divider than rows")
     func dividerCount() throws {
         let lines = try Self.codeLines("Features/Settings/SettingsContent.swift")
         let dividers = lines.filter { $0.contains("SettingsDivider()") }.count
-        #expect(dividers == 10, "6 preference + 3 program + 3 equipment + 2 backup rows = 10 gaps (the reminder's and the Lock Screen timer's own dividers are in their rows files)")
+        #expect(dividers == 12, "6 preference + 3 program + 3 equipment + 2 backup + 3 about rows = 12 gaps (the reminder's and the Lock Screen timer's own dividers are in their rows files)")
     }
 
     @Test("no Settings file types a user-visible string: every one comes from SettingsText or an enum label")

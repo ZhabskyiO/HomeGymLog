@@ -60,6 +60,8 @@ nonisolated enum ProgramGenerator {
     static let allowedMonths: Set<Int> = [1, 2, 3, 6]
     static let allowedFrequencies: Set<Int> = [3, 4, 5]
     static let allowedSessionLengths: Set<Int> = [20, 30, 45, 60]
+    /// Body weight is clamped into this range wherever it is entered or restored (onboarding, restart prefill).
+    static let bodyWeightRangeLb = 50.0...500.0
 
     /// Validates `inputs` (throws `ProgramInputError`) and returns every session with its week, phase,
     /// scheduled day and target weights in pounds. Sessions dated before `generatedOn` are re-slotted

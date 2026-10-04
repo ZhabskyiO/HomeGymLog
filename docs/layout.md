@@ -1,4 +1,4 @@
-# File layout (as of M5 live-activity slice, 2026-10-03)
+# File layout (as of M5 release slice, 2026-10-04)
 
 The per-file roster, moved out of `CLAUDE.md` on 2026-09-16 so every session and agent stops paying for it. `CLAUDE.md` keeps
 the directory map; read this file when you need to know which file owns what. `doc-writer` updates it after each slice.
@@ -96,7 +96,9 @@ HomeGymLog/                app target (synchronized folder: every .swift under i
                            seed and by restart in m4-settings), delete),
                            WorkoutLogStore (start, finish, guarded set writers that also start or clear the rest,
                            addRestTime, skipRest, swapExercise (the log and this session's plan element), discard,
-                           delete), ExerciseNoteStore (one note per key, saved per keystroke), StoreCommit (the failed-save
+                           delete; two .map calls and one contains(where:) moved to closure-literal form by m5-release, a
+                           Release-build warning fix, no behavior change), ExerciseNoteStore (one note per key, saved
+                           per keystroke), StoreCommit (the failed-save
                            policy's one home: commit = rollback, restore, rethrow; commitInsert; rehearseInsert, the only
                            scratch ModelContext; replaceInScratch (m5-export's whole-store replace: opens a scratch
                            ModelContext, runs the write closure, saves once, no rollback() on failure); rules in
@@ -112,7 +114,9 @@ HomeGymLog/                app target (synchronized folder: every .swift under i
                            current and archived programs; the only functions that hop to a row's program, off the render
                            path inside the screen's task)
   Engine/                  pure logic, no SwiftData/SwiftUI: EngineTypes, Equipment, ExerciseLibrary, SplitPlans,
-                           PhaseSplit, WeightFormula, CalendarRules, Reslot, ProgramGenerator, ProgramSummary (A6 numbers),
+                           PhaseSplit, WeightFormula, CalendarRules, Reslot, ProgramGenerator (gains bodyWeightRangeLb since m5-release, the
+                           input bound OnboardingDraft now forwards to, so Engine never names a Features/ type),
+                           ProgramSummary (A6 numbers),
                            StartingWeights (A5 rows), WeightDisplay (lb/kg number text), HomeStatsTypes
                            (SessionSummary, FinishedLogValue, validating HomeStatsInput), HomeStats (Home tab numbers,
                            plus sessionState shared with the Program card), ProgramTabStats (week windows, chips, day
@@ -129,7 +133,8 @@ HomeGymLog/                app target (synchronized folder: every .swift under i
                            ProgressStats (chip order across programs, chart point order, Best, Since start, the empty-history
                            fallback, the month calendar, chart geometry from the prototype's SVG),
                            RestartPrefill (OnboardingAnswers value type; answers(...) turns an archived program's scalar
-                           fields into onboarding defaults, per-field fallback, never throws),
+                           fields into onboarding defaults, per-field fallback, never throws; its weight clamp reads
+                           ProgramGenerator.bodyWeightRangeLb since m5-release),
                            ReminderPlan (ReminderAuthorization, ReminderRequest, ReminderRowState; desired(...) the total
                            daily-reminder schedule over pending session days — spec 5.1, wall-clock fire time not elapsed
                            minutes; rowState, reconcileKey (now carrying sound), the picker's time(minutes:) / minutes(of:) conversions),
@@ -155,9 +160,12 @@ HomeGymLog/                app target (synchronized folder: every .swift under i
                            BackupReadError), BackupValidation (BackupReadError, the twelve cases of spec 5.1; validate(_:)
                            runs rules 5–11 in table and row order, the third validating boundary after ProgramGenerator's
                            input and HomeStatsInput)
-  Features/Onboarding/     OnboardingView (flow root), OnboardingDraft (@Observable answers + step), OnboardingChrome
-                           (header, footer), StepTitle, one file per step: WelcomeStep, LengthStep, FrequencyStep,
-                           AboutYouStep, StartingWeightsStep, GeneratedProgramStep
+  Features/Onboarding/     OnboardingView (flow root), OnboardingDraft (@Observable answers + step; bodyWeightRangeLb
+                           forwards to Engine/ProgramGenerator.bodyWeightRangeLb since m5-release), OnboardingChrome
+                           (header, footer), StepTitle, one file per step: WelcomeStep (A1's tile is the real icon
+                           artwork, Image(decorative: "WelcomeTile"), since m5-release — not a Text("H")), LengthStep,
+                           FrequencyStep, AboutYouStep (A4 subtitle corrected since m5-release: "Session length sets
+                           how many exercises you do."), StartingWeightsStep, GeneratedProgramStep
   Features/Home/           HomeView (owns the @Query on PlannedSession, `now` state, fingerprint task, info sheet, the
                            shared start), HomeContent (layout), HomeHeader, StatTiles, WeekStrip, TodayCard (+ExerciseRow),
                            RestDayCard, RecentRecords (+PRCard), MissedPromptHost (the missed-session prompt and the
@@ -180,7 +188,8 @@ HomeGymLog/                app target (synchronized folder: every .swift under i
                            hapticsEnabled/soundEnabled @AppStorage reads and the restChime.play() calls; since
                            m5-live-activity also builds the RestActivityKey (RestTimer.next, no clock read in body) and
                            runs reconcileActivity in a .task(id:), bumping activeTick on scene-active and endedCount when a
-                           rest ends in the foreground, reads liveActivityEnabled @AppStorage),
+                           rest ends in the foreground, reads liveActivityEnabled @AppStorage; its "Next:" .map call moved to
+                           closure-literal form by m5-release, a Release-build warning fix, no behavior change),
                            WorkoutLoggingContent (layout, +ExerciseBlock; the bottom inset shows the bar or the
                            rest card), WorkoutHeader (+WorkoutElapsedClock, ProgressSegments; Swap dims unless every set
                            is pending), SetRow, SetSwipeRow (drag + VoiceOver actions), RPECard, WorkoutSheet (enum with
@@ -212,8 +221,9 @@ HomeGymLog/                app target (synchronized folder: every .swift under i
                            reads no backup row and runs no fetch), SettingsContent (layout, +SettingsSectionHeader;
                            bottom padding is FloatingTabBar.height + 16 since m5-export, so the last row clears the
                            floating tab pill at maximum scroll; draws the BACKUP header, card and its one divider, and
-                           since m5-live-activity a divider before LiveActivityRows in the preferences card —
-                           dividerCount 10 since this slice), SettingsRows (SettingsValueRow, one
+                           since m5-live-activity a divider before LiveActivityRows in the preferences card, and
+                           since m5-release an ABOUT header and card below BACKUP (two AboutLinkRow link rows plus
+                           a read-only Version row) — dividerCount 12 since this slice), SettingsRows (SettingsValueRow, one
                            accessibility element; SettingsControlRow, deliberately not combined so a control stays its
                            own stop), ReminderRows (the Daily reminder toggle and its one conditional second row — the
                            time picker, "Open iOS Settings" or "Allow notifications" — chosen by ReminderRowState;
@@ -221,7 +231,10 @@ HomeGymLog/                app target (synchronized folder: every .swift under i
                            notifications" row, is no longer private since m5-live-activity's LiveActivityRows reuses it
                            for its own denied row), LiveActivityRows (the Lock Screen timer switch plus, only when iOS
                            denies the app's Live Activities, a hairline and "Open iOS Settings"; reads no @AppStorage,
-                           store or clock — the screen passes the binding and the LiveActivityRowState), RestartAction (the one write behind the restart confirmation, split out so its
+                           store or clock — the screen passes the binding and the LiveActivityRowState), AboutRows
+                           (AboutLinkRow: a Link(destination:) row in the ReminderActionRow label shape — accent 15 pt
+                           semibold, full width, no trailing glyph — for the ABOUT card's Privacy policy and Support
+                           rows, since m5-release), RestartAction (the one write behind the restart confirmation, split out so its
                            outcome — archived / alreadyArchived / failed(message) — is a unit test, never asserts itself),
                            BackupFile (Transferable; builds the document lazily on the main actor when the share sheet
                            asks for it, Debug-asserts it passes its own validation, writes it to tmp/ after removing
@@ -254,14 +267,27 @@ HomeGymLog/                app target (synchronized folder: every .swift under i
                            text, month title, calendar cell values, chart point and container summaries),
                            SettingsText (every string the Settings tab shows or speaks; equipment values derived from
                            EquipmentKind, never typed; since m5-live-activity also lockScreenTimer/
-                           lockScreenTimerSubtitle/lockScreenTimerDenied, whose denied row reuses ReminderText.openSettings),
+                           lockScreenTimerSubtitle/lockScreenTimerDenied, whose denied row reuses ReminderText.openSettings; since
+                           m5-release also aboutSection/privacyPolicy/support/version, the two live
+                           privacyPolicyURL/supportURL literals, and versionText(short:build:) — total, "—" when
+                           either input is nil or empty),
                            ReminderText (every string the Daily reminder rows and the
                            notification itself show or speak; subtitle(minutes:calendar:locale:) formats the stored
                            time on a fixed reference day so the text never depends on the process zone); all formatting lives here, never in Engine
-  Assets.xcassets/         theme color sets (bg, sf, sf2, bd, tx, mu, success, warning, phaseFoundation, phaseDeload)
+  Assets.xcassets/         theme color sets (bg, sf, sf2, bd, tx, mu, success, warning, phaseFoundation, phaseDeload);
+                           AppIcon.appiconset (the real icon — light/dark/tinted PNGs from design/icon/ via
+                           docs/tools/make-app-icon.py, mac entries removed from Contents.json) and WelcomeTile.imageset
+                           (a byte copy of the light SVG, drawn by the A1 tile), both since m5-release
   rest-over.caf            the bundled rest-finished chime (IMA4 CAF, mono, 44.1 kHz, ≈ 0.2 s, ≈ 8.8 KB); a non-Swift file
                            at the synchronized folder's root, bundled with no project edit; generated by
                            docs/tools/make-rest-chime.py, checked in as provenance, not a build step
+  PrivacyInfo.xcprivacy    the privacy manifest (m5-release): no tracking, no collected data types, one accessed-API
+                           reason (NSPrivacyAccessedAPICategoryUserDefaults / CA92.1); a non-Swift file at the
+                           synchronized folder's root, copied to the app bundle root with no project edit; none in
+                           HomeGymLogWidgets/ or HomeGymLogShared/
+HomeGymLogSupport/          a path-referenced build input, never a synchronized folder or dragged into the project
+                           navigator (m5-release): Info.plist, the merged plist named by INFOPLIST_FILE on the app
+                           target only — UILaunchScreen → UIColorName = bg, ITSAppUsesNonExemptEncryption = false
 HomeGymLogShared/           types the app target (HomeGymLog) and the widget extension target (HomeGymLogWidgetsExtension)
                            both compile — a synchronized folder belonging to both targets, m5-live-activity (spec §4.3,
                            architecture NB9). Every type `nonisolated` (the extension has no default actor isolation);
@@ -334,7 +360,10 @@ HomeGymLogTests/           Swift Testing target
                            preference reads default when absent or wrong-typed, NB7), LiveActivityIntentHookTests
                            (makeHook's chain over the recorder and a hosted container: serializedPresses proves two
                            rapid taps land write → update → schedule, write → update → schedule in order; the literal
-                           intent titles pinned to RestActivityText)
+                           intent titles pinned to RestActivityText), ReleaseBundleTests (m5-release, hosted
+                           Bundle.main reads: PrivacyInfo.xcprivacy's bytes and bundle-root location, WelcomeTile's
+                           1024 pt pixel size, the three release Info keys, SettingsText.versionText fed from
+                           CFBundleShortVersionString/CFBundleVersion)
   Engine/                  one suite per Engine file plus StaticTableTests, the HomeStats suites
                            (HomeStats, HomeStatsEdge, HomeStatsInput, PersonalRecordsOrdering), the Program tab
                            suites (SessionState, SessionStateEdge, ProgramTabStats, ProgramTabStatsEdge), the workout
@@ -411,7 +440,9 @@ HomeGymLogTests/           Swift Testing target
                            RestActivityContentStateTests(+Gap) (ContentState.interval's clamp when end < start, equal
                            instants, a 1 ms rest), RestActivityTextTests (RestText's aliases equal RestActivityText's own
                            literals, not each other — a tautology guard, S7; nextLine(_:) matches the card's old
-                           "Next: " + text) suites
+                           "Next: " + text), VersionTextGapTests (m5-release: SettingsText.versionText's total
+                           contract beyond the shipped "1.0 (1)" — arbitrary short/build strings, both empty or nil
+                           → em dash) suites
   Seed/                    DebugSeed, MidProgramSeed, RestDaySeed, FreshProgramSeed, SeedHomeStats
                            (seed → Home numbers end to end), DebugProgramSelection(+Edge), WorkoutSeed(+Edge),
                            SummaryDoneHomeStats (Done on `summary` → Home numbers), RestSeedFlow (rest card actions on
@@ -468,14 +499,16 @@ HomeGymLogTests/           Swift Testing target
                            and import UIKit only in RootView.swift; no PlaceholderScreen or placeholderMilestone; no
                            FetchDescriptor in RootView.swift; UIApplication. named only by RootView.swift,
                            ReminderPermission.swift and (since m5-live-activity) RestActivityCenter.swift, NB3),
-                           SettingsScreenSourceTests (Features/Settings/'s nine files
-                           scanned since m5-live-activity added LiveActivityRows.swift (m5-export already added
-                           BackupFile.swift, BackupImportAction.swift and BackupRows.swift),
+                           SettingsScreenSourceTests (Features/Settings/'s ten files
+                           scanned since m5-release added AboutRows.swift (m5-live-activity already added
+                           LiveActivityRows.swift; m5-export added BackupFile.swift, BackupImportAction.swift and
+                           BackupRows.swift),
                            row order matches spec 2.1-2.4 plus the reminder rows' line order (toggle, one
-                           divider, the second row), LiveActivityRows( after Sound, and the BACKUP card's line order,
-                           every visible string comes from
-                           SettingsText, ReminderText or BackupText, dividerCount is 10 since the Lock Screen timer
-                           row's own divider;
+                           divider, the second row), LiveActivityRows( after Sound, the ABOUT header and card's line
+                           order (AboutRows.swift's AboutLinkRow( × 2 then the Version SettingsValueRow(), and the
+                           BACKUP card's line order, every visible string comes from
+                           SettingsText, ReminderText or BackupText, dividerCount is 12 since the ABOUT card's own two
+                           dividers;
                            the Haptics and Sound rows are the two live SettingsToggleRow( lines, no
                            .disabled(, no SettingsComingSoonRow left), ReminderRows and LiveActivityRows read no
                            @AppStorage/store/clock, the screen's one write goes through RestartAction),
@@ -508,11 +541,35 @@ HomeGymLogTests/           Swift Testing target
                            type, @MainActor only on the two static vars; literal intent titles pinned to
                            RestActivityText), WidgetSourceTests (HomeGymLogWidgets/: its colorset copies byte-equal to
                            the app's; Button(intent:) only on the Lock Screen view and the island's bottom region; no
-                           alertConfiguration, no widgetURL, no hard-coded string outside RestActivityText)
-design/                    prototype export (read-only reference)
+                           alertConfiguration, no widgetURL, no hard-coded string outside RestActivityText),
+                           ReleaseAssetTests (m5-release: AppIcon.appiconset's three slots and their appearances, each
+                           PNG's pixel size and alpha, WelcomeTile.svg's byte equality to design/icon/HomeGymLog-icon.svg,
+                           PrivacyInfo.xcprivacy's four keys and HomeGymLogSupport/Info.plist's two, the bundle-resource
+                           surface under HomeGymLog/ outside Assets.xcassets), ReleaseCopyTests (the A4 subtitle fix and
+                           the old string's absence, WelcomeStep's Image(decorative:) tile and no other Image( literal, the
+                           ABOUT card's URL literals living only in SettingsText.swift, the whole-token Link( scan over
+                           AboutRows.swift via ICU regex — Swift Regex has no lookbehind, gotchas 2026-10-04 —, the
+                           SettingsContent bottom-padding tokens), ReleaseProjectTests (project.pbxproj: the semantic
+                           orientation/encryption/INFOPLIST_FILE/version pins of spec §4.3, B-2 style — key and value
+                           tokens, never an exact line), StoreMetadataTests (docs/release/*.md: the five fenced metadata
+                           blocks against spec §5.5's limits and banned words, the privacy/support pages' email and
+                           date), StoreMetadataCheckerGapTests (the metadata checker's own boundaries: each limit's
+                           pass/fail edge, multi-byte keyword counting, a duplicated-id and an unterminated-block parse),
+                           ReleaseIsolationSourceTests (the §5.7 regressions without a Release build: no SetSnapshot.init
+                           or where: awaitsRating) reference, no map(RestText.nextLine), no Engine code line naming any
+                           Features/ type)
+design/                    prototype export (read-only reference); icon/ the app icon source SVGs (light, dark,
+                           tinted, m5-release), edit here and rerun docs/tools/make-app-icon.py
 docs/specs, docs/plans     specs from spec-creator, plans from implementation-planner (dated status when done)
 docs/tools                 make-rest-chime.py: generates HomeGymLog/rest-over.caf (880 Hz, 0.2 s, IMA4 CAF via
-                           afconvert); provenance only, never run by a build
+                           afconvert); make-app-icon.py (m5-release): renders design/icon/'s three SVGs through
+                           rsvg-convert into AppIcon.appiconset's three PNGs and copies the light SVG to
+                           WelcomeTile.imageset; make-store-screenshots.sh (m5-release): boots the iPhone 17 Pro Max
+                           simulator, overrides the status bar, launches each -seed and flattens the RGBA shot to
+                           docs/release/screenshots/; all three are provenance only, never run by a build
+docs/release               paste-ready App Store Connect text (app-store-metadata.md), committed copies of the
+                           live privacy/support pages (ZhabskyiO/homegymlog-site), a release checklist, and five
+                           1320×2868 store screenshots (m5-release)
 docs/reviews               saved agent reports per slice (researcher, architecture, verifier rounds, swift review)
 docs/learning              per-slice Swift study notes for the user (/learning-notes)
 insights/                  INSIGHTS.md, gotchas.md

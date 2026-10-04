@@ -46,6 +46,8 @@ struct SettingsContent: View {
             equipmentCard
             SettingsSectionHeader(title: BackupText.section)
             backupCard
+            SettingsSectionHeader(title: SettingsText.aboutSection)
+            aboutCard
         }
         .padding(.horizontal, 18)
         .padding(.top, 8)
@@ -106,6 +108,21 @@ struct SettingsContent: View {
         }
     }
 
+    /// Privacy policy, Support, Version (m5-release §2.7). The version is read from the built Info.plist at render.
+    private var aboutCard: some View {
+        SettingsCard {
+            AboutLinkRow(title: SettingsText.privacyPolicy, url: SettingsText.privacyPolicyURL)
+            SettingsDivider()
+            AboutLinkRow(title: SettingsText.support, url: SettingsText.supportURL)
+            SettingsDivider()
+            SettingsValueRow(label: SettingsText.version,
+                             value: SettingsText.versionText(short: info?["CFBundleShortVersionString"] as? String,
+                                                             build: info?["CFBundleVersion"] as? String))
+        }
+    }
+
+    private var info: [String: Any]? { Bundle.main.infoDictionary }
+
     private var equipmentCard: some View {
         SettingsCard {
             SettingsValueRow(label: SettingsText.dumbbells, value: SettingsText.dumbbellRange(unit: units))
@@ -117,7 +134,7 @@ struct SettingsContent: View {
     }
 }
 
-/// "PROGRAM" / "EQUIPMENT" / "BACKUP": 22 pt above, 8 pt below (spec 2).
+/// "PROGRAM" / "EQUIPMENT" / "BACKUP" / "ABOUT": 22 pt above, 8 pt below (spec 2).
 struct SettingsSectionHeader: View {
     let title: String
 

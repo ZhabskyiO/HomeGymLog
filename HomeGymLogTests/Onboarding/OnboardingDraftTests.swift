@@ -182,4 +182,9 @@ import Testing
         d.units = .lb
         #expect(d.bodyWeightUnit == .kg)
     }
+
+    @Test("the draft's body-weight range is 50…500 lb (forwarded from Engine, m5-release §5.7)")
+    func bodyWeightRange() {
+        #expect(OnboardingDraft.bodyWeightRangeLb == 50.0...500.0)
+    }
 }

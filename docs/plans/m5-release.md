@@ -1,5 +1,8 @@
 # M5 slice 5 — release: app icon from `design/icon/`, copy fix, Settings ABOUT card, privacy manifest, Info keys, 0 warnings, store metadata, screenshots, archive
-**Status: planned 2026-10-03.** Branch `m5-release`, baseline `43b262e` (1301 tests on iOS 17.5 and 26.5; `design/icon/` and the spec committed in `6a54b20`/`43b262e`).
+**Status: implemented 2026-10-04.** Branch `m5-release`, not yet merged; 1343 tests on iOS 17.5 and 26.5, Release
+build 0 warnings from a clean build, archive succeeded with both dSYMs and the appex embedded, swift review "ship"
+with five low notes, two applied. Baseline `43b262e` (1301 tests on iOS 17.5 and 26.5; `design/icon/` and the spec
+committed in `6a54b20`/`43b262e`).
 
 For `docs/specs/m5-release.md` (architecture review `docs/reviews/m5-release-architecture.md` applied: B-1–B-3, NB-1–NB-6, U9–U13; U14 retired).
 Spec §2–§6 and §8 are the contract (`AC-1`…`AC-22`). `implementer`: one step per build, nothing committed. **The user's three Xcode GUI settings

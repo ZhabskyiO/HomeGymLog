@@ -247,6 +247,10 @@ are kept as history.
   `.custom` strategy works on both. **`JSONEncoder` without `.sortedKeys` is not byte-stable on 26.5** (the same value encoded
   twice in one process differed; 17.5 was stable). Recognize it: a backup test green on 26.5 and red on 17.5, or a
   byte-comparison flaky only on 26.5. Source: `docs/reviews/m5-export-researcher.md` Q2.
+- 2026-10-04 — **Swift `Regex` does not support lookbehind at runtime**: `try Regex(#"(?<![A-Za-z])Link\("#)` compiled, then the
+  test threw "lookbehind is not currently supported" on iOS 17.5 (m5-release `ReleaseCopyTests`, the whole-token `Link(` scan
+  that must not match `ShareLink(`). Use ICU instead: `line.range(of: pattern, options: .regularExpression) != nil`, which
+  supports `(?<!…)`. Recognize it: a "Caught error" from a test, not a compile error, naming lookbehind.
 
 ## SwiftUI
 
@@ -428,6 +432,13 @@ are kept as history.
   - **Recognize it:** a "tap beside the button" check that performs the button's action, or a blocking check that fails only
     because the tap dismissed the overlay.
 - (expected areas still open: sheet + navigation interplay)
+- 2026-10-04 — **Adding a card below the fold can move unchanged text above it by 1 px**: after m5-release appended the
+  Settings ABOUT card (off-screen on the 6.1" iPhone 15), the non-scrolled `settings` screenshot was no longer byte-equal to the
+  baseline: the "Appearance" label, the "6-month program · 5 days" value and text behind the tab pill were drawn exactly
+  1 px (1/3 pt) higher; every other pixel, and the look at full size, was unchanged, and a reshoot reproduced it (deterministic).
+  A longer scroll content changes SwiftUI's pixel snapping of some text runs. Recognize it: a `CMPX` row diff confined to a
+  few text runs that match the baseline when shifted by one row (`dy = -1`); a plan's "pixel-identical because below the
+  fold" is then wrong, not the view.
 
 ## User notifications
 

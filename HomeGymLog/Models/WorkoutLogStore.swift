@@ -217,7 +217,7 @@ enum WorkoutLogStore {
         guard set.status == .pending else { return false }
         let order = set.order
         let carried = (set.exercise?.sets ?? []).filter { $0.order > order && $0.status == .pending }
-        let snapshots = ([set] + carried).map(SetSnapshot.init)
+        let snapshots = ([set] + carried).map { SetSnapshot($0) }
         let rest = RestSnapshot(set.exercise?.workout)
         set.weightLb = weightLb
         set.reps = reps
@@ -285,10 +285,10 @@ enum WorkoutLogStore {
     @discardableResult
     static func nextExercise(_ exercise: LoggedExercise, at: Date, in context: ModelContext) throws -> Bool {
         let sets = exercise.sets
-        guard !sets.contains(where: awaitsRating) else { return false }
+        guard !sets.contains(where: { awaitsRating($0) }) else { return false }
         let pending = sets.filter { $0.status == .pending }
         guard !pending.isEmpty else { return false }
-        let snapshots = pending.map(SetSnapshot.init)
+        let snapshots = pending.map { SetSnapshot($0) }
         let rest = RestSnapshot(exercise.workout)
         for set in pending {
             set.status = .skipped
