@@ -29,8 +29,7 @@ would instead be read aloud with its asset name. React analogy: `<img alt="" ari
 Image(decorative: "WelcomeTile").resizable().scaledToFit().frame(width: 44, height: 44)
 ```
 
-Surprise: an `Image` is not resizable by default. Without `.resizable()` the vector asset reports its intrinsic size
-of 1024 points and the `.frame` only crops it; the modifier order matters, like CSS `object-fit` needing a sized box.
+Surprise: an `Image` is not resizable by default; without `.resizable()` the asset keeps its 1024 pt intrinsic size and `.frame` only crops.
 
 ## 3. A forwarding `static var`: re-exporting a constant
 
@@ -60,8 +59,7 @@ let snapshots = ([set] + carried).map { SetSnapshot($0) }
 guard !sets.contains(where: { awaitsRating($0) }) else { return false }
 ```
 
-Surprise: `$0` is the implicit first parameter of a closure. A bare trailing closure is not allowed inside a `guard`
-condition, which is why the `where:` label stays explicit there.
+Surprise: `$0` is the closure's implicit first parameter; a bare trailing closure is not allowed inside a `guard` condition.
 
 ## 5. `Bundle.main.infoDictionary`: reading Info.plist at runtime
 
@@ -104,8 +102,7 @@ Apple's plist format (the manifest, Info.plist) parses into the same `[String: A
 try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
 ```
 
-Surprise: the result is `Any`, so the cast to a dictionary can fail and is wrapped in `#require`, which stops the
-test with a clear message instead of a crash.
+Surprise: the result is `Any`; the dictionary cast can fail, so `#require` wraps it and stops the test with a message.
 
 ## 8. ImageIO's `CGImageSource`: image metadata without UIKit
 
@@ -132,8 +129,7 @@ if subtitle.unicodeScalars.count > 30 { found.append("subtitle: length") }
 if keywords.utf8.count > 100 { found.append("keywords: bytes") }
 ```
 
-Surprise: Swift's plain `String.count` counts grapheme clusters, so an "é" is one, two scalars or bytes depending on
-the view you ask; pick the view the rule is written in.
+Surprise: plain `String.count` counts grapheme clusters; "é" is one character, one scalar here, two UTF-8 bytes.
 
 ## 10. Two regex engines: `Regex` and ICU `range(of:options:)`
 
