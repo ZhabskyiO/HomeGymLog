@@ -20,11 +20,15 @@ struct SettingsView: View {
     @AppStorage(ReminderPlan.minutesKey) private var reminderMinutes = ReminderPlan.defaultMinutes
     @AppStorage(FeedbackCues.hapticsKey) private var hapticsEnabled = FeedbackCues.defaultEnabled
     @AppStorage(FeedbackCues.soundKey) private var soundEnabled = FeedbackCues.defaultEnabled
+    @AppStorage(RestActivityPlan.enabledKey) private var liveActivityEnabled = RestActivityPlan.defaultEnabled
     /// Onboarding's body-weight unit: not shown here, read only so an export carries all eight preferences.
     @AppStorage("bodyWeightUnits") private var bodyWeightUnitsRaw = WeightUnit.lb.rawValue
     /// The root's one permission owner (≈ a context store); the reminder host refreshes it on every scene-active.
     @Environment(ReminderPermission.self) private var permission
     @Environment(\.reminderNotifier) private var reminderNotifier
+    /// Live in the app, silent in seeds: read here only for whether iOS allows the app's Live Activities.
+    @Environment(\.restActivityCenter) private var activityCenter
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.openURL) private var openURL
     @Environment(\.locale) private var locale
     @Environment(\.appClock) private var clock
@@ -34,6 +38,8 @@ struct SettingsView: View {
     @State private var showsRestartConfirm = false
     /// The failed-archive alert's message; nil means no alert (the two presentations never coexist, NB8).
     @State private var archiveError: String?
+    /// Whether iOS allows this app's Live Activities; nil until the first read (the row renders as on, spec 2.3).
+    @State private var activitiesEnabled: Bool?
 
     var body: some View {
         ScrollView {
@@ -46,6 +52,9 @@ struct SettingsView: View {
                             onAllowNotifications: { requestPermission() },
                             onOpenNotificationSettings: { openURL(ReminderPermission.settingsURL) },
                             hapticsEnabled: $hapticsEnabled, soundEnabled: $soundEnabled,
+                            liveActivityEnabled: $liveActivityEnabled,
+                            liveActivityState: RestActivityPlan.rowState(enabled: liveActivityEnabled, activitiesEnabled: activitiesEnabled),
+                            onOpenAppSettings: { openURL(RestActivityCenter.settingsURL) },
                             onRestart: { showsRestartConfirm = true },
                             backupFile: BackupFile(container: modelContext.container, clock: clock, preferences: backupPreferences,
                                                    suggestedName: BackupText.fileName(date: clock.now(), calendar: clock.calendar)),
@@ -66,14 +75,19 @@ struct SettingsView: View {
         }
         .onAppear {
             if restartPreview == true { showsRestartConfirm = true }
+            activitiesEnabled = activityCenter.areActivitiesEnabled()
+        }
+        // The user can only change the iOS switch outside the app, so a return to the foreground re-reads it (P7).
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { activitiesEnabled = activityCenter.areActivitiesEnabled() }
         }
     }
 
-    /// The eight stored preferences as the backup writes them (spec 5.7): raw values, exactly as stored.
+    /// The nine stored preferences as the backup writes them (spec 5.7): raw values, exactly as stored.
     private var backupPreferences: BackupPreferences {
         BackupPreferences(units: unitsRaw, bodyWeightUnits: bodyWeightUnitsRaw, appearance: appearanceRaw, missedDayPolicy: policyRaw,
                           reminderEnabled: reminderEnabled, reminderMinutes: reminderMinutes, hapticsEnabled: hapticsEnabled,
-                          soundEnabled: soundEnabled)
+                          soundEnabled: soundEnabled, liveActivityEnabled: liveActivityEnabled)
     }
 
     // Raw-string storage on one side, typed enums on the other (≈ a controlled input with parse / serialize).
@@ -140,5 +154,6 @@ struct SettingsView: View {
         // The root normally provides both; a preview must never reach the system notification center.
         .environment(ReminderPermission())
         .environment(\.reminderNotifier, .silent(status: .notDetermined))
+        .environment(\.restActivityCenter, .silent(activitiesEnabled: true))
 }
 #endif

@@ -1,5 +1,8 @@
 # M5 slice 4 — Live Activity rest timer (Lock Screen + Dynamic Island, +30s / Skip intents, Settings switch): implementation plan
-**Status: draft 2026-10-02, for plan-verifier.** For `docs/specs/m5-live-activity.md` (draft; architecture B1–B3, NB1–NB13 applied).
+**Status: implemented 2026-10-03; see CLAUDE.md milestones.** Branch `m5-live-activity`, not yet merged; 1301 tests on
+iOS 17.5 and 26.5, Release green, swift review "ship" with four low notes, two applied.
+
+For `docs/specs/m5-live-activity.md` (architecture B1–B3, NB1–NB13 applied).
 Spec §2–§6, §8 are the contract (`AC-1`…`AC-34`). `implementer`: one step per build, nothing committed; **Steps 1–3 are the user's GUI steps**. Baseline `4f87597`, 1169 tests.
 
 ## Spec issues (the spec was aligned to every resolution below by the main session on 2026-10-02; the plan follows them)

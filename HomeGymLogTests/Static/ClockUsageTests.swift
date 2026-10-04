@@ -54,4 +54,17 @@ import Testing
         #expect(try Self.swiftFiles(under: Self.appSourceRoot).count > 40, "the whole app target was scanned")
         #expect(try Self.offenders(under: Self.appSourceRoot) == ["App/AppClock.swift"])
     }
+
+    /// m5-live-activity AC-34 (NB9): the folder both targets compile is held to the same rule. `HomeGymLogWidgets/` is
+    /// deliberately not scanned (it draws system-driven timers and reads no clock either way).
+    @Test("HomeGymLogShared exists, holds at least four Swift files, and never calls Date() or Calendar.current")
+    func sharedFolderReadsNoClock() throws {
+        let shared = Self.appSourceRoot.deletingLastPathComponent().appendingPathComponent("HomeGymLogShared", isDirectory: true)
+        let files = try Self.swiftFiles(under: shared)
+        #expect(files.count >= 4)
+        for file in files {
+            let lines = try Self.codeLines(of: file)
+            #expect(!lines.contains { line in Self.forbidden.contains { line.contains($0) } }, "\(file.lastPathComponent)")
+        }
+    }
 }

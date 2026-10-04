@@ -28,6 +28,7 @@ struct RootView: View {
     @AppStorage(ReminderPlan.minutesKey) private var reminderMinutes = ReminderPlan.defaultMinutes
     @AppStorage(FeedbackCues.hapticsKey) private var hapticsEnabled = FeedbackCues.defaultEnabled
     @AppStorage(FeedbackCues.soundKey) private var soundEnabled = FeedbackCues.defaultEnabled
+    @AppStorage(RestActivityPlan.enabledKey) private var liveActivityEnabled = RestActivityPlan.defaultEnabled
     @State private var selectedTab: AppTab = .home
     /// A confirmed backup restore (m5-export 2.4): idle, the one save in flight behind "Restoring…", or its failure alert.
     @State private var restore: RootRestoreState = .idle
@@ -90,8 +91,12 @@ struct RootView: View {
         }
         // Draws nothing. `.id` ≈ key={programID}: a new or archived program rebuilds its query; a workout does not remount it.
         // `workoutInProgress` is the scalar, never the log's session (a hop on a log being discarded traps on 26.5).
+        // `RestActivityHost` ends a Live Activity once no workout is open; same scalar, no `.id` (it reads no rows).
         .background {
-            ReminderHost(programID: currentPrograms.first?.id, workoutInProgress: activeLogs.first != nil).id(currentPrograms.first?.id)
+            ZStack {
+                ReminderHost(programID: currentPrograms.first?.id, workoutInProgress: activeLogs.first != nil).id(currentPrograms.first?.id)
+                RestActivityHost(workoutInProgress: activeLogs.first != nil)
+            }
         }
         .environment(permission)
     }
@@ -159,6 +164,7 @@ struct RootView: View {
             reminderMinutes = preferences.reminderMinutes
             hapticsEnabled = preferences.hapticsEnabled
             soundEnabled = preferences.soundEnabled
+            liveActivityEnabled = preferences.liveActivityEnabled
         }
         restore = .idle
     }

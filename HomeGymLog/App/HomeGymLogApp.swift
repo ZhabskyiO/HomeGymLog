@@ -28,6 +28,8 @@ struct HomeGymLogApp: App {
     private let restNotifier: RestNotifier?
     /// Nil except a DEBUG `-seed` launch, which silences the rest chime; every other launch keeps the live default.
     private let restChime: RestChime?
+    /// Nil except a DEBUG `-seed` launch, which never shows a Live Activity; every other launch keeps the live default.
+    private let restActivityCenter: RestActivityCenter?
     /// Nil except a DEBUG `-seed` launch, which fixes the permission status and never touches the notification center.
     private let reminderNotifier: ReminderNotifier?
     /// Nil except `-seed settings-restart`, which opens Settings with its restart confirmation already up.
@@ -53,6 +55,7 @@ struct HomeGymLogApp: App {
         var progressPreselection: String? = nil
         var restNotifier: RestNotifier? = nil
         var restChime: RestChime? = nil
+        var restActivityCenter: RestActivityCenter? = nil
         var reminderNotifier: ReminderNotifier? = nil
         var settingsRestartPreview: Bool? = nil
         var backupPreview: BackupPreview? = nil
@@ -80,6 +83,14 @@ struct HomeGymLogApp: App {
                 backupPreview = seed.settingsBackupPreview
                 restNotifier = .silent()   // seeds freeze the clock: screenshot-only, never a real notification
                 restChime = .silent()   // and never a sound
+                // Nor a Live Activity, except `-liveActivity on`: the live seam and a live clock with the rest rebuilt at
+                // the real now (an activity's timer reads the wall clock); the notifier and chime stay silent.
+                let liveActivity = try DebugLiveActivity.parse(arguments: ProcessInfo.processInfo.arguments)
+                restActivityCenter = liveActivity == true ? nil : .silent(activitiesEnabled: seed.activitiesEnabled)
+                if liveActivity == true {
+                    clock = live
+                    makeContainer = { try seed.makeContainer(calendar: live.calendar, now: live.now()) }
+                }
                 reminderNotifier = .silent(status: seed.reminderStatus)
             }
             // Outside the seed branch: the selection arguments work on their own too.
@@ -97,6 +108,12 @@ struct HomeGymLogApp: App {
         }
         #endif
         containerResult = Result(catching: makeContainer)
+        // The Live Activity buttons' handler (spec §4.4): installed here, not in a view, because the system may run an
+        // intent with no scene. It captures the one container; seeds pass their silent seams, so it stays inert there.
+        if case .success(let container) = containerResult {
+            LiveActivityIntentHooks.handler = RestActivityHandler.makeHook(container: container, clock: clock, defaults: defaults,
+                notifier: restNotifier ?? .live(), center: restActivityCenter ?? .live())
+        }
         self.clock = clock
         self.defaults = defaults
         self.seedDraft = seedDraft
@@ -108,6 +125,7 @@ struct HomeGymLogApp: App {
         self.progressPreselection = progressPreselection
         self.restNotifier = restNotifier
         self.restChime = restChime
+        self.restActivityCenter = restActivityCenter
         self.reminderNotifier = reminderNotifier
         self.settingsRestartPreview = settingsRestartPreview
         self.backupPreview = backupPreview
@@ -145,6 +163,9 @@ struct HomeGymLogApp: App {
                     }
                     .transformEnvironment(\.restChime) { value in
                         if let override = restChime { value = override }
+                    }
+                    .transformEnvironment(\.restActivityCenter) { value in
+                        if let override = restActivityCenter { value = override }
                     }
             case .failure(let error):
                 StoreErrorView(error: error)

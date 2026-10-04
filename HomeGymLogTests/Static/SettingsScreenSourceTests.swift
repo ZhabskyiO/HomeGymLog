@@ -47,14 +47,16 @@ import Testing
     @Test("the eight Settings files are scanned")
     func filesScanned() throws {
         let files = try Self.settingsFiles()
-        #expect(files.map(\.path) == ["BackupFile.swift", "BackupImportAction.swift", "BackupRows.swift", "ReminderRows.swift",
-                                      "RestartAction.swift", "SettingsContent.swift", "SettingsRows.swift", "SettingsView.swift"])
+        #expect(files.map(\.path) == ["BackupFile.swift", "BackupImportAction.swift", "BackupRows.swift", "LiveActivityRows.swift",
+                                      "ReminderRows.swift", "RestartAction.swift", "SettingsContent.swift", "SettingsRows.swift",
+                                      "SettingsView.swift"])
     }
 
-    @Test("the preferences card lists Appearance, Units, the Daily reminder rows, Haptics, Sound in that order")
+    @Test("the preferences card lists Appearance, Units, the Daily reminder rows, Haptics, Sound, Lock Screen timer in that order")
     func preferencesRowOrder() throws {
         let lines = try Self.codeLines("Features/Settings/SettingsContent.swift")
-        let tokens = ["SettingsText.appearance", "SettingsText.units", "ReminderRows(", "SettingsText.haptics", "SettingsText.sound,"]
+        let tokens = ["SettingsText.appearance", "SettingsText.units", "ReminderRows(", "SettingsText.haptics", "SettingsText.sound,",
+                      "LiveActivityRows("]
         let indexes = try tokens.map { token in try #require(lines.firstIndex { $0.contains(token) }, "\(token)") }
         #expect(indexes == indexes.sorted())
         #expect(Set(indexes).count == tokens.count)
@@ -112,7 +114,7 @@ import Testing
     func dividerCount() throws {
         let lines = try Self.codeLines("Features/Settings/SettingsContent.swift")
         let dividers = lines.filter { $0.contains("SettingsDivider()") }.count
-        #expect(dividers == 9, "5 preference + 3 program + 3 equipment + 2 backup rows = 9 gaps (the reminder's own divider is in ReminderRows)")
+        #expect(dividers == 10, "6 preference + 3 program + 3 equipment + 2 backup rows = 10 gaps (the reminder's and the Lock Screen timer's own dividers are in their rows files)")
     }
 
     @Test("no Settings file types a user-visible string: every one comes from SettingsText or an enum label")

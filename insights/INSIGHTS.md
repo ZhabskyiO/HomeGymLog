@@ -51,6 +51,25 @@ session start, so nothing here depends on it.
     only in the seam's `.live()` (NB10). `ClockUsageTests` scans the shared folder too (NB9).
   - **U1 (the background/terminated intent launch path) is the one load-bearing unverified fact**; its probe is the device
     pass (AC-27/28) and its fallback, removing the buttons for tap-to-open, keeps the slice shippable.
+- **Implemented 2026-10-03** (branch `m5-live-activity`): 1301 tests on iOS 17.5 and 26.5 (1270 from the implementer's
+  per-step tests, 31 from the test-writer's gap pass), Release build green with 0 warnings and
+  `PlugIns/HomeGymLogWidgetsExtension.appex` embedded, swift review "ship" with four low notes
+  (`docs/reviews/m5-live-activity-swift-review.md`): the first (the expanded Dynamic Island's leading ring kept drawing
+  past `isStale`) and the fourth (`if isStale { EmptyView() } else { … }` → `if !isStale { … }`) were applied by the
+  main session; the second (a thrown `nextLine` fetch ends a live activity after a successful +30s; fall back to the
+  shown content's own `nextText`) and the third (`liveActivity == true` tested twice in `App.init`) are left as
+  follow-ups. Test-writer notes left as follow-ups (`docs/reviews/m5-live-activity-tests.md`): `RootView`'s restore
+  writes `@AppStorage` properties directly, so the ninth key's post-restore write is untestable without extracting a
+  `ResolvedPreferences.write(to:)`; `RestActivityKeyTests` compares two identical constructions (a positive control,
+  not a failure mode); a redundant per-event loop in `RestActivityHandlerRollbackTests`. Deviations from the plan: Xcode
+  27 named the target and its appex `HomeGymLogWidgetsExtension` (folder stays `HomeGymLogWidgets/`, bundle id
+  `com.zhabskyi.homegymlog.ios.widgets`); the handler is `apply(_:logID:)`, not the plan's name; the two intents' `title`s
+  are string literals, not constants (the App Intents metadata extractor rejects a constant), tied to
+  `RestActivityText` by a test; `RestActivityCenter.live()`'s `shown()` returns active or stale activities only;
+  the handler tests build their container from `DebugSeed.woRest.makeContainer`, not a hand-typed fixture. The Dynamic
+  Island was captured on both simulators (flaky per the Xcode gotcha below). Pending the user's MVP pass: the Lock
+  Screen and expanded island, the buttons, the suspended/terminated intent path (U1), the Settings switch and denied
+  pair on device, and `….ios.widgets` signing (AC-26–AC-32).
 
 ### 2026-09-29 — M5 export decisions (from the m5-export slice spec, user-answered)
 
@@ -917,6 +936,26 @@ each swipe writes a `LoggedSet`. On launch, an in-progress log reopens the worko
   does not break it.
 
 ## Patterns
+
+### 2026-10-03 — Shared code for an app extension: a root synchronized folder in both targets, `nonisolated`, a hook the app fills
+A widget extension runs in its own process, so it needs its own copy of anything the app and the extension both draw
+(here, the Live Activity's `ActivityAttributes` and its two buttons' intents). Give both targets one more synchronized
+folder (`HomeGymLogShared/`, alongside `HomeGymLog/`), mark every type in it `nonisolated` (the app target defaults to
+`@MainActor`; the extension has no default), and import nothing UIKit or app-specific there. A button's intent cannot
+call into the app directly (different process image), so it calls a process-wide static hook
+(`LiveActivityIntentHooks.handler`) that is nil in the extension and that the app's `init` fills with a closure
+closing over its own `ModelContainer`. React analogy: a shared `types.ts` imported by two separate bundles, plus a
+module-level callback (`let onAction = null`) the host app registers once at startup, like a native bridge's JS→native
+call. Source: `docs/reviews/m5-live-activity-architecture.md` NB2, NB9.
+
+### 2026-10-03 — Out-of-view write path through a serialized static hook
+A system-run action with no guaranteed scene (a Live Activity button, here) must still land its write in order, through
+the app's one store. Hold a `@MainActor static var inFlight: Task<Void, Never>?`; each call does
+`let previous = inFlight; inFlight = Task { await previous?.value; await perform() }` and awaits its own `Task`, not
+`inFlight` (which the next call may have replaced). Two rapid taps then chain strictly instead of racing on whichever
+`await` resumes first (actors are not FIFO). The handler re-reads the row it just wrote before deciding anything else,
+never trusts the values it intended to write. ≈ a promise chain (`inFlight = inFlight.then(() => perform())`) ahead of
+an effect that always re-fetches rather than trusting its own optimistic update. Source: `docs/reviews/m5-live-activity-architecture.md` B1.
 
 ### 2026-10-02 — An unverified race from review: probe it before adding the guard (m5-export B3)
 When a review says a render could see a stale row and proposes defensive state (hold a route until query ids change),

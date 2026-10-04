@@ -41,12 +41,18 @@ struct WorkoutView: View {
     @State private var setLoggedCount = 0
     @State private var restFinishedCount = 0
     @State private var workoutDoneCount = 0
+    /// Live Activity pass triggers (spec §4.4): a scene-active tick and a rest-end count, so a return to the foreground or a
+    /// rest ending in place re-runs the reconcile even when no stored value changed.
+    @State private var activeTick = 0
+    @State private var endedCount = 0
     @Environment(\.appClock) private var clock
     @Environment(\.modelContext) private var modelContext
     /// Live in the app, silent in seeds and previews.
     @Environment(\.restNotifier) private var notifier
     /// Live in the app, silent in seeds and previews.
     @Environment(\.restChime) private var chime
+    /// Live in the app, silent in seeds and previews: the rest Live Activity.
+    @Environment(\.restActivityCenter) private var activityCenter
     /// Active, inactive or background (≈ `document.visibilityState`).
     @Environment(\.scenePhase) private var scenePhase
     /// Nil except a DEBUG sheet seed (`-seed wo-adjust`, …), which opens that sheet as the screen appears.
@@ -56,6 +62,8 @@ struct WorkoutView: View {
     @AppStorage(FeedbackCues.soundKey) private var soundEnabled = FeedbackCues.defaultEnabled
     /// Settings' Haptics preference: gates every haptic on this screen.
     @AppStorage(FeedbackCues.hapticsKey) private var hapticsEnabled = FeedbackCues.defaultEnabled
+    /// Settings' Lock Screen timer preference: whether a rest shows as a Live Activity.
+    @AppStorage(RestActivityPlan.enabledKey) private var liveActivityEnabled = RestActivityPlan.defaultEnabled
 
     init(log: WorkoutLog, onDone: @escaping (Date) -> Void) {
         self.log = log
@@ -77,6 +85,11 @@ struct WorkoutView: View {
         let displayed = WorkoutFlow.displayedExercise(exercises: exercises, state: state)
         // The rest reconcile's inputs as one value (≈ a useEffect dependency array); nil while Exit deletes the row.
         let restKey: RestReconcileKey? = isDiscarding ? nil : RestReconcileKey(restEndsAt: log.restEndsAt, withSound: soundEnabled)
+        // The Live Activity pass's inputs (no clock read here, NB4: the time is read inside the task); nil while Exit deletes.
+        let activityKey: RestActivityKey? = isDiscarding ? nil : RestActivityKey(
+            logID: log.id.uuidString, restStartedAt: log.restStartedAt, restEndsAt: log.restEndsAt,
+            nextText: RestTimer.next(exercises: exercises, state: state).map(RestText.nextLine),
+            enabled: liveActivityEnabled, activeTick: activeTick, endedCount: endedCount)
         Group {
             if isDiscarding {
                 Theme.bg.ignoresSafeArea()
@@ -131,12 +144,15 @@ struct WorkoutView: View {
         .task(id: restKey) {
             await notifier.reconcile(restEndsAt: restKey?.restEndsAt, clock: clock, withSound: restKey?.withSound ?? false)
         }
+        // Requests, updates or ends the rest Live Activity; a newer key cancels a pass mid-end (B2).
+        .task(id: activityKey) { await reconcileActivity(activityKey) }
         // ≈ useEffect(load, [displayedKey]); keyed on nil while Exit deletes rows, so no fetch starts then (NB5).
         .task(id: isDiscarding ? nil : displayed?.exerciseKey) { loadPillBaseline(key: displayed?.exerciseKey) }
         .onChange(of: scenePhase) { _, phase in   // ≈ a visibilitychange listener
             if phase == .active {
                 notifier.removeDelivered()
                 guard !isDiscarding else { return }   // the log row is being deleted: never read its rest instants
+                activeTick += 1
                 observeRestEnd(resting: RestTimer.display(restStartedAt: log.restStartedAt, restEndsAt: log.restEndsAt, now: clock.now(),
                                                           exercises: exercises, state: state) != nil)
             } else {
@@ -156,6 +172,7 @@ struct WorkoutView: View {
     /// saw ends by time in the foreground (≈ an `aria-live` message; nothing happens without VoiceOver).
     private func observeRestEnd(resting: Bool) {
         guard !isDiscarding else { return }
+        if !resting { endedCount += 1 }
         let result = RestTimer.observeEnd(lastSeenEndsAt: lastSeenRestEnd, restEndsAt: log.restEndsAt, resting: resting, now: clock.now())
         lastSeenRestEnd = result.lastSeenEndsAt
         if result.announce {
@@ -165,6 +182,15 @@ struct WorkoutView: View {
             if cue.haptic != nil { restFinishedCount += 1 }
             if cue.chime { chime.play() }
         }
+    }
+
+    /// One Live Activity pass over the captured key: decide with a fresh `clock.now()` and the system's activities, apply.
+    private func reconcileActivity(_ key: RestActivityKey?) async {
+        guard let key else { return }
+        let decision = RestActivityPlan.decide(logID: key.logID, restStartedAt: key.restStartedAt, restEndsAt: key.restEndsAt,
+                                               nextText: key.nextText, enabled: key.enabled, now: clock.now(),
+                                               shown: activityCenter.shown())
+        await activityCenter.apply(decision, logID: key.logID)
     }
 
     /// The summary first appeared after the last set (spec 5.4): one success haptic, no chime.
@@ -398,5 +424,6 @@ struct WorkoutView: View {
         .environment(\.appClock, DebugSeed.woStart.clock(calendar: calendar))
         .environment(\.restNotifier, .silent())
         .environment(\.restChime, .silent())
+        .environment(\.restActivityCenter, .silent(activitiesEnabled: true))
 }
 #endif

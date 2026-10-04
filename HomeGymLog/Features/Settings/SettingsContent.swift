@@ -20,6 +20,10 @@ struct SettingsContent: View {
     /// The Haptics and Sound preferences (m5-haptics 2.1).
     @Binding var hapticsEnabled: Bool
     @Binding var soundEnabled: Bool
+    /// The Lock Screen timer switch (m5-live-activity 2.3): the preference, its row state, and the app-page action.
+    @Binding var liveActivityEnabled: Bool
+    let liveActivityState: LiveActivityRowState
+    let onOpenAppSettings: () -> Void
     let onRestart: () -> Void
     /// The backup card's inputs (m5-export 2.1): the lazily built export file and the restore hand-off to the root.
     let backupFile: BackupFile
@@ -67,6 +71,8 @@ struct SettingsContent: View {
             SettingsToggleRow(label: SettingsText.haptics, subtitle: SettingsText.hapticsSubtitle, isOn: $hapticsEnabled)
             SettingsDivider()
             SettingsToggleRow(label: SettingsText.sound, subtitle: SettingsText.soundSubtitle, isOn: $soundEnabled)
+            SettingsDivider()
+            LiveActivityRows(enabled: $liveActivityEnabled, state: liveActivityState, onOpenSettings: onOpenAppSettings)
         }
     }
 

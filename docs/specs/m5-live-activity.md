@@ -1,6 +1,10 @@
 # M5 slice 4 — Live Activity rest timer (Lock Screen + Dynamic Island mirror of the rest card, +30s / Skip intents, Settings switch)
 
-**Status: draft 2026-10-02.** Branch `m5-live-activity`. Depends on `m5-export` (merged, PR #10). The rest card is owned by
+**Status: implemented 2026-10-03; see CLAUDE.md milestones.** Branch `m5-live-activity`, not yet merged; 1301 tests on iOS
+17.5 and 26.5, Release green with 0 warnings and the appex embedded, swift review "ship" with four low notes, two
+applied (`docs/reviews/m5-live-activity-swift-review.md`). Pending the user's MVP pass: AC-26–AC-32.
+
+Depends on `m5-export` (merged, PR #10). The rest card is owned by
 `docs/specs/m3-rest-timer.md` (§2.1–2.6 behaviour, §4 data, §5 rules), the Settings rows by `docs/specs/m5-haptics.md` §2.1 (toggle-row
 style) and `docs/specs/m4-reminder.md` §2.1 (the denied row + "Open iOS Settings"), the backup preferences by `docs/specs/m5-export.md` §5.7;
 none is restated. Decisions: INSIGHTS "2026-10-02 — M5 live-activity decisions" (binding, §9), "2026-09-14 — Deadline-driven UI" (store

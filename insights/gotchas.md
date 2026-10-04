@@ -475,6 +475,37 @@ are kept as history.
 
 ## Xcode / build
 
+- 2026-10-03 — **The App Intents metadata extractor rejects an intent `title` built from a constant**: `static let title =
+  LocalizedStringResource(stringLiteral: RestActivityText.addAccessibility)` compiled, then the build failed in
+  `appintentsmetadataprocessor` with "'LocalizedStringResource' must be initialized with a call to its initializer or a string
+  literal" (and "no AppIntents metadata have been exported"). The extractor reads the source, so the value must be a literal:
+  `static let title: LocalizedStringResource = "Add 30 seconds"`; pin the literal to the shared constant in a test instead
+  (m5-live-activity `LiveActivityIntentHookTests.titles`). Recognize it: a BUILD FAILED whose only errors name
+  `LocalizedStringResource` and come from the metadata step, not the compiler.
+- 2026-10-03 — **After the Live Activity island shots on the iPhone 17 / 26.5 simulator, the default (parallel) 26.5 test run
+  hung twice**: once "The test runner hung before establishing connection" (1 test, failed), once silent for 10 minutes after
+  the build with no test output. Booting the device first (`simctl boot` + `bootstatus -b`) and passing
+  `-parallel-testing-enabled NO` ran all 1270 tests in 61 s. Recognize it: a 26.5 run right after `simctl` screenshots that
+  never prints a "Test case" line. The same session's `ISLAND` recipe (launch, 2 s, terminate, shots at 2…10 s) caught no
+  island on 17.5 in 5 shots; a rerun that stayed 4 s in the app and shot every 1.2 s caught it in 2 of 8 (17.5) and in most of
+  8 (26.5). Also `build/light-cmpx.py` fails with FileNotFoundError when both inputs share a basename (its temp BMPs collide):
+  give the two files different names.
+- 2026-10-03 — **Giving a new synchronized folder (`HomeGymLogShared/`) membership in two targets through Xcode 27's GUI has
+  one working recipe and several traps.** Working recipe: write at least one Swift file into the folder on disk first, then
+  right-click the project row → **Add Files to "HomeGymLog"…**, select the folder (not its contents) → **Add**; the
+  options sheet appears only after clicking Add: "Added folders: Create groups", **both** targets ticked; this makes a
+  classic `PBXGroup` with the file in both targets' Sources phase; then right-click the group in the Project Navigator → **Convert to
+  Folder** turns it into a `PBXFileSystemSynchronizedRootGroup` already listed under both targets — add every other file
+  to the folder on disk afterward, with no further GUI step. Traps hit on the way there: File → New → Folder… makes a
+  synchronized folder that belongs to the app target only (no membership picker at all); Add Files… with an **empty**
+  folder and "Create groups" makes an empty classic group with no membership; the File inspector's Target Membership
+  list's "+" button, used on a plain folder, adds it as a **folder reference inside Copy Bundle Resources** — wrong for
+  Swift source, and not what "Convert to Folder" produces. Also: the Info tab shown in a target's settings follows the
+  toolbar's current run destination, and reads "Custom macOS Application Target Properties" until an iPhone destination
+  is selected — the Info tab itself is not missing, the destination picker is just on the wrong platform. Recognize it:
+  a synchronized-folder scan test (`LiveActivitySourceTests`, `WidgetSourceTests`) passing on one target and failing
+  "file not found" on the other, or a build that silently drops a new file from one target's Sources phase.
+
 - 2026-10-02 — **Widget Extension target facts (template-verified, scratch-built; the wizard itself cannot be scripted)**:
   the wizard sets the extension's deployment target to the newest iOS (`latest_iphoneos`, 27.0) and `TARGETED_DEVICE_FAMILY
   = "1,2"`, both to be fixed by hand like the app's were; it does **not** add `NSSupportsLiveActivities` to the app (add it

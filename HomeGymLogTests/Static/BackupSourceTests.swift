@@ -88,7 +88,8 @@ import Testing
     func noPreferenceKeyLiterals() throws {
         let files = try Self.swiftFiles(under: "Engine/Backup")
         #expect(files.count == 3)
-        for key in ["appearance", "missedDayPolicy", "reminderEnabled", "reminderMinutes", "hapticsEnabled", "soundEnabled"] {
+        for key in ["appearance", "missedDayPolicy", "reminderEnabled", "reminderMinutes", "hapticsEnabled", "soundEnabled",
+                    "liveActivityEnabled"] {
             let found = files.flatMap { file in file.lines.filter { $0.contains("\"\(key)\"") } }
             #expect(found.isEmpty, "\(key): \(found)")
         }

@@ -56,4 +56,5 @@ func tableCounts(in container: ModelContainer) throws -> [String: Int] {
 
 /// Spec 5.7's `midProgram` preferences (the throwaway suite's defaults), typed out.
 let midProgramPreferences = BackupPreferences(units: "lb", bodyWeightUnits: "lb", appearance: "system", missedDayPolicy: "ask",
-                                              reminderEnabled: false, reminderMinutes: 420, hapticsEnabled: true, soundEnabled: true)
+                                              reminderEnabled: false, reminderMinutes: 420, hapticsEnabled: true, soundEnabled: true,
+                                              liveActivityEnabled: true)

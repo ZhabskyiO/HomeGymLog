@@ -76,6 +76,9 @@ enum DebugSeed: String, CaseIterable {
     case backupFailed = "backup-failed"
     /// `midProgram` behind the root's Restoring screen, with no write in flight (AC-4).
     case backupRestoring = "backup-restoring"
+    /// `midProgram` data with Live Activities switched off for the app in iOS: Settings' Lock Screen timer row reads "Live
+    /// Activities are off in iOS Settings" with the "Open iOS Settings" row (m5-live-activity AC-2).
+    case activityDenied = "activity-denied"
 
     /// nil when no `-seed` is present; throws for an unknown name or a trailing `-seed` with no value.
     static func parse(arguments: [String]) throws -> DebugSeed? {
@@ -94,7 +97,7 @@ enum DebugSeed: String, CaseIterable {
             day = DateComponents(year: 2026, month: 9, day: 15, hour: 12)
         case .settingsRestart, .restarted: day = DateComponents(year: 2026, month: 9, day: 15, hour: 12)
         case .reminderOn, .reminderDenied, .reminderUnasked: day = DateComponents(year: 2026, month: 9, day: 15, hour: 12)
-        case .backupConfirm, .backupFailed, .backupRestoring: day = DateComponents(year: 2026, month: 9, day: 15, hour: 12)
+        case .backupConfirm, .backupFailed, .backupRestoring, .activityDenied: day = DateComponents(year: 2026, month: 9, day: 15, hour: 12)
         case .missedSeveral: day = DateComponents(year: 2026, month: 9, day: 17, hour: 12)
         case .restDay: day = DateComponents(year: 2026, month: 9, day: 19, hour: 12)
         case .freshProgram: day = DateComponents(year: 2026, month: 8, day: 31, hour: 12)
@@ -119,17 +122,23 @@ enum DebugSeed: String, CaseIterable {
         case .midProgram, .missed, .missedSeveral, .missedShifted, .missedSkipped, .restDay, .freshProgram, .woStart, .woSwipe,
              .woRPE, .woAdjust, .woRest, .summary, .woDetail, .woSwap, .woSwapRDL, .woNotes, .progressHistory,
              .settingsRestart, .restarted, .reminderOn, .reminderDenied, .reminderUnasked, .backupConfirm, .backupFailed,
-             .backupRestoring:
+             .backupRestoring, .activityDenied:
             return nil
         }
     }
 
-    /// In-memory container, populated for the mid-program, missed-day and workout seeds.
+    /// In-memory container, populated for the mid-program, missed-day and workout seeds, at the seed's frozen reference day.
     func makeContainer(calendar: Calendar) throws -> ModelContainer {
+        try makeContainer(calendar: calendar, now: referenceDate(calendar: calendar))
+    }
+
+    /// The same container with the workout seeds' instants derived from `now` instead of the reference day:
+    /// `-liveActivity on` passes the real now, because a Live Activity's timer reads the wall clock (spec §4.5).
+    func makeContainer(calendar: Calendar, now: Date) throws -> ModelContainer {
         let container = try AppSchema.makeContainer(inMemory: true)
         switch self {
         case .midProgram, .missed, .missedSeveral, .settingsRestart, .reminderOn, .reminderDenied, .reminderUnasked,
-             .backupConfirm, .backupFailed, .backupRestoring:
+             .backupConfirm, .backupFailed, .backupRestoring, .activityDenied:
             try MidProgramSeed.populate(in: container.mainContext, calendar: calendar)
         case .restarted:
             try RestartSeed.populate(in: container.mainContext, calendar: calendar)
@@ -147,7 +156,7 @@ enum DebugSeed: String, CaseIterable {
         case .woStart, .woSwipe, .woRPE, .woAdjust, .woRest, .summary, .woDetail, .woSwap, .woSwapRDL, .woNotes:
             try MidProgramSeed.populate(in: container.mainContext, calendar: calendar)
             if let workoutStage {
-                try WorkoutSeed.populate(workoutStage, now: referenceDate(calendar: calendar), in: container.mainContext)
+                try WorkoutSeed.populate(workoutStage, now: now, in: container.mainContext)
             }
         default:
             break

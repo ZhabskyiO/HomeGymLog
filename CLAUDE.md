@@ -47,16 +47,22 @@ from five onboarding answers, then tracks every set. One athlete, fixed home-gym
 ```
 HomeGymLog/            app target; synchronized folder, so every .swift under it is compiled with no project edit
   App/                 entry point, RootView (router from live @Querys), ShellView (tab shell + missed-prompt overlay),
-                       AppClock (the only Date()/Calendar.current; also every @Entry value), RestNotifier, StoreErrorView
-  App/DebugSeed/       -seed launch states and the -programWeek/-programDay/-tab parsers; every file under #if DEBUG
+                       AppClock (the only Date()/Calendar.current; also every @Entry value), RestNotifier,
+                       RestActivityCenter (the Live Activity seam), RestActivityHost (ends a stray activity), StoreErrorView
+  App/DebugSeed/       -seed launch states and the -programWeek/-programDay/-tab/-liveActivity parsers; every file under #if DEBUG
   Models/              AppSchema, six @Model classes, the store writers (ProgramStore, WorkoutLogStore, ExerciseNoteStore),
                        StoreCommit (the failed-save policy's one home), the two snapshot builders (rows → Engine values)
-  Engine/              pure logic, no SwiftData/SwiftUI: generator, weights, calendar, Reslot, and the stats behind every
-                       screen (Home, Program tab, workout, rest, tools, missed day)
+  Engine/              pure logic, no SwiftData/SwiftUI: generator, weights, calendar, Reslot, RestActivityPlan, and
+                       the stats behind every screen (Home, Program tab, workout, rest, tools, missed day)
   Features/<Screen>/   one folder per screen (Onboarding, Home, Program, Workout, Progress, Settings); one screen per
                        file, subviews extracted once a body passes ~80 lines
   Shared/              Theme, tab bar, reusable controls, and every *Text helper (all formatting lives here, never in Engine)
   Assets.xcassets/     theme color sets
+HomeGymLogShared/      types the app target and the widget extension both compile (synchronized folder in both
+                       targets, nonisolated, no UIKit, no app types): the Live Activity's ActivityAttributes, its two
+                       intents, a hook the app fills with its own handler, and the shared rest-card strings
+HomeGymLogWidgets/     the widget extension target (HomeGymLogWidgetsExtension): the Live Activity's Lock Screen and
+                       Dynamic Island views, and its own copy of four colorsets
 HomeGymLogTests/       Swift Testing target: Support/ fixtures, then one folder per layer (App, Engine, Persistence,
                        Onboarding, Shared, Seed (Debug only), Static source scans)
 design/                prototype export (read-only reference)
@@ -82,16 +88,19 @@ the only seeds that let the Home prompt show), `restDay`, `freshProgram`, `progr
 confirmation dialog up), `restarted` (no current program, one archived program, onboarding opens prefilled at A2), and
 the reminder seeds `reminder-on`, `reminder-denied`, `reminder-unasked` (Settings with the Daily reminder on and each
 permission state), the backup seeds `backup-confirm`, `backup-failed`, `backup-restoring` (Settings with the restore
-confirmation dialog, the read-failed alert, and the root's "Restoring…" state up), and the workout seeds `wo-start`,
+confirmation dialog, the read-failed alert, and the root's "Restoring…" state up), `activity-denied` (Settings with
+the Lock Screen timer on and iOS's Live Activities permission denied), and the workout seeds `wo-start`,
 `wo-swipe`, `wo-rpe`,
 `wo-adjust`, `wo-rest`, `summary`, `wo-detail`, `wo-swap`, `wo-swap-rdl`, `wo-notes`, which open at the root with no
 `-tab`; frozen clock, in-memory store, throwaway preferences).
-Eight more DEBUG launch arguments target a screen without taps (taps are refused on this machine): `-programWeek <n>
+Nine more DEBUG launch arguments target a screen without taps (taps are refused on this machine): `-programWeek <n>
 -programDay <d>` preselects the Program tab's week and day, `-tab <name>` opens the shell on that tab, `-progressExercise
 <key>` preselects the Progress tab's chip, `-appearance <system|dark|light>` and `-missedDayPolicy <ask|shift|skip>`
 override those `@AppStorage` preferences for a screenshot, `-holdBanner` keeps the Settings missed-day automatic
-action's Home banner up with no auto-dismiss, and `-haptics <on|off>` / `-sound <on|off>` override the Haptics and
-Sound preferences for a screenshot (honoured only inside a `-seed` launch).
+action's Home banner up with no auto-dismiss, `-haptics <on|off>` / `-sound <on|off>` override the Haptics and
+Sound preferences for a screenshot, and `-liveActivity <on|off>` keeps the Live Activity seam live with a live clock
+(only inside a `-seed` launch) so a real, counting activity can be screenshotted, instead of the frozen clock every
+other seed uses (honoured only inside a `-seed` launch).
 
 Skills (`.claude/skills/README.md`): `/milestone <n> [slice]` runs that flow up to plan approval. `/build-and-run`,
 `/run-tests`, `/device-install` drive Xcode. `/ship-check` before a commit, `/pr-self-review` before a PR,
@@ -101,8 +110,9 @@ runs it once after every commit that touches code.
 
 ## Commands
 
-The Xcode project is created once through Xcode's wizard; `HomeGymLog/` and `HomeGymLogTests/` are synchronized
-folders, so any `.swift` file written under them is compiled with no project-file edits. Never hand-edit `project.pbxproj`;
+The Xcode project is created once through Xcode's wizard; `HomeGymLog/`, `HomeGymLogTests/`, `HomeGymLogShared/` and
+`HomeGymLogWidgets/` are synchronized folders, so any `.swift` file written under them is compiled with no project-file
+edits. Never hand-edit `project.pbxproj`;
 a PreToolUse hook (`.claude/hooks/guard-pbxproj.sh`, wired in `.claude/settings.json`) denies Edit/Write on it.
 
 ```
@@ -227,6 +237,21 @@ xcrun xcresulttool get test-results summary --path build/tests.xcresult   # tota
    1169 tests on iOS 17.5 and 26.5, Release green, swift review "ship" with four low notes, none applied
    (`docs/reviews/m5-export-swift-review.md`). Pending the user's MVP pass: AC-6–AC-10 (real share sheet, Files,
    AirDrop, Mail, the iCloud picker, a device restore, VoiceOver).
+   — live-activity slice done 2026-10-03 (branch `m5-live-activity`: a new Widget Extension target —
+   `HomeGymLogWidgetsExtension`, folder `HomeGymLogWidgets/`, bundle id `com.zhabskyi.homegymlog.ios.widgets` — mirrors
+   the rest card as a Live Activity on the Lock Screen and in the Dynamic Island, counting with the app suspended or
+   killed; `HomeGymLogShared/` (a `nonisolated` synchronized folder in both targets) holds the `ActivityAttributes`,
+   the `+30s`/`Skip` `LiveActivityIntent`s and a hook the app fills with its own handler; three callers (the workout
+   screen, a root `RestActivityHost`, the intent handler) share one pure `RestActivityPlan.decide`/`stranded` and one
+   `RestActivityCenter.apply` seam (`.live()`/`.silent()`, like `RestNotifier`); the intent handler runs with no scene,
+   installed in `App.init`, serialized through a chained `inFlight` Task, writing through the app's one
+   `ModelContainer`; a Settings "Lock Screen timer" row (default on) plus a denied pair; the backup's ninth preference
+   `liveActivityEnabled` (falls back to true); DEBUG `-liveActivity on|off`, seed `activity-denied`; 1301 tests on iOS
+   17.5 and 26.5, Release green with 0 warnings and the appex embedded, swift review "ship" with four low notes, two
+   applied (the expanded island's leading ring now hides on stale; a double `if`/`else` simplified), two left as
+   follow-ups (`docs/reviews/m5-live-activity-swift-review.md`). Pending the user's MVP pass: the Lock Screen and
+   expanded island, the buttons, the suspended/terminated intent path, the Settings switch and denied pair on device,
+   and `….ios.widgets` signing (AC-26–AC-32).
 
 ## Product decisions (settled 2026-09-09)
 
