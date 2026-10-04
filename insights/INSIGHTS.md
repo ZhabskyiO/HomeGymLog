@@ -69,6 +69,13 @@ session start, so nothing here depends on it.
   is a byte copy of the light SVG, and the "drop in later" AC is closed. **The dark icon ships
   transparent with the accent mark** (the dark SVG's opaque `0F0E10` field is dropped by the render script), per the user's
   earlier dark-style answer; the tinted SVG ships as drawn. `design/icon/` is the only copy (root duplicates removed).
+- **Both remaining risks closed before implementation (2026-10-03, user-answered)**: (1) the Xcode GUI checkpoint (portrait only,
+  `ITSAppUsesNonExemptEncryption = NO`, `INFOPLIST_FILE = HomeGymLogSupport/Info.plist`) is performed by the user **before** the
+  implementer starts, with the 11-line plist written by the main session first, so the plan's Step 7 is already done and no step
+  stops for the user; (2) the in-app privacy-policy link (guideline 5.1.1(i)) joins this slice: the public repo
+  `ZhabskyiO/homegymlog-site` is created now with GitHub Pages (`https://zhabskyio.github.io/homegymlog-site/privacy/` and
+  `/support/`), the contact email is `poltavagaz@gmail.com`, and Settings gains an ABOUT card (Privacy policy, Support, Version)
+  below BACKUP. The follow-up slice for the link is cancelled.
 
 ### 2026-10-02 — M5 live-activity decisions (user-answered before the spec; researcher `docs/reviews/m5-live-activity-researcher.md`)
 

@@ -159,3 +159,59 @@ Round-1 finding 6 was a no-action note and is unchanged.
 - Out of scope (per plan line 34): AC-20, AC-22 (user-run, never merge gates)
 - False claims about existing code: 0
 - Traceability: plan carries AC numbers; intact
+
+## Round 3 — 2026-10-03, scoped to the ABOUT card (spec §2.7/§5.9) and the pre-implementation GUI gate
+
+VERDICT: PASS WITH FIXES
+
+Re-read: spec §2.7, §4.3 "Ordering", §5.9, AC-3, AC-10, AC-11, AC-13, AC-19–22 and the "existing tests" list (424 lines); plan "Spec alignment", Steps 0, 2, 3, 5, 6, 11, the traceability table and the user-run section (448 lines). Code read: `Features/Settings/*.swift`, `Shared/SettingsText.swift`, `Shared/ProgressText.swift`, `Shared/WorkoutText.swift`, `HomeGymLogTests/Static/SettingsScreenSourceTests.swift`, `SettingsSourceTests.swift`, `FeedbackSourceTests.swift`, `HomeGymLogSupport/Info.plist`, `design/icon/` after commit `43b262e`, the live `ZhabskyiO/homegymlog-site` contents via `gh api`, and `project.pbxproj` as of this round.
+
+### (a) Traceability of the ABOUT ACs
+
+| AC | plan step | requirement (≤ 15 words) | evidence | status |
+|----|-----------|--------------------------|----------|--------|
+| AC-3 `settings` | Step 5 | non-scrolled `settings` shot pixel-identical; `/design-compare settings` with the ABOUT deviation | plan Step 5 verify: `RSHOTS s5; RCMP s5 # all 15 same`, then `/design-compare settings` against `build/rel/proto-settings.png` (Step 0 `PROTOOB` adds the `800 290 @ 2555 4148` crop, matching `light-env.sh` / gotcha 2026-09-22); the max-scroll view is Step 11 (optional) and AC-20 | covered |
+| AC-10 version line | Step 5(c) | `SettingsText.versionText(short:build:)` from `infoDictionary` == "1.0 (1)" | plan line 270: `ReleaseBundleTests`, appended: `SettingsText.versionText(short: info["CFBundleShortVersionString"] as? String, build: info["CFBundleVersion"] as? String) == "1.0 (1)"`; the Info half stays in Step 3 (`1.0` / `1` pinned there) | covered |
+| AC-11 ABOUT half | Step 5(a)(b) | two URL literals once each in `Shared/SettingsText.swift`, nowhere in Shared/Widgets; four strings; `versionText` four cases; `Link(` only in `AboutRows.swift` without `UIApplication`/`openURL`; `bottomPadding` tokens | plan Step 5(a) lists every predicate; raw-line scan justified (see (b)); `Link(` predicate has a collision — finding 1 | partial (finding 1) |
+| AC-13 | Step 6 | pages ≥ 400 bytes with `poltavagaz@gmail.com`; privacy has `2026-10-03`; metadata has both URLs; checklist strings | plan line 300–301 names all five predicates; the fetched files satisfy them (see (d)) | covered |
+| AC-20 | user; Step 11 optional | max-scroll ABOUT above the pill, links open Safari, VoiceOver order | plan §User-run ACs quotes the spec's wording; Step 11 (a)–(c) probes scroll, `.runningBackground` after the tap, and portrait in a scratch copy only | out-of-scope (user-run, plan line 443 "never block the merge") |
+
+### (b) Claims about the Settings code and tests
+
+| plan claim | found | verdict |
+|------------|-------|---------|
+| `SettingsContent.swift`: `SettingsSectionHeader(title:)` before each card, `SettingsCard { … }` with `SettingsDivider()` between rows, cards `preferencesCard`/`programCard`/`equipmentCard`/`backupCard`, `private static let bottomPadding = FloatingTabBar.height + 16`, `.padding(.bottom, Self.bottomPadding)` | all present (`SettingsContent.swift:36`, `:40–48`, `:52`, `:57–127`); `SettingsSectionHeader` `:121`, `SettingsCard<Content>` `:133`, `SettingsDivider` `:144` | true |
+| `SettingsValueRow` (read-only label/value, one combined accessibility element) in `SettingsRows.swift` | `SettingsRows.swift:5–24`: `HStack` label 15 pt `tx`, value 14 pt `mu`, 16/13 padding, `.accessibilityElement(children: .combine)`, `.accessibilityLabel(label)`, `.accessibilityValue(value)` — the §2.7 row-3 shape | true |
+| `ReminderActionRow` text shape (15 pt semibold, `Theme.accent`, full-width leading, 16/13 padding, `.contentShape(Rectangle())`, `.buttonStyle(.plain)`) | `ReminderRows.swift:50–66`, exactly those modifiers | true |
+| `SettingsScreenSourceTests.filesScanned` 9 files today; `sectionHeaders` filters `hasSuffix("Section")` == `["programSection", "equipmentSection"]` and three header tokens; `dividerCount` == 10 | `:48–53` nine names (`AboutRows.swift` would sort first, as the plan says); `:107–117` filter and `Set(headers).count == 3`; `:120–124` `dividers == 10` — counted in `SettingsContent.swift`: 5 + 2 + 1 + 2 = 10 | true |
+| `.noLiteralCopy`, `.preferencesRowOrder`, `.feedbackToggleRows`, `.rowAccessibilityShape` not broken by `AboutRows` / `aboutCard` | `noLiteralCopy` scans `Text("`/`Button("`/`Label("` (`Text(title)` is none); row-order tokens unchanged; toggle rows count stays 2; `SettingsValueRow` reused | true |
+| `SettingsSourceTests.uiApplicationStaysInApp` tolerates `Link` | `:85` `hits("UIApplication.", in: all)` → exactly `[App/ReminderPermission.swift, App/RestActivityCenter.swift, App/RootView.swift]`; `Link(destination:)` contains no `UIApplication.`; today's `openURL` use is `SettingsView.swift:32,53,57` (unchanged) | true |
+| Dash convention `ProgressText.none` / `WorkoutText.recordPrevious` | `ProgressText.swift:10 static let none = "\u{2014}"`; `WorkoutText.swift:91–94 recordPrevious … guard let lb else { return "—" }` | true |
+| `FeedbackSourceTests.codeLines` cuts at the first `//` (so `https://` vanishes; raw-line scan needed) | `FeedbackSourceTests.swift:15–20`: `if let comment = line.range(of: "//") { return String(line[..<comment.lowerBound]) }` | true |
+| `SettingsTextTests` suite exists (named in Step 5's `WONLY`) | `HomeGymLogTests/Shared/SettingsTextTests.swift` | true |
+| `RestActivityCenter.settingsURL` precedent for `URL(string:)!` | `App/RestActivityCenter.swift:24 static let settingsURL = URL(string: UIApplication.openSettingsURLString)!` | true |
+| `design/icon/` after `43b262e`: no `<metadata>`, rect-only; every round-1 pin still holds | `<metadata` 0 ×3, `xmlns:c2pa` 0 ×3, `#0F0E10` 1 in dark only, `</rect>` 4/4/3, the four attribute pins 1 hit each ×3, dark SVG bytes `<rect width="1024" height="1024" fill="#0F0E10"></rect>`; spec §4.2 (line 136), §4.4 U14 row (line 200) and AC-6 (line 342) updated to "no `<metadata>`" | true |
+
+### (c) The Step 0 gate
+
+Plan Step 0 lines 80–92: the seven greps are token-and-count greps (`grep -c Portrait`, `grep -cE "Landscape|UpsideDown"`, `grep -c "NO"`, `grep -c "HomeGymLogSupport/Info.plist"`, the `GENERATE_INFOPLIST_FILE` exclusion, the two version counts, the LiveActivities count); none pins an exact line, so a quoted or `$(SRCROOT)/`-prefixed value passes (B-2). The gate says "Stop and report on any mismatch; do not build". It also lints `HomeGymLogSupport/Info.plist` (on disk now: 11 lines, `plutil -lint` OK, `UILaunchScreen` → `UIColorName` = `bg`, outside every synchronized folder, untracked), checks `ls HomeGymLog/Info.plist` is empty, confirms `git status --short HomeGymLog.xcodeproj` shows only `project.pbxproj`, and reads the `HEAD` values (`git show HEAD:$PBX`) so Steps 3's predicates are shown false-before. U9 is recorded from `git diff $PBX`. Ordering is sound against the tree as it stands this round: `project.pbxproj` is unmodified (`git status` clean for it; Landscape count 2, encryption 0, `INFOPLIST_FILE` 2), so Step 0's first grep returns 2, not 0, and the implementer stops until the user's steps land; after them, `ReleaseBundleTests` (Steps 2, 3, 5) and `ReleaseProjectTests` (Step 3) are created with plain `#expect` at their natural steps, which is what spec §4.3 "Ordering (revised)" asks. The gate adds `git show HEAD:$PBX | grep _iPhone | grep -cE "Landscape"` → 2 and `grep -c ITSAppUses` → 0, both verified true at `HEAD` now.
+
+### (d) The `gh api` fetch and the committed copies
+
+`gh api repos/ZhabskyiO/homegymlog-site/contents/privacy.md --jq .content | base64 -d` run this round: the repo is public (`private: false`, `has_pages: true`, default `main`), the content field is base64 with embedded newlines and macOS `base64 -d` decodes it (973 bytes, starts `---\ntitle: Privacy policy\npermalink: /privacy/\n---`); `gh auth status` shows a logged-in account, and a public repo's contents endpoint needs none. Predicates: `privacy.md` 973 bytes ≥ 400, `poltavagaz@gmail.com` ×1, `2026-10-03` ×1; `support.md` 1166 bytes, `poltavagaz@gmail.com` ×1. Both live URLs answer `200 text/html`. The plan says the copies carry Jekyll front matter; they do, and spec §2.5 now calls the files "the committed copies of what `ZhabskyiO/homegymlog-site` serves" with the literal email and date, so AC-13 and §2.5 agree.
+
+### Findings (round 3)
+
+1. **should-fix** — The AC-11 predicate "`Link(` only in `Features/Settings/AboutRows.swift`" (spec line 367; plan Step 5(a) line 251) collides with `ShareLink(`. Evidence: `grep -rn "Link(" HomeGymLog` today returns exactly one line, `Features/Settings/BackupRows.swift:16 ShareLink(item: file, preview: …`, whose text contains the substring `Link(`. A `contains("Link(")` scan — the shape every other predicate in `ReleaseCopyTests` uses — would report two files and fail on a correct implementation, inviting a "fix" that weakens the pin. Fix: in Step 5(a) say the scan matches `Link(` as a whole token (regex `(?<![A-Za-z])Link\(`, or a line whose trimmed text starts with `Link(`), and name `BackupRows.swift:16`'s `ShareLink(` as the known non-hit; mirror the wording in spec AC-11. React analogy: `grep "Link("` also matching `ShareLink(` is the same as a selector `[class*="Link"]` catching `ShareLink`.
+
+No other finding. The rest of (a)–(d) is closed as evidenced above.
+
+### Summary (after round 3)
+
+- Covered: 19 of 22 acceptance criteria (AC-1–10, AC-12–19, AC-21)
+- Partial: AC-11 (finding 1, one predicate's token shape)
+- Missing: none
+- Ambiguous: none
+- Out of scope (per plan): AC-20, AC-22 (user-run)
+- False claims about existing code: 0
+- Traceability: plan carries AC numbers and a step table; intact after renumbering (Steps 0–11)
