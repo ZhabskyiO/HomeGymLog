@@ -9,3 +9,5 @@
 - `HomeGymLog-icon-1024.png`: 1024×1024, 8-bit RGB (color type 2, no alpha channel), sRGB chunk.
 - `HomeGymLog-icon-dark.svg`: dark Home Screen style.
 - `HomeGymLog-icon-tinted.svg`: mark only, white on transparent, for the tinted style.
+
+2026-10-03: the C2PA `<metadata>` block and `xmlns:c2pa` attribute were removed from the three SVGs (rsvg-convert renders byte-identical before and after).

@@ -121,7 +121,7 @@ preferences. `DebugSeed.allCases` is unchanged, so all eight `allCases` iteratio
 
 | Path | Holds | Rule |
 |---|---|---|
-| `design/icon/HomeGymLog-icon.svg`, `-dark.svg`, `-tinted.svg`, `HomeGymLog-icon-1024.png`, `NOTE.md` (committed; the only copy) | the artwork source (§5.1): each SVG is `0 0 1024 1024`, three `rect`s plus a field `rect` in the light and dark files, no `<text>`, an `xmlns:c2pa` attribute and a `<metadata><c2pa:manifest>…</metadata>` block | read-only design input; **a future artwork change = edit here and rerun the script.** There is no `docs/tools/app-icon.svg` copy (one source of truth; the doc-writer aligns the INSIGHTS "derived from it" wording) |
+| `design/icon/HomeGymLog-icon.svg`, `-dark.svg`, `-tinted.svg`, `HomeGymLog-icon-1024.png`, `NOTE.md` (committed; the only copy) | the artwork source (§5.1): each SVG is `0 0 1024 1024`, three `rect`s plus a field `rect` in the light and dark files, no `<text>`, no `<metadata>` (the C2PA provenance block the files arrived with was stripped 2026-10-03 at the user's request; renders were byte-identical before and after) | read-only design input; **a future artwork change = edit here and rerun the script.** There is no `docs/tools/app-icon.svg` copy (one source of truth; the doc-writer aligns the INSIGHTS "derived from it" wording) |
 | `docs/tools/make-app-icon.py` | reads `design/icon/` directly (paths from `__file__`) and calls `rsvg-convert` (`/opt/homebrew/bin`, 2.60.0): light from `HomeGymLog-icon.svg` with `-b '#E11D48'`; dark from `-dark.svg` **with its opaque `#0F0E10` field `rect` removed** (the one `<rect>` whose `fill` is `#0F0E10`, asserted to occur exactly once), no `-b`; tinted from `-tinted.svg` as drawn, no `-b`; then copies `HomeGymLog-icon.svg` verbatim to `WelcomeTile.svg`. Intermediates in `tempfile.mkdtemp`; its complete output set is the four named files, nothing else under `HomeGymLog/` (anything there ships, gotcha 2026-09-24) | provenance like `make-rest-chime.py`, not a build step |
 | `HomeGymLog/Assets.xcassets/AppIcon.appiconset/{AppIcon-Light,AppIcon-Dark,AppIcon-Tinted}.png` + `Contents.json` | the three `universal`/`ios` 1024 entries with `filename`s; the ten `"idiom" : "mac"` objects deleted | the PNGs / the SVG are script outputs, never hand-edited; each `Contents.json` is written by hand once (not a script output) |
 | `HomeGymLog/Assets.xcassets/WelcomeTile.imageset/WelcomeTile.svg` + `Contents.json` | byte copy of `design/icon/HomeGymLog-icon.svg`; `Contents.json` exactly researcher Q2's (one `universal` image, `preserves-vector-representation: true`) | the SVG is a script output; `Contents.json` is written by hand once |
@@ -189,7 +189,7 @@ Expected read-back: `INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UII
 | **Unverified (U11)** the four closure-form fixes compile warning-free (three are the exact analog of `WorkoutLogStore.swift:324`, which is not among the six) | review U-3 | AC-15's Release build is the probe |
 | **Unverified (U12)** AC-8–10's hosted reads were verified on 17.5 only | review U-4 | AC-18 runs the full suite, `ReleaseBundleTests` included, on 26.5 |
 | **Unverified (U13)** `nonisolated static let` on a main-actor `@Observable` class in Swift 5 mode | review U-5 | not needed: B-1 moves the constant into Engine |
-| **Unverified (U14)** Xcode's SVG asset compiler and `rsvg-convert` with a foreign-namespace `<metadata><c2pa:manifest>` block (Q2 probed a plain SVG) | this spec | AC-9 (`UIImage` loads), AC-15 (actool), AC-18 (byte-identical reruns) are the probes; fallback: the script strips the `<metadata>` element from every copy and render, and AC-6 compares to the stripped source |
+| **(U14, retired 2026-10-03)** the SVGs' foreign-namespace `<metadata>` block was removed from `design/icon/`, so the sources are plain rect-only SVGs of the shape researcher Q2 probed; nothing left to verify | this spec | — |
 
 ## 5. Rules and formulas (contracts)
 
@@ -209,7 +209,7 @@ no alpha on the light image only** (dark and tinted carry alpha by design).
 
 ### 5.2 Welcome tile
 
-`WelcomeTile.svg` is byte-equal to `design/icon/HomeGymLog-icon.svg` (its `<metadata>` block included). Drawn at 44 × 44 pt, aspect-fit, clipped to a 12 pt
+`WelcomeTile.svg` is byte-equal to `design/icon/HomeGymLog-icon.svg`. Drawn at 44 × 44 pt, aspect-fit, clipped to a 12 pt
 rounded rectangle (today's shape), decorative for accessibility (`Image(decorative:)`). At 44 pt (× 44/1024): bar 30.3 × 4.1 pt, plates 7.6 × 24.1 pt.
 
 ### 5.3 Privacy manifest — the exact XML of researcher Q1
@@ -325,7 +325,7 @@ repo root = `appSourceRoot.deletingLastPathComponent()`):
 6. `WelcomeTile.imageset/WelcomeTile.svg` exists and is byte-equal to `design/icon/HomeGymLog-icon.svg` (repo root + `design/icon/`); its `Contents.json` has
    one image with `filename == "WelcomeTile.svg"`, `idiom == "universal"`, and `properties["preserves-vector-representation"] == true`; the SVG contains
    `#E11D48` and that hex equals `AccentColor.colorset/Contents.json`'s single entry (`0xE1`, `0x1D`, `0x48`); the SVG contains no `<text` element (a
-   `<metadata` element is allowed); the three `design/icon/*.svg` files each contain the four §5.1 rect attribute strings `x="160" y="464"`, `x="220" y="232"`, `x="628" y="232"`, `width="704" height="96"`.
+   no `<metadata` element either, since the C2PA block was stripped); the three `design/icon/*.svg` files each contain the four §5.1 rect attribute strings `x="160" y="464"`, `x="220" y="232"`, `x="628" y="232"`, `width="704" height="96"`.
 7. `HomeGymLog/PrivacyInfo.xcprivacy` parses with `PropertyListSerialization` to the four keys: `NSPrivacyTracking == false`, `NSPrivacyTrackingDomains`
    empty, `NSPrivacyCollectedDataTypes` empty, `NSPrivacyAccessedAPITypes` exactly one entry with type `NSPrivacyAccessedAPICategoryUserDefaults`
    and reasons `["CA92.1"]`; no file named `PrivacyInfo.xcprivacy` anywhere under `HomeGymLogWidgets/` or `HomeGymLogShared/`.

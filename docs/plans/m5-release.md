@@ -10,8 +10,8 @@ Xcode GUI checkpoint**: the implementer stops there and hands it over in one mes
 - **F1** `INFOPLIST_FILE` counts exclude `GENERATE_INFOPLIST_FILE` lines (×6 at `project.pbxproj:452,497,538,565,593,629`): 2 today, 4 after (§4.3, AC-14).
 - **F2** AC-18's determinism check is `shasum` of the four outputs before and after a rerun (a `git status` is never empty before the commit).
 - **F3** `design/icon/` is the real artwork, user-confirmed, and ships now. It is the only copy and is committed. There is no placeholder and no
-  `docs/tools/app-icon.svg`; `make-app-icon.py` reads `design/icon/` directly. AC-21 is closed and §9 Q3 is moot. New **U14** (an SVG with a
-  foreign-namespace `<metadata><c2pa:manifest>` block): Step 2 probes it before anything else.
+  `docs/tools/app-icon.svg`; `make-app-icon.py` reads `design/icon/` directly. AC-21 is closed and §9 Q3 is moot. **U14 retired**: the C2PA `<metadata>` block was stripped from the three
+  SVGs on 2026-10-03 (renders byte-identical before and after), so they are plain rect-only SVGs of the shape researcher Q2 probed.
 - **F4** the wrapper SVG carries both namespaces, and every output image is read. **F5** the pages are prose with `<contact email>` / `<effective date>`.
   **F6** AC-11 pins `Image(decorative:` on the one `"WelcomeTile"` line; VoiceOver is in AC-20. **F7** the archive is the implementer's last step,
   the doc-writer runs after swift review, and the archive is re-run if review changes Swift. **F8** the checkpoint tell is the Landscape/UpsideDown count, 2 → 0.
@@ -22,7 +22,7 @@ Xcode GUI checkpoint**: the implementer stops there and hands it over in one mes
 ## 1. Goal and scope
 Make the app submittable in dependency order:
 - Zero the six Release warnings first (the body-weight constant moves into Engine, plus four closure forms), so every later step's Release build is a clean 0-warning probe.
-- Then the icon renders from `design/icon/` (U14 probed first), the privacy manifest and the merged `Info.plist` file, the A1 tile and the A4 subtitle, the
+- Then the icon renders from `design/icon/`, the privacy manifest and the merged `Info.plist` file, the A1 tile and the A4 subtitle, the
   App Store text, and the 6.9" screenshots.
 - Then the user's GUI checkpoint, the hosted and project pins it unblocks, both runtimes, the Release plist read-back, and the signed archive.
 
@@ -114,13 +114,12 @@ RELEASEW                      # BUILD SUCCEEDED, 0  (AC-15 first half; U11 probe
 The persistence suites run on 17.5 (gotchas "SwiftData"); no relationship, delete or `#Predicate` changes. If `RELEASEW` is not 0: read the
 remaining diagnostic and report it. Do not reach for `@preconcurrency` or `nonisolated(unsafe)` (the §5.7 rule). **AC-15** (warnings half).
 
-### Step 2 — `make-app-icon.py` over `design/icon/`, the two catalogs (AC-4, AC-5, AC-6; U14 first)
-Probed while planning, rsvg half of U14 (scratchpad): all three sources render with `/opt/homebrew/bin/rsvg-convert` despite the `<metadata>` block
-(light RGB; dark and tinted RGBA); two light renders are byte-identical; `-dark.svg` holds exactly one `<rect width="1024" height="1024" fill="#0F0E10"></rect>`
+### Step 2 — `make-app-icon.py` over `design/icon/`, the two catalogs (AC-4, AC-5, AC-6)
+Probed while planning (scratchpad): all three sources render with `/opt/homebrew/bin/rsvg-convert` (light RGB; dark and tinted RGBA); two light renders are byte-identical; `-dark.svg` holds exactly one `<rect width="1024" height="1024" fill="#0F0E10"></rect>`
 (the sources use `<rect …></rect>` pairs). The light render is **not** byte-equal to `design/icon/HomeGymLog-icon-1024.png`, which is not an input.
 
-Order: (a) the actool probe, (b) the tests, red, (c) the script.
-- **(a) U14 actool probe first.**
+Order: (a) the actool smoke check, (b) the tests, red, (c) the script.
+- **(a) actool smoke check first** (cheap; the sources are now plain SVGs like the one researcher Q2 compiled, so this is a confirmation, not a probe).
   - Create `HomeGymLog/Assets.xcassets/WelcomeTile.imageset/Contents.json` with researcher Q2's JSON verbatim (one `universal` image `WelcomeTile.svg`,
     `info` xcode/1, `preserves-vector-representation: true`).
   - `cp design/icon/HomeGymLog-icon.svg HomeGymLog/Assets.xcassets/WelcomeTile.imageset/WelcomeTile.svg`. The script recreates this file in (c).
@@ -128,11 +127,9 @@ Order: (a) the actool probe, (b) the tests, red, (c) the script.
   - Then run: `xcrun --sdk iphonesimulator assetutil --info $REL/Assets.car | grep -B2 -A8 '"WelcomeTile"'`. Expect the
     `WelcomeTile` entry with `AssetType` `Vector` and a rasterised fallback (the Q2 shape).
   - Also run a one-off hosted probe now (scratch test, deleted after it passes, since AC-9 proper lands in Step 8 after the checkpoint):
-    `UIImage(named: "WelcomeTile")` non-nil with size 1024 × 1024 on 17.5, so U14's runtime half is known before the tile is wired in Step 4.
-  - **If the build fails, a warning names the imageset, there is no Vector entry, or the hosted probe is nil, take the U14 fallback:** the script strips the
-    `<metadata>…</metadata>` element (one `re.subn` with `re.S`, asserted to remove exactly 1) from every render input and from the `WelcomeTile.svg`
-    copy. `ReleaseAssetTests` then compares `WelcomeTile.svg` to the source with the same strip applied (a test helper `strippedMetadata(_:)`).
-    Rerun (a), and report the fallback as a spec deviation for §5.2 and AC-6. AC-9 (Step 8) and AC-18 (Step 9) are the later probes.
+    `UIImage(named: "WelcomeTile")` non-nil with size 1024 × 1024 on 17.5, so the imageset is known to load before the tile is wired in Step 4.
+  - **If the build fails, a warning names the imageset, there is no Vector entry, or the hosted probe is nil: stop and report** (the sources are
+    rect-only SVGs matching researcher Q2's verified shape, so a failure here is new information, not the retired U14).
 - **(b) Tests first, red.** New `HomeGymLogTests/Static/ReleaseAssetTests.swift` (`@Suite struct ReleaseAssetTests`, `import Foundation, ImageIO, Testing`):
   - Roots: `FeedbackSourceTests.appSourceRoot` (internal `static var`, `Static/FeedbackSourceTests.swift:8`), and `repoRoot = appSourceRoot.deletingLastPathComponent()`.
   - Decoders `IconSet` / `IconImage` (the Q9 shape plus `size`). The `pixelInfo(_ url:)` helper uses `CGImageSourceCopyPropertiesAtIndex`.
@@ -143,7 +140,7 @@ Order: (a) the actool probe, (b) the tests, red, (c) the script.
     - `WelcomeTile.svg` `Data` == `repoRoot/design/icon/HomeGymLog-icon.svg` `Data`.
     - The imageset's `Contents.json` has one image: `filename == "WelcomeTile.svg"`, `idiom == "universal"`, and `properties["preserves-vector-representation"] as? Bool == true`.
     - Build the hex from `AccentColor.colorset/Contents.json` as `"#" + red + green + blue`, with `0x` stripped. The tile SVG must contain it.
-    - The tile SVG has no `<text` (a `<metadata` element is allowed). Each of the three `design/icon/*.svg` contains the four strings `x="160" y="464"`, `x="220" y="232"`, `x="628" y="232"`, `width="704" height="96"`.
+    - The tile SVG has no `<text` and no `<metadata` element. Each of the three `design/icon/*.svg` contains the four strings `x="160" y="464"`, `x="220" y="232"`, `x="628" y="232"`, `width="704" height="96"`.
       (copied from the files, 1 hit each, matching spec §5.1).
   - **NB-2 half:** the `.svg` files under `HomeGymLog/` (enumerator `.skipsHiddenFiles`) are exactly `["Assets.xcassets/WelcomeTile.imageset/WelcomeTile.svg"]`.
   - `WONLY ReleaseAssetTests`: AC-4 and AC-5 fail (no PNGs, mac entries present). This shows the predicates can fail.
@@ -315,7 +312,7 @@ Read the image: a uniform near-black `0F0E10`, not `000000`. Sample one centre p
   `#expect`, no `withKnownIssue`, `.disabled` or guard, per B-3):
   - **AC-8**: `Bundle.main.url(forResource: "PrivacyInfo", withExtension: "xcprivacy")` is non-nil. Its `deletingLastPathComponent().resolvingSymlinksInPath().path`
     equals `Bundle.main.bundleURL.resolvingSymlinksInPath().path`. Its `Data` equals `appSourceRoot/PrivacyInfo.xcprivacy`'s.
-  - **AC-9**: `UIImage(named: "WelcomeTile")?.size == CGSize(width: 1024, height: 1024)`. This is U14's runtime probe. On failure, take the Step 2 U14 fallback and rerun Steps 2 and 8.
+  - **AC-9**: `UIImage(named: "WelcomeTile")?.size == CGSize(width: 1024, height: 1024)`. On failure, stop and report (Step 2(a) already loaded this imageset).
   - **AC-10**: `info = Bundle.main.infoDictionary`:
     - `["UISupportedInterfaceOrientations"] as? [String] == ["UIInterfaceOrientationPortrait"]`
     - `["ITSAppUsesNonExemptEncryption"] as? Bool == false`
@@ -370,7 +367,7 @@ The local variable is `APPX` because `APP` is the Debug path in the env. **AC-17
   `HomeGymLog/PrivacyInfo.xcprivacy`, the two catalogs' new files (script outputs), `design/icon/` (the artwork source, edit here and rerun),
   `docs/release/` (four `.md` and `screenshots/`), `docs/tools/make-app-icon.py`, `make-store-screenshots.sh`, and the five new test files.
 - `CLAUDE.md`: in the layout block, rows for `HomeGymLogSupport/` and `docs/release/`, with `docs/tools/` named. The M5 milestone line for `m5-release`.
-- `insights/INSIGHTS.md`: an "Implemented" bullet under 2026-10-03 release decisions (counts, F1–F8 and U14 outcomes). Confirm the icon bullets
+- `insights/INSIGHTS.md`: an "Implemented" bullet under 2026-10-03 release decisions (counts, F1–F8 outcomes). Confirm the icon bullets
   already read `design/icon/` as the one source (S2 was fixed by the main session during planning; no edit expected).
 - `insights/gotchas.md` (Xcode/build): the pbxproj lines the GUI actually wrote at Step 7 (U9), and anything else that bit.
 
@@ -384,7 +381,7 @@ INSIGHTS "Real-touch probes":
 ### Traceability (AC → step)
 | AC | Step | AC | Step | AC | Step |
 |---|---|---|---|---|---|
-| 1 | 4 | 9 | 8 (U14 runtime probe) | 17 | 10 |
+| 1 | 4 | 9 | 8 | 17 | 10 |
 | 2 | 4 | 10 | 8 | 18 | 9 (26.5, determinism) |
 | 3 | 4, 9 | 11 | 4 | 19 | 7 (user) |
 | 4 | 2 | 12 | 5 | 20 | user (Step 12 optional) |
@@ -424,7 +421,7 @@ None: no `@Model`, field, relationship, delete rule, `#Predicate`, preference ke
 | Finder `.DS_Store` under `HomeGymLog/` would ship and break NB-2 | Enumerators skip hidden files; Step 3 `ls -a $REL` shows no `.DS_Store` (whether Xcode copies dotfiles is unverified; that listing is the probe) |
 | Store shots: RGBA from `simctl`, first 26.5 shot island, status bar left overridden, all-black flatten (F4) | rsvg flatten; throwaway shot; `trap` with failure-path probe; read every image |
 | Icon script output stray under `HomeGymLog/` ships (gotcha 2026-09-24) | `mkdtemp` intermediates; Step 2 `git status --short HomeGymLog/` lists only the expected files; NB-2 test |
-| U14: the `<metadata><c2pa:manifest>` block breaks actool's SVG compile | Step 2 (a) probes with `assetutil` before the tests; AC-9 and AC-18 probe again; the fallback strips `<metadata>` in the script and in AC-6's comparison |
+| (retired) U14: the `<metadata>` block breaking actool | The block was stripped from `design/icon/` 2026-10-03; Step 2 (a) keeps a cheap `assetutil` smoke check |
 | A changed artwork without exactly one `#0F0E10` field rect in `-dark.svg` | The script exits with a message (guarded by Step 2's negative probe); never hand-edit the outputs |
 | Archive signing (second bundle id on the wildcard dev profile, Q5) | One retry with `-allowProvisioningUpdates`; report on failure |
 

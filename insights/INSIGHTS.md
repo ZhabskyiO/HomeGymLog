@@ -63,7 +63,8 @@ session start, so nothing here depends on it.
     to the two intended resources and the one SVG inside its imageset (NB-2).
 - **The real icon artwork arrived during planning (2026-10-03, user-confirmed)**: `design/icon/HomeGymLog-icon.svg`, `-dark.svg`,
   `-tinted.svg`, a 1024 RGB PNG and `NOTE.md` (a white dumbbell that reads as an "H" on `#E11D48`; produced with Claude at the
-  user's request, C2PA-tagged). The slice ships it instead of the placeholder: `docs/tools/make-app-icon.py` reads
+  user's request; its C2PA `<metadata>` provenance block was stripped from the SVGs the same evening at the user's request, renders
+  byte-identical before and after). The slice ships it instead of the placeholder: `docs/tools/make-app-icon.py` reads
   `design/icon/` directly (one source of truth, no copy under `docs/tools/`), the three PNGs render from it, the welcome tile
   is a byte copy of the light SVG, and the "drop in later" AC is closed. **The dark icon ships
   transparent with the accent mark** (the dark SVG's opaque `0F0E10` field is dropped by the render script), per the user's
