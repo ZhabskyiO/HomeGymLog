@@ -35,6 +35,11 @@ the spec's prose or reordered from memory. A spec number that disagrees with cod
 value to pass on (m4-settings: the spec's `lowRow 80` was a chart point, the library default is 90; and both
 `sips` crops reached the plan transposed, which silently yields a blank band).
 
+GUI steps the user performs: take the click sequence from a dated `insights/gotchas.md` recipe when one exists, and
+only then from the researcher, whose GUI wording is marked unverified; always pair each step with a read-only
+`project.pbxproj` grep (in m5-live-activity the planned "File inspector → Target Membership → tick" did not exist in
+Xcode 27, and the working path was Add Files… then Convert to Folder, recorded in gotchas 2026-10-03).
+
 Constraints: no new dependencies or entitlements unless the spec approved them. Any step that adds or
 changes a SwiftData relationship, delete, or `#Predicate` must include a persistence test that runs on the
 iPhone 15 / iOS 17.5 simulator (runtime behavior differs from newer OS; see gotchas "SwiftData"). Any step

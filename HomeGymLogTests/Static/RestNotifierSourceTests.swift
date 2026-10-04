@@ -36,7 +36,7 @@ import Testing
         }
     }
 
-    @Test("a .live() on a line naming the rest notifier appears once in the app target: the restNotifier @Entry default")
+    @Test("a .live() on a line naming the rest notifier appears twice: the restNotifier @Entry default and the intent hook installation")
     func liveOnlyAsEntryDefault() throws {
         let enumerator = try #require(FileManager.default.enumerator(at: Self.appSourceRoot, includingPropertiesForKeys: nil))
         let files = enumerator.compactMap { $0 as? URL }.filter { $0.pathExtension == "swift" }
@@ -48,8 +48,9 @@ import Testing
                 found.append((file.path.replacingOccurrences(of: Self.appSourceRoot.path + "/", with: ""), line))
             }
         }
-        #expect(found.count == 1)
-        #expect(found.first?.path == "App/AppClock.swift")
-        #expect(found.first?.line.contains("@Entry var restNotifier") == true)
+        // m5-live-activity: the intent handler's installation in App.init is the second allowed line.
+        #expect(found.count == 2)
+        #expect(found.contains { $0.path == "App/AppClock.swift" && $0.line.contains("@Entry var restNotifier") })
+        #expect(found.contains { $0.path == "App/HomeGymLogApp.swift" && $0.line.contains("restNotifier ?? .live()") })
     }
 }

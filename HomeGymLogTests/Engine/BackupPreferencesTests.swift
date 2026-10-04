@@ -13,7 +13,8 @@ import Testing
     func defaults() {
         let d = ResolvedPreferences.defaults
         #expect(d == ResolvedPreferences(units: .lb, bodyWeightUnits: .lb, appearance: .system, missedDayPolicy: .ask,
-                                         reminderEnabled: false, reminderMinutes: 420, hapticsEnabled: true, soundEnabled: true))
+                                         reminderEnabled: false, reminderMinutes: 420, hapticsEnabled: true, soundEnabled: true,
+                                         liveActivityEnabled: true))
         #expect(BackupPreferences().resolved() == d, "an empty object resolves every key to its fallback")
     }
 

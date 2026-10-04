@@ -1,15 +1,16 @@
 import Foundation
 
 /// Strings for the rest card and the rest-end notification. `RestTimer` returns numbers and `RestNext`; this turns them
-/// into text (the Engine stays text-free).
+/// into text (the Engine stays text-free). The six card strings the Live Activity also draws are typed once in the
+/// shared `RestActivityText` (`HomeGymLogShared/`) and aliased here.
 enum RestText {
-    static let title = "Rest"
-    static let addLabel = "+30s"
-    static let skipLabel = "Skip"
-    static let addAccessibility = "Add 30 seconds"
-    static let skipAccessibility = "Skip rest"
+    static let title = RestActivityText.title
+    static let addLabel = RestActivityText.addLabel
+    static let skipLabel = RestActivityText.skipLabel
+    static let addAccessibility = RestActivityText.addAccessibility
+    static let skipAccessibility = RestActivityText.skipAccessibility
     /// The notification title and the VoiceOver announcement at the end of a rest.
-    static let restOver = "Rest over"
+    static let restOver = RestActivityText.restOver
     static let notificationBody = "Time for your next set."
 
     /// "m:ss" with minutes uncapped: 62 → "1:02", 632 → "10:32", 3 600 → "60:00". Negative → "0:00".
@@ -35,5 +36,10 @@ enum RestText {
         case .firstSet(let exerciseKey): return "\(WorkoutText.exerciseName(key: exerciseKey)) · set 1"
         case .set(let number, let count): return "set \(number) of \(count)"
         }
+    }
+
+    /// The whole "Next: …" line under the countdown, on the rest card and in the Live Activity: "Next: set 2 of 3".
+    static func nextLine(_ next: RestNext) -> String {
+        RestActivityText.nextPrefix + self.next(next)
     }
 }

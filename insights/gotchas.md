@@ -46,6 +46,11 @@ are kept as history.
 
 ## SwiftData
 
+- 2026-10-02 — **A second `ModelContainer` over the same store URL leaves the first container's `mainContext` stale on 17.5**
+  (a write saved through container B: the screen's loaded object stayed stale on both runtimes, `mainContext.fetch` stayed
+  stale on 17.5 and read fresh on 26.5, only a brand-new `ModelContext` read fresh). A write through the SAME container's
+  `mainContext` updates the loaded object at once. So an out-of-view writer (a `LiveActivityIntent` handler) must reach the
+  app's one container through a process-wide handle, never open its own. Source: `docs/reviews/m5-live-activity-researcher.md` P2.
 - 2026-09-16 — **A `PlannedSession → program` hop costs 322–347 µs per row on 17.5 and is not cached** (fresh context;
   150 rows = 47–52 ms per body; `program?.id` alone ~170 µs; 26.5: 2–5 µs). m4-progress researcher addendum. Fetching
   every `Program` first made it ~35 µs, but fetching only the current one by id did not, and the cause is unverified, so
@@ -180,6 +185,12 @@ are kept as history.
   `docs/reviews/m5-export-researcher.md` B3 addendum.
 ## Swift language
 
+- 2026-10-02 — **`@MainActor` on an `AppIntent` struct breaks it**: a warning in the extension target (an error in Swift 6
+  mode) and an error in the app through `AppShortcutsProvider`. `perform()` is nonisolated; hop to the main actor inside it
+  (a `@MainActor static var handler` hook). The project is **Swift 5 language mode** (`SWIFT_VERSION = 5.0`) with
+  `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` on the app target only; a widget extension target has no default isolation,
+  so a type compiled into both must be `nonisolated` to read the same way in each. `UIApplication.shared` in a file the
+  extension compiles fails its build ("'shared' is unavailable in application extensions"). Source: `docs/reviews/m5-live-activity-researcher.md` P2, P6, Q2.
 - 2026-10-02 — **A type conforming to `Transferable` is not main-actor under `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`**:
   m5-export's `BackupFile` failed to build with "main actor-isolated property 'mainContext' can not be referenced from a
   nonisolated context" inside its own helper method. The conformance (a `Sendable` protocol with nonisolated requirements)
@@ -239,6 +250,10 @@ are kept as history.
 
 ## SwiftUI
 
+- 2026-10-02 — **A `Button(intent:)` inside a Dynamic Island compact or minimal region compiles silently** and is simply
+  not allowed there (Lock Screen and expanded only). Nothing warns; a static source scan is the only guard. Also
+  `Text(timerInterval:)` in `compactTrailing` with `.frame(width: 40)` clipped "1:04" on 17.5 and fit "0:55" on 26.5: budget
+  ≥ 48 pt (geometry-dependent). Source: `docs/reviews/m5-live-activity-researcher.md` P5, Q4.
 - 2026-10-02 — **The tab shell draws scroll content all the way to the screen edge, so the ~34 pt strip below the floating
   pill shows whatever sits there; "below the fold" means below the screen, not below the pill.** m5-export's BACKUP card made
   `-seed midProgram -tab settings` differ from its baseline only in rows 2456–2555 px (17.5; 2496–2621 on 26.5): the top of
@@ -460,6 +475,57 @@ are kept as history.
 
 ## Xcode / build
 
+- 2026-10-03 — **Xcode 27's Widget Extension wizard names the target and product `<Name>Extension`** (`HomeGymLogWidgetsExtension`,
+  `PlugIns/HomeGymLogWidgetsExtension.appex`) while the folder stays `<Name>/` and the proposed bundle id uses `<Name>`. A
+  plan written against the folder name (`HomeGymLogWidgets.appex`) breaks every path and target-name pin. Recognize it:
+  `grep -n "name = " project.pbxproj` after the wizard. Accept the name rather than renaming the target.
+- 2026-10-03 — **The App Intents metadata extractor rejects an intent `title` built from a constant**: `static let title =
+  LocalizedStringResource(stringLiteral: RestActivityText.addAccessibility)` compiled, then the build failed in
+  `appintentsmetadataprocessor` with "'LocalizedStringResource' must be initialized with a call to its initializer or a string
+  literal" (and "no AppIntents metadata have been exported"). The extractor reads the source, so the value must be a literal:
+  `static let title: LocalizedStringResource = "Add 30 seconds"`; pin the literal to the shared constant in a test instead
+  (m5-live-activity `LiveActivityIntentHookTests.titles`). Recognize it: a BUILD FAILED whose only errors name
+  `LocalizedStringResource` and come from the metadata step, not the compiler.
+- 2026-10-03 — **After the Live Activity island shots on the iPhone 17 / 26.5 simulator, the default (parallel) 26.5 test run
+  hung twice**: once "The test runner hung before establishing connection" (1 test, failed), once silent for 10 minutes after
+  the build with no test output. Booting the device first (`simctl boot` + `bootstatus -b`) and passing
+  `-parallel-testing-enabled NO` ran all 1270 tests in 61 s. Recognize it: a 26.5 run right after `simctl` screenshots that
+  never prints a "Test case" line. The same session's `ISLAND` recipe (launch, 2 s, terminate, shots at 2…10 s) caught no
+  island on 17.5 in 5 shots; a rerun that stayed 4 s in the app and shot every 1.2 s caught it in 2 of 8 (17.5) and in most of
+  8 (26.5). Also `build/light-cmpx.py` fails with FileNotFoundError when both inputs share a basename (its temp BMPs collide):
+  give the two files different names.
+- 2026-10-03 — **Giving a new synchronized folder (`HomeGymLogShared/`) membership in two targets through Xcode 27's GUI has
+  one working recipe and several traps.** Working recipe: write at least one Swift file into the folder on disk first, then
+  right-click the project row → **Add Files to "HomeGymLog"…**, select the folder (not its contents) → **Add**; the
+  options sheet appears only after clicking Add: "Added folders: Create groups", **both** targets ticked; this makes a
+  classic `PBXGroup` with the file in both targets' Sources phase; then right-click the group in the Project Navigator → **Convert to
+  Folder** turns it into a `PBXFileSystemSynchronizedRootGroup` already listed under both targets — add every other file
+  to the folder on disk afterward, with no further GUI step. Traps hit on the way there: File → New → Folder… makes a
+  synchronized folder that belongs to the app target only (no membership picker at all); Add Files… with an **empty**
+  folder and "Create groups" makes an empty classic group with no membership; the File inspector's Target Membership
+  list's "+" button, used on a plain folder, adds it as a **folder reference inside Copy Bundle Resources** — wrong for
+  Swift source, and not what "Convert to Folder" produces. Also: the Info tab shown in a target's settings follows the
+  toolbar's current run destination, and reads "Custom macOS Application Target Properties" until an iPhone destination
+  is selected — the Info tab itself is not missing, the destination picker is just on the wrong platform. Recognize it:
+  a synchronized-folder scan test (`LiveActivitySourceTests`, `WidgetSourceTests`) passing on one target and failing
+  "file not found" on the other, or a build that silently drops a new file from one target's Sources phase.
+
+- 2026-10-02 — **Widget Extension target facts (template-verified, scratch-built; the wizard itself cannot be scripted)**:
+  the wizard sets the extension's deployment target to the newest iOS (`latest_iphoneos`, 27.0) and `TARGETED_DEVICE_FAMILY
+  = "1,2"`, both to be fixed by hand like the app's were; it does **not** add `NSSupportsLiveActivities` to the app (add it
+  under the app target's Info tab; it lands as `INFOPLIST_KEY_NSSupportsLiveActivities = YES`); it creates the extension
+  folder as a synchronized folder **plus** a `PBXFileSystemSynchronizedBuildFileExceptionSet` with `membershipExceptions =
+  (Info.plist)`, and without that exception the build fails with "Multiple commands produce …/HomeGymLogWidgets.appex/Info.plist"
+  (reproduced). The existing shared `HomeGymLog` scheme builds, tests and Release-builds (`CODE_SIGNING_ALLOWED=NO`) the
+  embedded appex unchanged. `Activity.request` without the app's `NSSupportsLiveActivities` throws `unsupportedTarget`
+  (code 6) while `ActivityAuthorizationInfo().areActivitiesEnabled` still reads true. Source: `docs/reviews/m5-live-activity-researcher.md` Q1, Q3, Q10.
+- 2026-10-02 — **Live Activities in the simulator: the Dynamic Island shot is flaky and no CLI reaches the Lock Screen.**
+  The island rendered on the Home Screen in 2 of 6 `simctl io screenshot` runs and never over another app (Settings);
+  `simctl ui`, `notifyutil` and a SpringBoard respring do not lock the device; the expanded view needs a long press (taps are
+  refused here). `xcrun simctl install` over a running app dropped its activities on 17.5; an uninstall clears them.
+  `shortcuts://run-shortcut` cannot run an App Shortcut on the simulator ("Could not find the shortcut"). A seeded launch
+  can request a real activity, but `Text(timerInterval:)` reads the wall clock, so a frozen `AppClock` renders an ended
+  timer: a Live Activity screenshot needs live instants. Source: `docs/reviews/m5-live-activity-researcher.md` Q8, P1.
 - 2026-09-24 — **Confirmed at runtime: the hosted unit test target's `Bundle.main` is the app bundle**, not the test
   bundle (`TEST_HOST`, `project.pbxproj:427`; m5-haptics `RestChimeAssetTests` resolves `rest-over.caf` through
   `Bundle.main.url(forResource:withExtension:)` and reads it with `AVAudioFile`). Recognize it: a test that needs an

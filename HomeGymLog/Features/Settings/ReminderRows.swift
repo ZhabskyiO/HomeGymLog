@@ -46,8 +46,8 @@ struct ReminderRows: View {
     }
 }
 
-/// A full-width accent action in the "Build a new program…" style.
-private struct ReminderActionRow: View {
+/// A full-width accent action in the "Build a new program…" style. Shared with `LiveActivityRows`' denied row.
+struct ReminderActionRow: View {
     let title: String
     let action: () -> Void
 

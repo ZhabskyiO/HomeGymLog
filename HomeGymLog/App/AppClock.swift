@@ -29,6 +29,9 @@ extension EnvironmentValues {
     /// Plays the rest-finished chime. Live by default; only the root's DEBUG seed branch and the workout `#Preview`
     /// override it with `.silent()`. The default is re-built on every read, so `.live()` holds no state (`RestChime`).
     @Entry var restChime: RestChime = .live()
+    /// Requests, updates and ends the rest Live Activity. Live by default; only the root's DEBUG seed branch and the
+    /// workout and Settings `#Preview`s override it with `.silent(activitiesEnabled:)`.
+    @Entry var restActivityCenter: RestActivityCenter = .live()
     /// Nil in every Release build and in any launch without the debug arguments; only the root's `#if DEBUG`
     /// block ever sets it. Analogy: a context value a test harness may provide, undefined in production.
     @Entry var programTabPreselection: ProgramTabPreselection? = nil

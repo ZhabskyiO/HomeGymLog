@@ -17,7 +17,9 @@ codebase. Your job:
 - **insights/INSIGHTS.md**: add dated entries for decisions, with the reason and the implication. Newest
   first within a section. Update or strike an entry that is no longer true rather than leaving both.
 - **insights/gotchas.md**: add dated entries under the right heading with symptom, fix, and how to
-  recognize it. One entry per gotcha.
+  recognize it. One entry per gotcha. When the brief recounts a GUI sequence you did not witness, copy the
+  sequence as given; never reconstruct it from memory of Xcode (m5-live-activity's shared-folder recipe came out
+  as "File → New → File…" when the working path was "Add Files…" then "Convert to Folder").
 - **docs/**: specs live in `docs/specs/`, plans in `docs/plans/`. Mark a spec or plan as implemented
   with a dated status line at the top when its milestone lands; do not delete them.
 - **Doc comments**: add a short `///` comment to public Engine functions and SwiftData models when

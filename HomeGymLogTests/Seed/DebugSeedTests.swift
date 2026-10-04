@@ -20,7 +20,7 @@ import Testing
         case .progressHistory: expectedDay = TestCalendar.day(2026, 9, 15)
         case .settingsRestart, .restarted: expectedDay = TestCalendar.day(2026, 9, 15)
         case .reminderOn, .reminderDenied, .reminderUnasked: expectedDay = TestCalendar.day(2026, 9, 15)
-        case .backupConfirm, .backupFailed, .backupRestoring: expectedDay = TestCalendar.day(2026, 9, 15)
+        case .backupConfirm, .backupFailed, .backupRestoring, .activityDenied: expectedDay = TestCalendar.day(2026, 9, 15)
         case .restDay: expectedDay = TestCalendar.day(2026, 9, 19)
         case .freshProgram: expectedDay = TestCalendar.day(2026, 8, 31)
         default: expectedDay = TestCalendar.day(2026, 8, 31)

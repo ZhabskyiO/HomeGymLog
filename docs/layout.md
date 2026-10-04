@@ -1,4 +1,4 @@
-# File layout (as of M5 export slice, 2026-10-02)
+# File layout (as of M5 live-activity slice, 2026-10-03)
 
 The per-file roster, moved out of `CLAUDE.md` on 2026-09-16 so every session and agent stops paying for it. `CLAUDE.md` keeps
 the directory map; read this file when you need to know which file owns what. `doc-writer` updates it after each slice.
@@ -7,7 +7,10 @@ the directory map; read this file when you need to know which file owns what. `d
 HomeGymLog/                app target (synchronized folder: every .swift under it is compiled)
   App/                     HomeGymLogApp (entry point: container, clock, DEBUG seed; installs AppNotificationDelegate as
                            the first statement of init, retained because the notification center holds its delegate
-                           weakly), RootView (router from live @Querys,
+                           weakly; since m5-live-activity also installs LiveActivityIntentHooks.handler through
+                           RestActivityHandler.makeHook once the container exists, so a Lock Screen tap with no scene
+                           alive still has somewhere to write; chooses the restActivityCenter override from -liveActivity),
+                           RootView (router from live @Querys,
                            nothing navigates: the workout while the current program has an in-progress log, else the
                            shell, else onboarding; owns selectedTab, applies initialTab once; a third @Query on
                            archivedProgramPredicate feeds the restart prefill; owns the one ReminderPermission @State
@@ -17,14 +20,18 @@ HomeGymLog/                app target (synchronized folder: every .swift under i
                            overrideUserInterfaceStyle on every window of every connected scene on appear and on an
                            `appearance` preference change, the app's only import UIKit; since m5-export also owns
                            RootRestoreState, the restore .task(id:) that calls BackupStore.replaceAll then writes the
-                           file's resolved preferences through five new @AppStorage bindings, the restore-failed alert,
-                           and the onRestore closure it hands ShellView, reading no @Query after the save, B3),
+                           file's resolved preferences through what is now six @AppStorage bindings, the restore-failed alert,
+                           and the onRestore closure it hands ShellView, reading no @Query after the save, B3; since
+                           m5-live-activity the restore handler writes a sixth @AppStorage binding, liveActivityEnabled,
+                           and RestActivityHost mounts beside ReminderHost in the same .background ZStack, keyed on
+                           nothing since it reads no rows),
                            ShellView (tab shell,
                            selection bound from RootView; MissedPromptHost as an .overlay after the tab bar's inset, so
                            its scrim covers the bar; routes .settings to SettingsView, passing through the onRestore
                            closure RootView gave it), AppTab, AppClock (the only
                            Date()/Calendar.current in the app; an environment value, and the file holding the
-                           restNotifier and reminderNotifier @Entry values (default .live()) and the nil-by-default debug @Entry values:
+                           restNotifier, reminderNotifier and (since m5-live-activity) restActivityCenter @Entry values
+                           (default .live()) and the nil-by-default debug @Entry values:
                            programTabPreselection, initialTab, workoutDragPreview, workoutSheetPreview,
                            missedPromptEnabled, settingsRestartPreview, missedBannerHold, settingsBackupPreview
                            (BackupPreview?: .confirm/.readFailed/.restoring), and restChime, default
@@ -33,7 +40,17 @@ HomeGymLog/                app target (synchronized folder: every .swift under i
                            reconcile), RestChime (the foreground rest-finished chime: a struct of closures like
                            RestNotifier over a process-wide static player box, .live() / .silent(); .ambient set once,
                            a failed setCategory or missing rest-over.caf leaves the box a permanent no-op; the only file
-                           importing AVFAudio), ReminderHost (the non-drawing daily-reminder reconcile host, mounted once at the
+                           importing AVFAudio), RestActivityCenter (the Live Activity seam, m5-live-activity: a struct of
+                           closures like RestNotifier over ActivityKit — shown/request/update/end/areActivitiesEnabled —
+                           .live()/.silent(activitiesEnabled:); apply(_:logID:) runs the ends then the one step, stopping
+                           if a newer pass cancelled it; the only file importing ActivityKit; settingsURL opens the app's
+                           iOS Settings page), RestActivityHandler (the Live Activity buttons' intent handler: makeHook
+                           builds the @MainActor closure App.init installs, serialized through a chained
+                           LiveActivityIntentHooks.inFlight Task so two rapid taps land in order; re-syncs the activity
+                           from the stored row after each write, never from the intended values), RestActivityHost (the
+                           non-drawing stray-activity cleanup host RootView mounts beside ReminderHost: ends an activity
+                           once no workout is open or the preference is off, reading only the root's workoutInProgress
+                           scalar), ReminderHost (the non-drawing daily-reminder reconcile host, mounted once at the
                            root: its own @Query on the current program's pending sessions, a scene-active tick, one
                            .task(id:) keyed on ReminderPlan.ReconcileKey that diffs the notification center), RestoringView
                            (RootRestoreState: idle/restoring(BackupDocument)/failed(String), its isRestoring; the plain
@@ -45,7 +62,9 @@ HomeGymLog/                app target (synchronized folder: every .swift under i
                            request's answer), AppNotificationDelegate (foreground presentation: banner + list + sound
                            for reminder-* ids, nothing for rest-timer), StoreErrorView
   App/DebugSeed/           DebugSeed (-seed launch names → frozen clock, in-memory store, prepared draft, workout
-                           previews, forcesMissedDayPrompt: true only for the missed family, settingsRestartPreview true
+                           previews; makeContainer(calendar:) is now a convenience over makeContainer(calendar:now:),
+                           which -liveActivity on calls with the real now so a screenshotted activity really counts;
+                           activity-denied carries midProgram's rows; forcesMissedDayPrompt: true only for the missed family, settingsRestartPreview true
                            only for settings-restart; reminderStatus and reminderPreferences (ReminderSeedPreferences:
                            enabled, minutes) for the reminder-on / reminder-denied / reminder-unasked seeds, all three on
                            `midProgram` rows with a different silent notification status; the root writes the
@@ -62,7 +81,11 @@ HomeGymLog/                app target (synchronized folder: every .swift under i
                            (the -haptics/-sound on|off parser: writes each given value into the throwaway seed suite,
                            honoured only inside a -seed launch), BackupSeed (settingsBackupPreview: maps
                            backup-confirm/backup-failed/backup-restoring to .confirm/.readFailed/.restoring, nil for every
-                           other seed; the three seeds carry midProgram's rows); all twelve files under #if DEBUG
+                           other seed; the three seeds carry midProgram's rows), DebugLiveActivity (-liveActivity on|off
+                           parser: `on` keeps the Live Activity seam live inside a -seed launch and switches the clock to
+                           the real one, rebuilding the seed's rest around the real now, since an activity's timer reads
+                           the wall clock; `activitiesEnabled` on DebugSeed reports the seam's iOS permission, false only
+                           for activity-denied); all thirteen files under #if DEBUG
   Models/                  AppSchema (Schema(versionedSchema: AppSchemaV1.self), migrationPlan: AppMigrationPlan.self),
                            AppSchemaV1 (the frozen m5-export schema: the six top-level classes at Version(1,0,0), what the
                            unversioned Schema([...]) already wrote; AppMigrationPlan has one schema and no stages), six
@@ -96,7 +119,9 @@ HomeGymLog/                app target (synchronized folder: every .swift under i
                            cells, selection → focus), WorkoutFlow (workout state from set rows, row states, isStartable,
                            displayedExercise, canSwap), WorkoutSummary (volume, end instant, duration, muscles, records),
                            RestTimer (remaining seconds and fraction, resting display, "Rest over" end rule,
-                           RestNotificationPlan), SwapCandidates (same muscle, library order, target weights),
+                           RestNotificationPlan; next(exercises:state:) since m5-live-activity: what "Next:" names with no
+                           time gate, so the workout screen's Live Activity key never reads the clock in body, NB4),
+                           SwapCandidates (same muscle, library order, target weights),
                            ProgressionPill (previous best and last top, delta), MissedDay (isMissed, firstMissed,
                            shouldPrompt over a PromptSilence, total shiftMap built on Reslot, dayLabelStyle,
                            MissedDayPolicy (ask/shift/skip preference), resolution (policy + rows + silence → prompt,
@@ -115,11 +140,16 @@ HomeGymLog/                app target (synchronized folder: every .swift under i
                            reconcile task's key;
                            CalendarRules owns days(from:to:), the one day-difference helper;
                            AppearanceMode (moved here from Shared/ by m5-export B1, so ResolvedPreferences stays pure
-                           Engine; System/Dark/Light, storageKey, from(raw:); UIKit-free; its label is a Shared extension)
+                           Engine; System/Dark/Light, storageKey, from(raw:); UIKit-free; its label is a Shared extension);
+                           RestActivityPlan (m5-live-activity: RestActivityContent/ShownRestActivity/RestActivityStep/
+                           RestActivityDecision mirror ActivityKit's ContentState field for field so Engine stays
+                           ActivityKit-free (NB10); decide(...) spec §5.1's total end-or-request-or-update-or-nothing rule;
+                           stranded(...) §5.2's cleanup rule; rowState(...) §5.3's on/off/denied; enabledKey/defaultEnabled;
+                           RestActivityKey and RestStrandedKey are the workout screen's and the root host's .task(id:) keys)
   Engine/Backup/           BackupDocument (the Codable DTO mirror of spec 4.3–4.4: BackupDocument plus its six per-table
                            rows and BackupPreferences, every CodingKeys with no raw values so the JSON key equals the
                            case name; counts; BackupPreferences.resolved() -> ResolvedPreferences, the per-key fallback of
-                           spec 5.7), BackupCodec (encode/read: .sortedKeys + .prettyPrinted, a .custom ISO 8601 date
+                           spec 5.7, now nine keys since m5-live-activity's liveActivityEnabled), BackupCodec (encode/read: .sortedKeys + .prettyPrinted, a .custom ISO 8601 date
                            strategy that always writes the fraction and decodes it falling back to a plain formatter for a
                            fraction-less string; read does header check → full decode → BackupValidation, every failure a
                            BackupReadError), BackupValidation (BackupReadError, the twelve cases of spec 5.1; validate(_:)
@@ -147,7 +177,10 @@ HomeGymLog/                app target (synchronized folder: every .swift under i
                            lazy PR baseline task, the per-key pill baseline task, openPreview, every write handler, the
                            1 Hz rest TimelineView and the rest effects: end announcement, notification .task(id:), scene
                            phase; also the three setLogged/restFinished/workoutDone counters read by WorkoutFeedback, the
-                           hapticsEnabled/soundEnabled @AppStorage reads and the restChime.play() calls),
+                           hapticsEnabled/soundEnabled @AppStorage reads and the restChime.play() calls; since
+                           m5-live-activity also builds the RestActivityKey (RestTimer.next, no clock read in body) and
+                           runs reconcileActivity in a .task(id:), bumping activeTick on scene-active and endedCount when a
+                           rest ends in the foreground, reads liveActivityEnabled @AppStorage),
                            WorkoutLoggingContent (layout, +ExerciseBlock; the bottom inset shows the bar or the
                            rest card), WorkoutHeader (+WorkoutElapsedClock, ProgressSegments; Swap dims unless every set
                            is pending), SetRow, SetSwipeRow (drag + VoiceOver actions), RPECard, WorkoutSheet (enum with
@@ -165,21 +198,30 @@ HomeGymLog/                app target (synchronized folder: every .swift under i
                            into view), ProgressChartCard (Best, Since start, from/to captions, empty-state line),
                            TopWeightChart (Swift Charts line over ProgressStats.chartGeometry, hidden axes and rules),
                            MonthCalendar (+MonthDayCell; the month containing today, one accessibility element per cell)
-  Features/Settings/       SettingsView (six @AppStorage preferences (appearance, units, missed-day policy, reminder
-                           enabled, reminder minutes, plus bodyWeightUnits added for m5-export's export preferences),
+  Features/Settings/       SettingsView (seven @AppStorage preferences (appearance, units, missed-day policy, reminder
+                           enabled, reminder minutes, liveActivityEnabled since m5-live-activity, plus bodyWeightUnits
+                           added for m5-export's export preferences),
                            restart confirmation dialog and
                            failed-archive alert, `program`'s immutable fields, the root-owned selectedTab binding; reads
                            the environment's ReminderPermission and calls request(using:) when the reminder toggle turns
-                           on with no permission read yet; builds BackupFile and BackupPreferences from its own
+                           on with no permission read yet; reads the environment's restActivityCenter for
+                           areActivitiesEnabled(), re-read on appear and on every return to the foreground (iOS's own
+                           switch can only change while the app is away, P7), feeding RestActivityPlan.rowState(...) to
+                           LiveActivityRows; builds BackupFile and BackupPreferences from its own
                            @AppStorage values and passes them, plus onRestore, down to BackupRows — the screen itself
                            reads no backup row and runs no fetch), SettingsContent (layout, +SettingsSectionHeader;
                            bottom padding is FloatingTabBar.height + 16 since m5-export, so the last row clears the
-                           floating tab pill at maximum scroll; draws the BACKUP header, card and its one divider —
-                           dividerCount 9 since this slice), SettingsRows (SettingsValueRow, one
+                           floating tab pill at maximum scroll; draws the BACKUP header, card and its one divider, and
+                           since m5-live-activity a divider before LiveActivityRows in the preferences card —
+                           dividerCount 10 since this slice), SettingsRows (SettingsValueRow, one
                            accessibility element; SettingsControlRow, deliberately not combined so a control stays its
                            own stop), ReminderRows (the Daily reminder toggle and its one conditional second row — the
                            time picker, "Open iOS Settings" or "Allow notifications" — chosen by ReminderRowState;
-                           reads no @AppStorage, store or clock), RestartAction (the one write behind the restart confirmation, split out so its
+                           reads no @AppStorage, store or clock; ReminderActionRow, the "Open iOS Settings" / "Allow
+                           notifications" row, is no longer private since m5-live-activity's LiveActivityRows reuses it
+                           for its own denied row), LiveActivityRows (the Lock Screen timer switch plus, only when iOS
+                           denies the app's Live Activities, a hairline and "Open iOS Settings"; reads no @AppStorage,
+                           store or clock — the screen passes the binding and the LiveActivityRowState), RestartAction (the one write behind the restart confirmation, split out so its
                            outcome — archived / alreadyArchived / failed(message) — is a unit test, never asserts itself),
                            BackupFile (Transferable; builds the document lazily on the main actor when the share sheet
                            asks for it, Debug-asserts it passes its own validation, writes it to tmp/ after removing
@@ -201,20 +243,54 @@ HomeGymLog/                app target (synchronized folder: every .swift under i
                            slot (≈ a children prop) that only the workout's detail sheet fills; its four presentation
                            modifiers are the `exerciseInfoSheet(item:)` View extension both tabs call), StartWorkoutButton
                            (Home and Program), WorkoutText (clock, grouping, set and record text), FlowLayout (wrapping
-                           chips), RestText (m:ss, spoken countdown, "Next:" and notification text), ExerciseToolsText
+                           chips), RestText (m:ss, spoken countdown, "Next:" and notification text; since m5-live-activity
+                           title/addLabel/skipLabel/addAccessibility/skipAccessibility/restOver alias the shared
+                           `RestActivityText` (`HomeGymLogShared/`, drawn by the app's card and the extension's Live
+                           Activity alike), and nextLine(_:) is the whole "Next: …" line both draw), ExerciseToolsText
                            (pill, note label and hints, swap title, empty state, candidate rows), MissedDayText (prompt
                            strings, "You skipped … on …" title, plus the automatic-action banner text:
                            shiftedBanner, skippedBanner), SecondaryActionButton (full-width sf2 button: the
                            prompt's Skip and the Program card's shift and skip), ProgressText (chip labels, weight and delta
                            text, month title, calendar cell values, chart point and container summaries),
                            SettingsText (every string the Settings tab shows or speaks; equipment values derived from
-                           EquipmentKind, never typed), ReminderText (every string the Daily reminder rows and the
+                           EquipmentKind, never typed; since m5-live-activity also lockScreenTimer/
+                           lockScreenTimerSubtitle/lockScreenTimerDenied, whose denied row reuses ReminderText.openSettings),
+                           ReminderText (every string the Daily reminder rows and the
                            notification itself show or speak; subtitle(minutes:calendar:locale:) formats the stored
                            time on a fixed reference day so the text never depends on the process zone); all formatting lives here, never in Engine
   Assets.xcassets/         theme color sets (bg, sf, sf2, bd, tx, mu, success, warning, phaseFoundation, phaseDeload)
   rest-over.caf            the bundled rest-finished chime (IMA4 CAF, mono, 44.1 kHz, ≈ 0.2 s, ≈ 8.8 KB); a non-Swift file
                            at the synchronized folder's root, bundled with no project edit; generated by
                            docs/tools/make-rest-chime.py, checked in as provenance, not a build step
+HomeGymLogShared/           types the app target (HomeGymLog) and the widget extension target (HomeGymLogWidgetsExtension)
+                           both compile — a synchronized folder belonging to both targets, m5-live-activity (spec §4.3,
+                           architecture NB9). Every type `nonisolated` (the extension has no default actor isolation);
+                           no UIKit, no SwiftUI import beyond what AppIntents needs, no SwiftData, no app type.
+                           RestActivityAttributes (the Live Activity's ActivityAttributes: logID fixed for its life, plus
+                           ContentState — restStartedAt/restEndsAt/nextText and the clamped `interval` every
+                           `timerInterval:` view reads, S3), RestActivityIntents (AddRestTimeIntent, SkipRestIntent: the
+                           two LiveActivityIntents the system runs in the app's process with no scene; literal `title`s,
+                           pinned by a test, since the App Intents metadata step rejects a constant; isDiscoverable
+                           false), LiveActivityIntentHooks (RestActivityAction; the process-wide `handler` App.init
+                           installs and `inFlight`, the chained Task that serializes two rapid taps, both @MainActor
+                           static vars — the scan's one exception to "no @MainActor in this folder"), RestActivityText
+                           (the six rest-card strings the app's card and the extension's views both draw, typed once;
+                           aliased by the app's RestText)
+HomeGymLogWidgets/          the widget extension target (HomeGymLogWidgetsExtension, bundle id
+                           com.zhabskyi.homegymlog.ios.widgets; Xcode named the folder and appex after the template's
+                           default, not the spec's HomeGymLogWidgets). HomeGymLogWidgetsBundle (@main WidgetBundle: one
+                           Live Activity, no Home Screen widget), RestLiveActivity (the ActivityConfiguration: the Lock
+                           Screen closure and the Dynamic Island one, both driven by the system with no clock read here —
+                           Text(timerInterval:) ticks on its own), RestActivityLockScreenView (ring, "Rest", counting
+                           m:ss, "Next: …", +30s/Skip; swaps to "Rest over" with the ring and buttons hidden once
+                           `isStale`; also declares RestActivityRing and RestActivityButtons, shared with the island),
+                           RestActivityIslandViews (RestActivityIsland.make: expanded — leading ring, center
+                           "Rest"/"Next:", trailing countdown, bottom buttons; compact — glyph leading, countdown
+                           trailing; minimal — glyph only; no Button(intent:) in compact or minimal, which compiles but
+                           is not allowed there)
+  Assets.xcassets/         the extension's own copies of four app colorsets (sf, sf2, tx, mu) plus AccentColor and
+                           WidgetBackground, byte-equal to the app's by a Static test (no asset-catalog sharing between
+                           targets; plain file copies, no project edit)
 HomeGymLogTests/           Swift Testing target
   Support/                 TestCalendar (fixed calendar), TestContainer (makeTestStore, insertSampleGraph), TestInputs,
                            HomeFixtures (Home inputs built from the generator, never from a seed), WorkoutFixtures
@@ -233,7 +309,11 @@ HomeGymLogTests/           Swift Testing target
                            plain values with fixed ids, for the Engine codec/validation/preferences suites), BackupStoreFixtures
                            (insertRichGraph(in:): insertSampleGraph plus every optional field set at least once — a
                            swap, an RPE skip, a live rest, an archived program, an orphan chain — for the persistence
-                           round-trip and replace suites)
+                           round-trip and replace suites), midProgramPreferences (spec 5.7's typed defaults, now
+                           carrying liveActivityEnabled: true since m5-live-activity),
+                           RestActivityCenterRecorder (the RestNotifierRecorder shape for RestActivityCenter: held
+                           shown/request/update/end/areActivitiesEnabled calls in order, for the handler and host suites,
+                           never a real Activity)
   Support/Fixtures/        unversioned-1.0.0.store (+ -wal, -shm): a store written once on iOS 26.5 by HEAD's
                            unversioned AppSchema, before AppSchemaV1 landed; committed and never regenerated. Read
                            through #filePath, never Bundle.main, by SchemaMigrationTests — the two-install migration
@@ -248,7 +328,13 @@ HomeGymLogTests/           Swift Testing target
                            (reconcile threading withSound into every add, over the recorders), RestChimeTests (the
                            seam's shape over a counting play closure; .silent()/.live() smoke only, no audio session
                            touched), RestChimeAssetTests (Bundle.main resolves rest-over.caf in the hosted test; its
-                           duration and channel count via AVAudioFile)
+                           duration and channel count via AVAudioFile), RestActivityCenterTests (the seam's shape over
+                           the recorder: .silent()/.live() smoke, apply(_:logID:)'s end-then-step order and its
+                           cancellation-after-end stop, B2), RestActivityPreferenceTests (the Live Activity and Sound
+                           preference reads default when absent or wrong-typed, NB7), LiveActivityIntentHookTests
+                           (makeHook's chain over the recorder and a hosted container: serializedPresses proves two
+                           rapid taps land write → update → schedule, write → update → schedule in order; the literal
+                           intent titles pinned to RestActivityText)
   Engine/                  one suite per Engine file plus StaticTableTests, the HomeStats suites
                            (HomeStats, HomeStatsEdge, HomeStatsInput, PersonalRecordsOrdering), the Program tab
                            suites (SessionState, SessionStateEdge, ProgramTabStats, ProgramTabStatsEdge), the workout
@@ -271,9 +357,19 @@ HomeGymLogTests/           Swift Testing target
                            BackupCodecTests (sorted keys, the exact top-level key set, byte-stable re-encoding,
                            millisecond dates with the no-fraction fallback, bit-exact doubles, preferences round trip),
                            BackupValidationTests (every rule of spec 5.1 on a mutated sample document, the tolerated
-                           list, the rule-order case), BackupPreferencesTests (every 5.7 fallback, the two seed rows, a
+                           list, the rule-order case), BackupPreferencesTests (every 5.7 fallback, now nine keys since
+                           m5-live-activity's liveActivityEnabled, the two seed rows, a
                            wrong-typed field, a non-object preferences), BackupCountsTests (BackupDocument.counts: a
-                           finished log counts as a workout, an unfinished one does not)
+                           finished log counts as a workout, an unfinished one does not),
+                           RestActivityPlanTests(+Gap) (spec 5.1's rows as decide(...)'s total end-or-request-or-
+                           update-or-nothing rule, stranded(...)'s cleanup, rowState(...)'s on/off/denied; the gap suite
+                           adds a clock moved back, foreign-plus-changed in both orders, a start-only content change),
+                           RestTimerNextTests(+Gap) (next(exercises:state:)'s "Next:" name with no time gate, over every
+                           WorkoutState including a swapped exercise and an index one past the end), RestActivityKeyTests
+                           (RestActivityKey/RestStrandedKey equality, the .task(id:) keys both the workout screen and the
+                           root host use), BackupLiveActivityKeyTests(+RoundTrip) (the ninth preference's own fallback,
+                           round-tripped through the whole-file codec: missing, wrong-typed, absent beside the other
+                           eight, a pre-slice eight-key file)
   Persistence/             ModelRoundTrip, ProgramStore, ProgramStart, ProgramStartMidWeek, WorkoutLogStore,
                            WorkoutLogStoreSets, RoutingPredicate, ExerciseNoteStore, StatusInvariant, CascadeDelete,
                            HomeSnapshotBuilder, ProgramTabSnapshot (seed rows → ProgramTabStats, no validating step),
@@ -311,7 +407,11 @@ HomeGymLogTests/           Swift Testing target
                            SettingsText, ReminderText (every fixed string; the subtitle time in en_US and
                            en_GB against TestCalendar, host-independent; U+202F/U+00A0 normalised before comparing),
                            BackupText (every backup string verbatim, fileName's wall-clock day including the DST days,
-                           confirmMessage rows 1–3 plus singulars, all twelve readFailedMessage cases) suites
+                           confirmMessage rows 1–3 plus singulars, all twelve readFailedMessage cases),
+                           RestActivityContentStateTests(+Gap) (ContentState.interval's clamp when end < start, equal
+                           instants, a 1 ms rest), RestActivityTextTests (RestText's aliases equal RestActivityText's own
+                           literals, not each other — a tautology guard, S7; nextLine(_:) matches the card's old
+                           "Next: " + text) suites
   Seed/                    DebugSeed, MidProgramSeed, RestDaySeed, FreshProgramSeed, SeedHomeStats
                            (seed → Home numbers end to end), DebugProgramSelection(+Edge), WorkoutSeed(+Edge),
                            SummaryDoneHomeStats (Done on `summary` → Home numbers), RestSeedFlow (rest card actions on
@@ -329,19 +429,30 @@ HomeGymLogTests/           Swift Testing target
                            DebugFeedbackPreferencesTests(+Edge) (the -haptics/-sound parser: AC-18's six rows, a
                            repeated argument keeps its first occurrence, unknownValue's argument/value),
                            BackupSeedTests (the three backup-* seeds carry midProgram's rows, map only themselves to a
-                           BackupPreview case, and the backup-confirm document matches spec 5.2 row 1 at the frozen clock)
+                           BackupPreview case, and the backup-confirm document matches spec 5.2 row 1 at the frozen clock),
+                           DebugLiveActivityTests (-liveActivity on|off parse, makeContainer(calendar:now:) rebuilding
+                           wo-rest's rest instants around an arbitrary now), LiveActivitySeedTests (activity-denied parses,
+                           carries midProgram's rows, reports Live Activities off; every other seed reports them on),
+                           RestActivitySeedFlowTests (the workout screen's key inputs → RestActivityPlan.decide across
+                           every workout seed, including a stale rest deciding nothing), RestActivityHandlerTests(+Shown,
+                           +FailedSave, +Rollback) (RestActivityHandler.perform over wo-rest: +30s/Skip write → re-sync →
+                           activity + notifier events sharing one event log; Shown covers foreign/duplicate activities
+                           already up; FailedSave and Rollback are the allowsSave: false suites, first read a
+                           same-context fetch by id, rollback() before the store file is deleted)
                            suites (Debug only)
-  Static/                  source scans: ClockUsageTests (Date() / Calendar.current only in App/AppClock.swift),
+  Static/                  source scans: ClockUsageTests (Date() / Calendar.current only in App/AppClock.swift;
+                           since m5-live-activity also scans HomeGymLogShared/ by the same rule, NB9),
                            SchemaSourceTests (rpeSkipped keeps its default, rest instants stay optional),
                            SeedNameScanTests (workout, missed-day, settings and reminder seed names — including
                            settings-restart, restarted, -holdBanner, reminder-on, reminder-denied, reminder-unasked,
-                           -haptics, -sound —
+                           -haptics, -sound, activity-denied, -liveActivity —
                            only in App/DebugSeed/; no workoutAdjustPreview left;
                            settingsRestartPreview and missedBannerHold declared nil-by-default on one @Entry line each
                            in AppClock.swift and provided once each, outside #if DEBUG, in HomeGymLogApp.swift),
                            RestNotifierSourceTests (.silent() on exactly two lines of HomeGymLogApp.swift, one naming
                            restNotifier and one restChime, both inside the seed branch;
-                           .live() only as each @Entry default), StoreCommitSourceTests (ModelContext( in Models/ only in
+                           .live() on a line naming the rest notifier now appears twice since m5-live-activity — the
+                           @Entry default and the intent hook's handler installation, both allowed), StoreCommitSourceTests (ModelContext( in Models/ only in
                            StoreCommit.swift; the note store rehearses after its update branch),
                            FailedSavePolicySourceTests (rollback() only in StoreCommit; commitInsert only in the two
                            insert writers; ProgramStore's shift and skipMissed call StoreCommit.commit),
@@ -355,15 +466,18 @@ HomeGymLogTests/           Swift Testing target
                            Engine/AppearanceMode.swift since m5-export B1 moved the type there; @AppStorage(AppearanceMode.storageKey) in exactly
                            RootView.swift and SettingsView.swift; preferredColorScheme nowhere; overrideUserInterfaceStyle
                            and import UIKit only in RootView.swift; no PlaceholderScreen or placeholderMilestone; no
-                           FetchDescriptor in RootView.swift; UIApplication. named only by RootView.swift and
-                           ReminderPermission.swift, NB3), SettingsScreenSourceTests (Features/Settings/'s eight files
-                           scanned since m5-export added BackupFile.swift, BackupImportAction.swift and BackupRows.swift,
+                           FetchDescriptor in RootView.swift; UIApplication. named only by RootView.swift,
+                           ReminderPermission.swift and (since m5-live-activity) RestActivityCenter.swift, NB3),
+                           SettingsScreenSourceTests (Features/Settings/'s nine files
+                           scanned since m5-live-activity added LiveActivityRows.swift (m5-export already added
+                           BackupFile.swift, BackupImportAction.swift and BackupRows.swift),
                            row order matches spec 2.1-2.4 plus the reminder rows' line order (toggle, one
-                           divider, the second row) and the BACKUP card's line order, every visible string comes from
-                           SettingsText, ReminderText or BackupText, dividerCount is 9 since the BACKUP card's divider;
-                           the Haptics and Sound rows are the two live SettingsToggleRow( lines (not the last in the
-                           card any more, now that BACKUP follows), no
-                           .disabled(, no SettingsComingSoonRow left), ReminderRows reads no
+                           divider, the second row), LiveActivityRows( after Sound, and the BACKUP card's line order,
+                           every visible string comes from
+                           SettingsText, ReminderText or BackupText, dividerCount is 10 since the Lock Screen timer
+                           row's own divider;
+                           the Haptics and Sound rows are the two live SettingsToggleRow( lines, no
+                           .disabled(, no SettingsComingSoonRow left), ReminderRows and LiveActivityRows read no
                            @AppStorage/store/clock, the screen's one write goes through RestartAction),
                            ReminderSourceTests (seeded runs and previews never reach the system notification center
                            through the reminder notifier; the reconcile host's shape — .background, ReminderHost(,
@@ -382,11 +496,19 @@ HomeGymLogTests/           Swift Testing target
                            via a loud `#require` parser reading `Assets.xcassets` from the source tree; the AA floors
                            and three recorded shortfalls of spec 2.4/5.3; Theme ↔ colorset names; the hard-coded color
                            sites as sorted path lists), BackupSourceTests (Engine/Backup/ imports only Foundation, no
-                           .iso8601 anywhere, one sorted encoder line, no preference-key literal under Engine/Backup/;
+                           .iso8601 anywhere, one sorted encoder line, no preference-key literal under Engine/Backup/ —
+                           now nine keys including liveActivityEnabled since m5-live-activity;
                            no delete(model:) anywhere; replaceAll/replaceInScratch bodies carry no await or rollback(;
                            RootView.swift's restore handler reads no @Query between the replaceAll( call and the next
                            restore = .idle line, B3's handler rule; Engine/AppearanceMode.swift has no import UIKit and
-                           no label, B1)
+                           no label, B1), LiveActivityProjectTests (project.pbxproj: the HomeGymLogWidgetsExtension
+                           target's 17.0 deployment and iPhone-only family, the app's NSSupportsLiveActivities, the
+                           Info.plist membership exception, HomeGymLogShared in both synchronized groups), 
+                           LiveActivitySourceTests (what HomeGymLogShared/ may import and contain — no UIKit, no app
+                           type, @MainActor only on the two static vars; literal intent titles pinned to
+                           RestActivityText), WidgetSourceTests (HomeGymLogWidgets/: its colorset copies byte-equal to
+                           the app's; Button(intent:) only on the Lock Screen view and the island's bottom region; no
+                           alertConfiguration, no widgetURL, no hard-coded string outside RestActivityText)
 design/                    prototype export (read-only reference)
 docs/specs, docs/plans     specs from spec-creator, plans from implementation-planner (dated status when done)
 docs/tools                 make-rest-chime.py: generates HomeGymLog/rest-over.caf (880 Hz, 0.2 s, IMA4 CAF via

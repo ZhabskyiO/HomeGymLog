@@ -32,7 +32,10 @@ multiple-choice question when the slicing is not obvious.
    state which seed shows which screen), and require screenshot-based acceptance criteria that
    `/design-compare` can check. Read the spec. Present its open questions to the user as multiple-choice
    questions with a recommended default, batched. Fold answers into the spec and record decisions in
-   `insights/INSIGHTS.md`.
+   `insights/INSIGHTS.md`. When the researcher's findings change the product options (a feature's cost, an
+   unverifiable path, a platform limit), ask the user's product questions **before** launching `spec-creator`, with
+   the researcher's facts as the option descriptions, so the spec is written once (m5-live-activity: buttons vs
+   tap-to-open, a Settings switch, colorset copies were settled this way and the spec needed only the review's edits).
 5. Launch `architecture-reviewer` on the spec. It writes its review to `docs/reviews/<slug>-architecture.md` (pass the path) and returns a summary.
    If the verdict is rework, fix the spec (resume the same `spec-creator` agent with SendMessage so it
    keeps context) and re-run once. Surface anything blocking to the user. If the review marks platform claims as

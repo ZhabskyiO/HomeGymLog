@@ -43,13 +43,20 @@ nonisolated enum RestTimer {
     static func display(restStartedAt: Date?, restEndsAt: Date?, now: Date, exercises: [WorkoutExerciseValue],
                         state: WorkoutState) -> RestDisplay? {
         guard let restStartedAt, let restEndsAt, now < restEndsAt,
-              case .logging(let exercise, let set) = state else { return nil }
+              let next = RestTimer.next(exercises: exercises, state: state) else { return nil }
+        return RestDisplay(startedAt: restStartedAt, endsAt: restEndsAt, next: next)
+    }
+
+    /// What "Next:" names for this state with no time gate (NB4): the Logging state at an exercise that exists in
+    /// `WorkoutFlow.sorted(exercises)`, else nil. `display` adds the instants and `now < restEndsAt`; the workout screen's
+    /// Live Activity key uses this alone so `body` never reads the clock.
+    static func next(exercises: [WorkoutExerciseValue], state: WorkoutState) -> RestNext? {
+        guard case .logging(let exercise, let set) = state else { return nil }
         let ordered = WorkoutFlow.sorted(exercises)
         guard ordered.indices.contains(exercise) else { return nil }
-        let next: RestNext = set == 0
+        return set == 0
             ? .firstSet(exerciseKey: ordered[exercise].exerciseKey)
             : .set(number: set + 1, of: ordered[exercise].sets.count)
-        return RestDisplay(startedAt: restStartedAt, endsAt: restEndsAt, next: next)
     }
 
     /// Spec 5.5, run only from effects (never in `body`). Announce when the end instant the screen last saw while

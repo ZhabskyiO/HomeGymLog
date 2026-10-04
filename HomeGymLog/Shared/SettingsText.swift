@@ -12,6 +12,10 @@ enum SettingsText {
     static let hapticsSubtitle = "Set logged, rest finished, workout done"
     static let sound = "Sound"
     static let soundSubtitle = "Rest finished, daily reminder"
+    /// The Live Activity switch (m5-live-activity §2.3); its denied row reuses `ReminderText.openSettings`.
+    static let lockScreenTimer = "Lock Screen timer"
+    static let lockScreenTimerSubtitle = "Rest countdown as a Live Activity"
+    static let lockScreenTimerDenied = "Live Activities are off in iOS Settings"
 
     static let programSection = "PROGRAM"
     static let current = "Current"

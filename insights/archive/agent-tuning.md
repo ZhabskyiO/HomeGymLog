@@ -5,6 +5,25 @@ Moved out of `INSIGHTS.md` on 2026-09-16 to keep session and agent reads small. 
 
 ## Agent tuning
 
+- 2026-10-03 — **doc-writer**: wrote a gotcha's GUI recipe from its own idea of Xcode ("File → New → File…") instead of
+  the sequence the brief gave (Add Files… with a non-empty folder, both targets, then Convert to Folder); the main session
+  fixed the entry. Edit: copy a GUI sequence from the brief verbatim; never reconstruct one not witnessed.
+- 2026-10-03 — **spec-creator**: strong on the hard part (the serialized hook, three source roots) but the planner found eight
+  slips: a signature with two label sets, a tautological AC (alias == source), an unclamped `start...end`, an undefined
+  `-liveActivity off`, a tuple where an `Equatable` struct was needed. Edit: a final consistency pass (one shape per
+  signature, no tautological ACs, ranges from two instants say what reversed means).
+- 2026-10-03 — **implementation-planner**: carried the researcher's unverified "File inspector → Target Membership → tick"
+  wording into the user's GUI step; Xcode 27 shows a "+" list that adds a folder reference instead. Edit: gotchas recipes
+  first, researcher GUI wording second, a pbxproj grep after each step (already there, and it is what caught every trap).
+- 2026-10-03 — **researcher** (no edit): two rounds, 358 k tokens, every binding fact survived implementation; the addendum
+  verified the in-process intent path and the stale-second-container trap, both load-bearing. It flagged the brief's
+  wrong "Swift 6 mode" and INSIGHTS' wrong "an entitlement".
+- 2026-10-03 — **implementer** (no edit): 11 steps, 101 tests, stopped correctly for the GUI steps, found the App Intents
+  metadata literal rule and the 26.5 runner hang itself and recorded both; island catch rate 2 of 8 with its revised recipe.
+- 2026-10-03 — **swift-reviewer** (no edit): "ship" with one real gap (the expanded island's leading ring ignored `isStale`),
+  which the main session applied in one line.
+- 2026-10-03 — **test-writer** (no edit): 31 gap tests in six files, none duplicating the implementer's; it named an
+  untestable path (restore writes `@AppStorage`) with the smallest extraction instead of forcing a test.
 - 2026-10-02 — **spec-creator**: m5-export's spec missed `DebugSeedTests.parses(seed:)` (new seeds with a different
   clock), which was the verifier's only blocking finding. Separately, the planner found seven spec issues, three of them
   file-ownership statements contradicting AC-19's scan counts. Edit: grep `allCases` for new seeds, and cross-check file
@@ -271,6 +290,11 @@ Moved out of `INSIGHTS.md` on 2026-09-16 to keep session and agent reads small. 
 
 ### Skill tuning
 
+- 2026-10-03 — **milestone**: the user's product questions were asked after the researcher but before `spec-creator`,
+  with the researcher's facts as option descriptions; the spec then needed only the architecture review's edits. Edit:
+  step 4 now says to do this whenever research reshapes the options.
+- 2026-10-03 — **milestone** (no edit): the user delegated the spec's open questions and the three-round cap mid-run
+  ("resolve with the recommended default, record in INSIGHTS, don't ask me"); the skill's defaults handled it.
 - 2026-09-27 — **design-compare**: step 1 now says how to get a light reference for any snapshot (the `patch_light.py`
   recipe in `docs/plans/m5-light-theme.md` Step 2, rendered into `build/proto-light/`); before, only `home-light` existed.
 - 2026-09-23 — **milestone** (no edit): the researcher returns suggested gotchas and INSIGHTS lines by design; the

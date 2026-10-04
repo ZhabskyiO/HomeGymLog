@@ -135,7 +135,7 @@ nonisolated struct BackupExerciseNote: Codable, Equatable, Sendable {
     var updatedAt: Date
 }
 
-/// The eight preferences as the app stores them (5.7), each optional and decoded leniently: a missing or wrong-typed
+/// The nine preferences as the app stores them (5.7; m5-live-activity §5.4 added `liveActivityEnabled`), each optional and decoded leniently: a missing or wrong-typed
 /// field is nil, never a reason to reject the file.
 nonisolated struct BackupPreferences: Codable, Equatable, Sendable {
     var units: String?
@@ -146,9 +146,12 @@ nonisolated struct BackupPreferences: Codable, Equatable, Sendable {
     var reminderMinutes: Int?
     var hapticsEnabled: Bool?
     var soundEnabled: Bool?
+    /// Missing in every backup written before m5-live-activity; resolves to on.
+    var liveActivityEnabled: Bool?
 
     init(units: String? = nil, bodyWeightUnits: String? = nil, appearance: String? = nil, missedDayPolicy: String? = nil,
-         reminderEnabled: Bool? = nil, reminderMinutes: Int? = nil, hapticsEnabled: Bool? = nil, soundEnabled: Bool? = nil) {
+         reminderEnabled: Bool? = nil, reminderMinutes: Int? = nil, hapticsEnabled: Bool? = nil, soundEnabled: Bool? = nil,
+         liveActivityEnabled: Bool? = nil) {
         self.units = units
         self.bodyWeightUnits = bodyWeightUnits
         self.appearance = appearance
@@ -157,10 +160,12 @@ nonisolated struct BackupPreferences: Codable, Equatable, Sendable {
         self.reminderMinutes = reminderMinutes
         self.hapticsEnabled = hapticsEnabled
         self.soundEnabled = soundEnabled
+        self.liveActivityEnabled = liveActivityEnabled
     }
 
     enum CodingKeys: CodingKey {
-        case units, bodyWeightUnits, appearance, missedDayPolicy, reminderEnabled, reminderMinutes, hapticsEnabled, soundEnabled
+        case units, bodyWeightUnits, appearance, missedDayPolicy, reminderEnabled, reminderMinutes, hapticsEnabled, soundEnabled,
+             liveActivityEnabled
     }
 
     init(from decoder: any Decoder) throws {
@@ -173,6 +178,7 @@ nonisolated struct BackupPreferences: Codable, Equatable, Sendable {
         reminderMinutes = (try? c.decodeIfPresent(Int.self, forKey: .reminderMinutes)) ?? nil
         hapticsEnabled = (try? c.decodeIfPresent(Bool.self, forKey: .hapticsEnabled)) ?? nil
         soundEnabled = (try? c.decodeIfPresent(Bool.self, forKey: .soundEnabled)) ?? nil
+        liveActivityEnabled = (try? c.decodeIfPresent(Bool.self, forKey: .liveActivityEnabled)) ?? nil
     }
 
     /// Every key resolved through its fallback (5.7), so the restore writes exactly what the file describes. Total.
@@ -185,7 +191,8 @@ nonisolated struct BackupPreferences: Codable, Equatable, Sendable {
             reminderEnabled: reminderEnabled ?? false,
             reminderMinutes: reminderMinutes.flatMap { ReminderPlan.validMinutes($0) } ?? ReminderPlan.defaultMinutes,
             hapticsEnabled: hapticsEnabled ?? FeedbackCues.defaultEnabled,
-            soundEnabled: soundEnabled ?? FeedbackCues.defaultEnabled)
+            soundEnabled: soundEnabled ?? FeedbackCues.defaultEnabled,
+            liveActivityEnabled: liveActivityEnabled ?? RestActivityPlan.defaultEnabled)
     }
 }
 
@@ -199,10 +206,12 @@ nonisolated struct ResolvedPreferences: Equatable, Sendable {
     var reminderMinutes: Int
     var hapticsEnabled: Bool
     var soundEnabled: Bool
+    var liveActivityEnabled: Bool
 
     /// 5.7's fallback column.
     static let defaults = ResolvedPreferences(units: .lb, bodyWeightUnits: .lb, appearance: .system, missedDayPolicy: .ask,
                                               reminderEnabled: false, reminderMinutes: ReminderPlan.defaultMinutes,
                                               hapticsEnabled: FeedbackCues.defaultEnabled,
-                                              soundEnabled: FeedbackCues.defaultEnabled)
+                                              soundEnabled: FeedbackCues.defaultEnabled,
+                                              liveActivityEnabled: RestActivityPlan.defaultEnabled)
 }

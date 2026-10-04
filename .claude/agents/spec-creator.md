@@ -34,6 +34,11 @@ Write the spec to `docs/specs/<milestone-or-feature>.md` with these sections:
    launch argument that opens that tab (`-tab program`), since scripted taps are not available.
 9. **Open questions.** Only things the prototype and decisions do not settle. Propose a default for each.
 
+Before returning, make one consistency pass: every type or function signature appears with one shape (if §4 names
+`makeHook(container:clock:…)`, §8 and §9 use the same labels); an AC that compares an alias to its source (`RestText.x ==
+RestActivityText.x` once aliased) is tautological, so pin literals instead; a range built from two stored instants says
+what happens when they are equal or reversed (`start...end` traps). The planner found eight such slips in m5-live-activity.
+
 Rules: every acceptance criterion must agree with the rules table it cites (cross-check each AC's numbers and states
 against that table before returning; an AC saying "Sep 9 completed" while the rules table has that session missed is the
 failure to avoid), and every worked example must be internally possible (dates relative to its own "today"). Every named

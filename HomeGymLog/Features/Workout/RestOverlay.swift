@@ -30,7 +30,7 @@ struct RestOverlay: View {
                     .accessibilityLabel(RestText.title)
                     .accessibilityValue(RestText.spoken(seconds: seconds))
                     .accessibilityAddTraits(.updatesFrequently)
-                    Text("Next: " + RestText.next(rest.next))
+                    Text(RestText.nextLine(rest.next))
                         .font(.system(size: 12.5)).foregroundStyle(Theme.mu)
                         .padding(.top, 6)
                 }

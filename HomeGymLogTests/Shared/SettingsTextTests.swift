@@ -72,4 +72,11 @@ import Testing
         #expect(SettingsText.benchDetail == "Flat · incline")
         #expect(SettingsText.marcy == "Marcy home gym")
     }
+
+    @Test("the Lock Screen timer row's strings (m5-live-activity 2.3)")
+    func lockScreenTimer() {
+        #expect(SettingsText.lockScreenTimer == "Lock Screen timer")
+        #expect(SettingsText.lockScreenTimerSubtitle == "Rest countdown as a Live Activity")
+        #expect(SettingsText.lockScreenTimerDenied == "Live Activities are off in iOS Settings")
+    }
 }

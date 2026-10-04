@@ -18,12 +18,13 @@ enum DebugFeedbackError: Error, Equatable {
 /// launch; compiled out of Release with the whole file.
 enum DebugFeedbackPreferences {
     static func parse(arguments: [String]) throws -> FeedbackSeedPreferences {
-        FeedbackSeedPreferences(haptics: try value(of: "-haptics", in: arguments),
-                                sound: try value(of: "-sound", in: arguments))
+        FeedbackSeedPreferences(haptics: try onOff("-haptics", in: arguments),
+                                sound: try onOff("-sound", in: arguments))
     }
 
-    /// nil when `argument` is absent; true / false for `on` / `off`; throws for any other value or none.
-    private static func value(of argument: String, in arguments: [String]) throws -> Bool? {
+    /// nil when `argument` is absent; true / false for `on` / `off`; throws for any other value or none. Shared with
+    /// `DebugLiveActivity` (`-liveActivity on|off`).
+    static func onOff(_ argument: String, in arguments: [String]) throws -> Bool? {
         guard let index = arguments.firstIndex(of: argument) else { return nil }
         let next = index + 1 < arguments.count ? arguments[index + 1] : ""
         switch next {

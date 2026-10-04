@@ -83,6 +83,6 @@ import Testing
         let all = try Self.sources()
         #expect(all.count > 40, "the whole app target was scanned")
         let files = Array(Set(Self.hits("UIApplication.", in: all).map(\.path))).sorted()
-        #expect(files == ["App/ReminderPermission.swift", "App/RootView.swift"])
+        #expect(files == ["App/ReminderPermission.swift", "App/RestActivityCenter.swift", "App/RootView.swift"])
     }
 }
