@@ -42,3 +42,6 @@ Package.resolved.bak
 
 # Retrospective marker (local state)
 .claude/.last-retro
+
+# Xcode 27 auto-shares a scheme for the widget extension target; only the HomeGymLog scheme is used
+HomeGymLog.xcodeproj/xcshareddata/xcschemes/HomeGymLogWidgetsExtension.xcscheme
